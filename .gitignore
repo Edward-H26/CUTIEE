@@ -25,10 +25,30 @@ htmlcov/
 .env
 .env.local
 
-# Playwright
+# Playwright + browser-automation artifacts
 test-results/
 playwright-report/
 storage_state.json
+
+# Playwright MCP plugin caches: accessibility-tree YAML + console log dumps
+# accumulate every time browser_snapshot / browser_navigate runs from this
+# repo. Pure cache, never useful after the session ends.
+.playwright-mcp/
+page-*.yml
+console-*.log
+.snapshot.yml
+
+# Manual end-to-end testing screenshots dropped at repo root by
+# chrome-devtools / playwright sessions. Curated documentation
+# screenshots in docs/ are NOT covered (they should stay tracked).
+/e2e-*.png
+/screenshot-*.png
+/snap-*.png
+
+# Per-domain storage_state cookie jars (auth secrets); defense in depth
+# even though `data/` is already broadly ignored above.
+data/storage_state.json
+data/storage_state/
 
 # OS / IDE
 .DS_Store

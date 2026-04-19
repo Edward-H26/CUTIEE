@@ -68,11 +68,31 @@ is treated as zero.
 
 Three Gemini 3.1 variants:
 
+CUTIEE defaults to **Computer Use (screenshot + pixel coordinates) for every task**
+as of 2026-04. Google extended the `ComputerUse` tool to the regular Flash family,
+so CU now runs at flash pricing.
+
+### Default — Computer Use
+
+| Model | Approx $/MT input | Approx $/MT output | Notes |
+|-------|-------------------|--------------------|-------|
+| **gemini-flash-latest** | **0.15** | **0.60** | Default. Auto-tracks Google's latest Flash. |
+| gemini-3-flash-preview | 0.15 | 0.60 | Pinned alternative. |
+| gemini-2.5-computer-use-preview-10-2025 | 1.25 | 5.00 | Specialty preview, ~8× more expensive. Opt-in only. |
+
+Override via `CUTIEE_CU_MODEL=<model-id>` in `.env`.
+
+### Opt-in DOM router (`?use_cu=0`)
+
+Faster on simple HTML forms but blind to canvas / iframes / custom JS widgets.
+Pro variants are explicitly disabled at the client level (`GeminiCloudClient.__post_init__`
+raises on any `*-pro*` id) to keep escalation cost bounded.
+
 | Tier | Model | Approx $/MT input | Approx $/MT output |
 |------|-------|-------------------|-------------------|
-| 1 | gemini-3.1-flash-lite | 0.075 | 0.30 |
-| 2 | gemini-3.1-flash | 0.15 | 0.60 |
-| 3 | gemini-3.1-pro | 1.25 | 5.00 |
+| 1 | gemini-3.1-flash-lite-preview | 0.075 | 0.30 |
+| 2 | gemini-3-flash-preview | 0.15 | 0.60 |
+| 3 | gemini-3-flash-preview | 0.15 | 0.60 |
 
 Pricing constants live in `agent/routing/models/gemini_cloud.py`. Every
 call records `usage_metadata.prompt_token_count` and
@@ -104,7 +124,7 @@ Action(
     target="#submit",                   # CSS selector or URL
     value=None,
     reasoning="click the primary CTA",
-    model_used="gemini-3.1-flash",
+    model_used="gemini-3-flash-preview",
     tier=2,
     confidence=0.91,
     risk=RiskLevel.LOW,

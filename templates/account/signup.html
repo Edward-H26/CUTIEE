@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Create an account · CUTIEE{% endblock %}
 {% block content %}
-<section style="display: grid; place-items: center; min-height: 60vh;">
-    <div class="cutiee-card" style="padding: 36px; max-width: 420px; width: 100%;">
+<section class="cutiee-auth-wrap">
+    <div class="cutiee-card cutiee-auth-card">
         <h1>Create your CUTIEE account</h1>
-        <p class="cutiee-mono" style="margin: 6px 0 var(--cutiee-space-5);">Email + password is the secondary path. Most users sign in with Google.</p>
+        <p class="cutiee-text-sm cutiee-muted cutiee-mt-1 cutiee-mb-4">Email + password is the secondary path. Most users sign in with Google.</p>
         <form method="post" action="{% url 'account_signup' %}" class="cutiee-stack-tight">
             {% csrf_token %}
             {% for field in form %}
@@ -14,9 +14,9 @@
                     {% if field.errors %}<span class="cutiee-error">{{ field.errors|join:', ' }}</span>{% endif %}
                 </label>
             {% endfor %}
-            <button type="submit" class="cta" style="width: 100%; justify-content: center; padding: 12px;" data-testid="signup-submit">Create account</button>
+            <button type="submit" class="cta cutiee-auth-submit" data-testid="signup-submit">Create account</button>
         </form>
-        <p style="text-align: center; color: var(--cutiee-text-muted); font-size: var(--cutiee-text-sm); margin-top: var(--cutiee-space-4);">
+        <p class="cutiee-text-center cutiee-text-sm cutiee-muted cutiee-mt-4">
             Already have an account? <a href="{% url 'account_login' %}">Sign in</a>
         </p>
     </div>

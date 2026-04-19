@@ -1,6 +1,6 @@
 # CUTIEE
 
-**Computer Use Token-efficient agentIc self-Evolving Engineering**
+**Computer Use agentIc-framework with Token-efficient harnEss Engineering**
 
 A Django web application that wraps a computer-use agent with three
 cost-reduction mechanisms (procedural memory replay, temporal recency
@@ -43,7 +43,7 @@ uv sync
 uv run playwright install chromium
 
 # Copy the env template and fill in values
-cp .env.cutiee.template .env
+cp .env.example .env
 # CUTIEE_ENV=local, NEO4J_*, GOOGLE_CLIENT_ID/SECRET, optional GEMINI_API_KEY
 
 # Start Neo4j (local) + the Qwen llama-server + Django (one shot)
@@ -128,12 +128,13 @@ CUTIEE/
 ├── static/css/          unified design tokens (cutiee.css)
 ├── templates/           base.html + allauth overrides
 ├── tests/               pytest unit + integration tests
-└── render.yaml          Render deployment (web + redis)
+└── render.yaml          Render deployment (single web service; progress cached in AuraDB)
 ```
 
 ## Environment variables
 
-`.env.cutiee.template` is the canonical reference. Required keys:
+`.env.example` is the canonical reference (single source of truth — replaced
+the legacy `.env.cutiee.template`). Required keys:
 
 | Key | Required when | Purpose |
 |---|---|---|
@@ -144,15 +145,19 @@ CUTIEE/
 | `QWEN_SERVER_URL` | local | Local llama-server URL |
 | `GEMINI_API_KEY` | production | Gemini 3.1 |
 | `GEMINI_MODEL_TIER1/2/3` | production | Gemini variant per tier |
-| `CUTIEE_PROGRESS_BACKEND` | production multi-worker | `redis` |
-| `REDIS_URL` | production | Render Redis URL |
+| `CUTIEE_PROGRESS_BACKEND` | production multi-worker | `memory`, `redis`, or `neo4j` (default `memory`; demo deploys use `neo4j`) |
+| `REDIS_URL` | only when `CUTIEE_PROGRESS_BACKEND=redis` | Render Redis URL |
 | `CUTIEE_CREDENTIAL_KEY` | optional | Fernet key for credential bullets |
 
 ## Deploy to Render
 
-`render.yaml` describes a two-service blueprint: a Python web service and
-a managed Redis. Push to GitHub, point Render at the repo, fill in the
-secrets marked `sync: false`, and the rest provisions automatically.
+`render.yaml` is a single-service blueprint: one Python web dyno with the
+cross-process progress cache stored on AuraDB (the database we already
+pay for) via `CUTIEE_PROGRESS_BACKEND=neo4j`. Push to GitHub, point
+Render at the repo, fill in the secrets marked `sync: false`, and the
+rest provisions automatically. To opt into a Redis-backed progress cache
+instead, set `CUTIEE_PROGRESS_BACKEND=redis`, add a managed Redis
+service block to `render.yaml`, and wire `REDIS_URL` via `fromService`.
 
 Detailed walkthrough in `docs/evaluation/production_readiness.md`.
 

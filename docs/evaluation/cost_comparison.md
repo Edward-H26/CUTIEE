@@ -2,14 +2,32 @@
 
 ## Pricing reference
 
-Approximate Gemini 3.1 pricing per million tokens, used in
-`agent/routing/models/gemini_cloud.py`:
+CUTIEE defaults to **screenshot-based Computer Use everywhere** as of
+2026-04. The default model is `gemini-flash-latest` because Google
+extended the `ComputerUse` tool to the regular Flash family at flash
+pricing, eliminating the cost penalty that previously made CU a
+"specialty" tier. The DOM router stays available as an opt-in escape
+hatch (`?use_cu=0`) for high-volume DOM-stable workflows.
+
+### Computer Use (default)
+
+| Model | Input $/MT | Output $/MT | Notes |
+|-------|------------|-------------|-------|
+| **gemini-flash-latest** | **0.15** | **0.60** | Default. Tracks Google's latest Flash. |
+| gemini-3-flash-preview | 0.15 | 0.60 | Pinned alternative for deterministic replay. |
+| gemini-2.5-computer-use-preview-10-2025 | 1.25 | 5.00 | Specialty preview, ~8× more expensive. Opt-in via `CUTIEE_CU_MODEL`. |
+
+### DOM router (opt-in via `?use_cu=0`)
+
+Pro variants are intentionally disabled at the client level (rejected by
+`GeminiCloudClient.__post_init__`) so the worst case DOM-router escalation
+stays bounded at flash pricing.
 
 | Tier | Model | Input $/MT | Output $/MT |
 |------|-------|------------|-------------|
-| 1 | gemini-3.1-flash-lite | 0.075 | 0.30 |
-| 2 | gemini-3.1-flash | 0.15 | 0.60 |
-| 3 | gemini-3.1-pro | 1.25 | 5.00 |
+| 1 | gemini-3.1-flash-lite-preview | 0.075 | 0.30 |
+| 2 | gemini-3-flash-preview | 0.15 | 0.60 |
+| 3 | gemini-3-flash-preview | 0.15 | 0.60 |
 
 Local Qwen3.5 0.8B is treated as zero marginal cost.
 

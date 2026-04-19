@@ -43,9 +43,9 @@ SCENARIOS: dict[str, Scenario] = {
 
 TIER_MODEL_PRODUCTION = {
     0: ("replay", 0.0, 0.0),
-    1: ("gemini-3.1-flash-lite", *PRICING_PER_MILLION["gemini-3.1-flash-lite"]),
-    2: ("gemini-3.1-flash", *PRICING_PER_MILLION["gemini-3.1-flash"]),
-    3: ("gemini-3.1-pro", *PRICING_PER_MILLION["gemini-3.1-pro"]),
+    1: ("gemini-3.1-flash-lite-preview", *PRICING_PER_MILLION["gemini-3.1-flash-lite-preview"]),
+    2: ("gemini-3-flash-preview", *PRICING_PER_MILLION["gemini-3-flash-preview"]),
+    3: ("gemini-3-flash-preview", *PRICING_PER_MILLION["gemini-3-flash-preview"]),
 }
 
 

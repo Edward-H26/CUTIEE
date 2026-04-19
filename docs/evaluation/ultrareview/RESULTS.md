@@ -87,4 +87,4 @@ CUTIEE_ENV=local ... DJANGO_SUPERUSER_USERNAME=review \
 CUTIEE_ENV=local ... uv run python manage.py runserver 0.0.0.0:8000
 ```
 
-Full env var block, see `.env.cutiee.template` at the repo root.
+Full env var block, see `.env.example` at the repo root.

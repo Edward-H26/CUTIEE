@@ -26,22 +26,20 @@
 
     <div class="cutiee-card">
         <h2>Cost over time</h2>
-        <canvas id="costChart" height="120" data-testid="cost-chart"></canvas>
+        <div id="costChartHost" class="cutiee-chart-host">
+            <canvas id="costChart" height="120" data-testid="cost-chart"></canvas>
+            <div id="costEmpty" class="cutiee-empty" hidden>No spend recorded in the last 14 days.</div>
+        </div>
     </div>
 
     <div class="cutiee-card">
         <h2>Tier distribution</h2>
-        <canvas id="tierChart" height="120" data-testid="tier-chart"></canvas>
+        <div id="tierChartHost" class="cutiee-chart-host">
+            <canvas id="tierChart" height="120" data-testid="tier-chart"></canvas>
+            <div id="tierEmpty" class="cutiee-empty" hidden>No tier activity yet. Run a task to populate this chart.</div>
+        </div>
     </div>
 </section>
-
-<style>
-    .cutiee-metric-grid {
-        display: grid;
-        gap: var(--cutiee-space-4);
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    }
-</style>
 
 <script>
 async function fetchJson(url) {
@@ -49,40 +47,49 @@ async function fetchJson(url) {
     return r.json();
 }
 
+function showEmpty(canvasId, emptyId) {
+    document.getElementById(canvasId).hidden = true;
+    document.getElementById(emptyId).hidden = false;
+}
+
 (async () => {
     const ts = await fetchJson("{% url 'tasks:cost_timeseries' %}");
-    const labels = ts.series.map(r => r.day);
-    const costs = ts.series.map(r => r.daily_cost);
-    new Chart(document.getElementById("costChart").getContext("2d"), {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: "Daily spend (USD)",
-                data: costs,
-                borderColor: "#6C86C0",
-                backgroundColor: "rgba(108,134,192,0.18)",
-                tension: 0.3,
-                fill: true,
-            }],
-        },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
-    });
+    if (!ts.series.length) {
+        showEmpty("costChart", "costEmpty");
+    } else {
+        new Chart(document.getElementById("costChart").getContext("2d"), {
+            type: "line",
+            data: {
+                labels: ts.series.map(r => r.day),
+                datasets: [{
+                    label: "Daily spend (USD)",
+                    data: ts.series.map(r => r.daily_cost),
+                    borderColor: "#6C86C0",
+                    backgroundColor: "rgba(108,134,192,0.18)",
+                    tension: 0.3,
+                    fill: true,
+                }],
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+        });
+    }
 
     const tier = await fetchJson("{% url 'tasks:tier_distribution' %}");
-    const tierLabels = tier.distribution.map(r => "Tier " + r.tier);
-    const tierCounts = tier.distribution.map(r => r.count);
-    new Chart(document.getElementById("tierChart").getContext("2d"), {
-        type: "doughnut",
-        data: {
-            labels: tierLabels.length ? tierLabels : ["No data"],
-            datasets: [{
-                data: tierCounts.length ? tierCounts : [1],
-                backgroundColor: ["#6C86C0", "#8B6CC0", "#cf6cc0", "#94a3b8"],
-            }],
-        },
-        options: { plugins: { legend: { position: "bottom" } } },
-    });
+    if (!tier.distribution.length) {
+        showEmpty("tierChart", "tierEmpty");
+    } else {
+        new Chart(document.getElementById("tierChart").getContext("2d"), {
+            type: "doughnut",
+            data: {
+                labels: tier.distribution.map(r => "Tier " + r.tier),
+                datasets: [{
+                    data: tier.distribution.map(r => r.count),
+                    backgroundColor: ["#6C86C0", "#8B6CC0", "#cf6cc0", "#94a3b8"],
+                }],
+            },
+            options: { plugins: { legend: { position: "bottom" } } },
+        });
+    }
 })();
 </script>
 {% endblock %}

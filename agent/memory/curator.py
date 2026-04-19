@@ -23,7 +23,7 @@ from agent.memory.reflector import (
     SEMANTIC_HINTS,
     LessonCandidate,
 )
-from apps.memory_app.bullet import Bullet, DeltaUpdate, hashContent
+from agent.memory.bullet import Bullet, DeltaUpdate, hashContent
 
 CONTENT_DEDUP_THRESHOLD = 0.90
 

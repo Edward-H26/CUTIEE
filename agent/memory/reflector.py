@@ -49,16 +49,30 @@ class HeuristicReflector:
                 continue
             if step.action.type == ActionType.FINISH:
                 continue
+            # Computer Use steps carry pixel coordinates instead of CSS selectors;
+            # capture them so the replay planner can rebuild a CU-compatible
+            # action without falling back to an unparsable target string.
+            extra = ""
+            if step.action.coordinate is not None:
+                cx, cy = step.action.coordinate
+                extra += f" coordinate=({cx},{cy})"
+            if step.action.keys:
+                extra += f" keys={','.join(step.action.keys)}"
+            if step.action.scrollDx or step.action.scrollDy:
+                extra += f" scroll=({step.action.scrollDx},{step.action.scrollDy})"
             content = (
                 f"step_index={step.index} action={step.action.type.value} "
                 f"target={step.action.target!r} "
                 f"value={(step.action.value or '')!r}"
+                f"{extra}"
             )
             tags = [topic]
             if domain:
                 tags.append(f"domain:{domain}")
             if step.action.risk.value == "high":
                 tags.append("risk:high")
+            if step.action.tier == 4:
+                tags.append("tier:cu")
             lessons.append(
                 LessonCandidate(
                     content = content,

@@ -15,8 +15,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.memory.ace_memory import ACEMemory
-from apps.memory_app import repo as memoryRepo
-from apps.memory_app.bullet import Bullet
+from agent.memory.bullet import Bullet
 
 
 def _resolveFernet() -> Any:
@@ -47,7 +46,7 @@ class SemanticCredentialStore:
             concept = label or "credential",
             is_credential = True,
         )
-        memoryRepo.upsertBullet(self.memory.userId, bullet)
+        self.memory.store.upsertBullet(self.memory.userId, bullet)
         self.memory.bullets[bullet.id] = bullet
         return bullet
 

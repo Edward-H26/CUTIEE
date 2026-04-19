@@ -3,9 +3,9 @@
 {% block content %}
 <section class="cutiee-stack">
     <div>
-        <a href="{% url 'tasks:list' %}" class="cutiee-mono">&larr; back to all tasks</a>
-        <h1 style="margin: 8px 0 4px;">{{ task.description }}</h1>
-        <div class="cutiee-row" style="font-size: var(--cutiee-text-sm); color: var(--cutiee-text-muted); gap: var(--cutiee-space-4);">
+        <a href="{% url 'tasks:list' %}" class="cutiee-back-link">&larr; back to all tasks</a>
+        <h1 class="cutiee-detail-title">{{ task.description }}</h1>
+        <div class="cutiee-detail-meta">
             <span>status: <strong>{{ task.status }}</strong></span>
             <span>runs: <strong>{{ task.run_count }}</strong></span>
             <span>spent: <strong>${{ task.total_cost_usd|floatformat:4 }}</strong></span>
@@ -17,19 +17,27 @@
         <button type="button" class="cta" data-testid="run-task"
                 hx-post="{% url 'tasks:run' task_id=task.id %}"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                hx-swap="none">Run task now</button>
-        <span class="cutiee-mono">CUTIEE will check procedural memory, replay if possible, otherwise run the full pipeline.</span>
+                hx-swap="none"
+                title="Computer Use via gemini-flash-latest (screenshot + pixel coordinates)">Run task now</button>
+        <span class="cutiee-text-sm cutiee-muted">CUTIEE checks procedural memory first; otherwise it runs the screenshot-based Computer Use pipeline.</span>
     </div>
 
     {% if executions %}
+        <div id="approval-slot"
+             hx-get="{% url 'tasks:approval_pending' execution_id=executions.0.id %}"
+             hx-trigger="load, every 1s"
+             hx-swap="outerHTML"
+             hx-target="this"></div>
+
         <div class="cutiee-card" data-testid="latest-execution">
             <h2>Latest execution · run #{{ executions.0.run_index }}</h2>
             <div id="exec-progress"
+                 class="cutiee-exec-progress"
                  hx-get="{% url 'tasks:status' execution_id=executions.0.id %}"
                  hx-trigger="load, every 2s"
-                 hx-swap="innerHTML"
-                 style="margin-top: var(--cutiee-space-3);">
-                <span class="cutiee-mono">Loading status…</span>
+                 hx-swap="outerHTML"
+                 hx-target="this">
+                <span class="cutiee-text-sm cutiee-muted">Loading status…</span>
             </div>
         </div>
 
@@ -41,8 +49,9 @@
                         <th>Action</th>
                         <th>Target</th>
                         <th>Tier</th>
-                        <th style="text-align: right;">Cost</th>
+                        <th class="cutiee-text-right">Cost</th>
                         <th>OK</th>
+                        <th>View</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -52,17 +61,18 @@
                         <td>{{ step.action_type }}</td>
                         <td class="mono">{{ step.target|truncatechars:60 }}</td>
                         <td>T{{ step.tier }} ({{ step.model|default:"-" }})</td>
-                        <td class="mono" style="text-align: right;">${{ step.cost_usd|floatformat:4 }}</td>
+                        <td class="mono cutiee-text-right">${{ step.cost_usd|floatformat:4 }}</td>
                         <td>{% if step.verification_ok %}<span class="cutiee-pill cutiee-pill--success">ok</span>{% else %}<span class="cutiee-pill cutiee-pill--danger">fail</span>{% endif %}</td>
+                        <td>{% if step.tier == 4 %}<a href="{% url 'tasks:step_screenshot' execution_id=executions.0.id step_index=step.index %}" target="_blank" rel="noreferrer" class="cutiee-text-sm">screenshot</a>{% else %}<span class="cutiee-text-sm cutiee-muted">-</span>{% endif %}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="6" class="cutiee-mono">No steps recorded yet.</td></tr>
+                    <tr><td colspan="7" class="cutiee-text-sm cutiee-muted">No steps recorded yet.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     {% else %}
-        <div class="cutiee-card"><p class="cutiee-mono" style="margin: 0;">This task has not been run yet. Click "Run task now" to start.</p></div>
+        <div class="cutiee-card"><p class="cutiee-text-sm cutiee-muted cutiee-m-0">This task has not been run yet. Click "Run task now" to start.</p></div>
     {% endif %}
 </section>
 {% endblock %}

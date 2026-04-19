@@ -1,38 +1,70 @@
-"""Bridge between Django views and the agent harness.
+"""Bridge between Django views and the Computer Use agent runner.
 
-`runTaskForUser` is the function the API endpoint calls. It composes the
-right orchestrator (router + memory + pruner + safety gate) for the active
-`CUTIEE_ENV`, runs the task synchronously inside a thread, and persists the
-resulting state back to Neo4j. Thread execution keeps Django's WSGI stack
-unaware of the agent's asyncio event loop.
+`runTaskForUser` is the function the API endpoint calls. CUTIEE runs every
+task through `ComputerUseRunner` (screenshot + pixel coordinates via
+gemini-flash-latest by default). The DOM-router stack was removed once
+Gemini Flash gained the ComputerUse tool at flash pricing.
 
-The function returns a small `TaskRunSummary` so callers can render the
-HTMX progress block without re-querying Neo4j.
+Wiring lives in `runner_factory.py`; this module owns the run-and-persist
+sequence plus the live-progress publish path. The agent runs in a
+background thread so Django's WSGI stack stays unaware of the asyncio
+event loop the runner spawns.
 """
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+import threading
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from agent.browser.controller import BrowserController, StubBrowserController
-from agent.harness.orchestrator import (
-    Orchestrator,
-    buildLiveOrchestrator,
-    buildPhase1Orchestrator,
-)
-from agent.harness.state import Action, ActionType, AgentState
-from agent.memory.ace_memory import ACEMemory
-from agent.memory.pipeline import ACEPipeline
-from agent.memory.replay import ReplayPlanner
-from agent.pruning.context_window import RecencyPruner
-from agent.routing.factory import buildMockRouter, buildRouter
-from agent.routing.models.mock import MockVLMClient
-from agent.safety.approval_gate import ApprovalGate
-from apps.audit.repo import appendAudit
+from agent.harness.state import AgentState, ObservationStep
+from apps.audit.screenshot_store import Neo4jScreenshotStore
 from apps.memory_app.repo import upsertTemplate
 from apps.tasks import progress_backend, repo as tasksRepo
+from apps.tasks.runner_factory import buildLiveCuRunnerForUser, buildMockCuRunner
+
+_SCREENSHOT_STORE: Neo4jScreenshotStore | None = None
+_SCREENSHOT_STORE_LOCK = threading.Lock()
+_logger = logging.getLogger("cutiee")
+
+
+def _screenshotStore() -> Neo4jScreenshotStore:
+    """Thread-safe lazy singleton for the Neo4j screenshot store.
+
+    The agent runs in a background thread; the Django request thread
+    also touches this for the screenshot-serving view. Without the lock,
+    two simultaneous first-touches would race and instantiate two
+    stores (and two driver pools).
+    """
+    global _SCREENSHOT_STORE
+    if _SCREENSHOT_STORE is not None:
+        return _SCREENSHOT_STORE
+    with _SCREENSHOT_STORE_LOCK:
+        if _SCREENSHOT_STORE is None:
+            _SCREENSHOT_STORE = Neo4jScreenshotStore()
+    return _SCREENSHOT_STORE
+
+
+def persistScreenshot(executionId: str, stepIndex: int, pngBytes: bytes) -> None:
+    try:
+        _screenshotStore().save(executionId, stepIndex, pngBytes)
+    except Exception:  # noqa: BLE001 - persistence is best-effort, run continues
+        _logger.warning(
+            "Failed to persist CU screenshot for %s step %s", executionId, stepIndex,
+            exc_info = True,
+        )
+
+
+# Browser policy:
+#
+# Render's web tier ships without `playwright install chromium`, so the
+# default for the demo deploy is the stub browser. Real-browser deploys
+# (worker dynos with Playwright installed, or local laptops with chromium)
+# must opt in by setting CUTIEE_USE_STUB_BROWSER=0.
+USE_STUB_BROWSER = os.environ.get("CUTIEE_USE_STUB_BROWSER", "true").lower() not in {"0", "false", "no"}
 
 
 @dataclass
@@ -54,7 +86,16 @@ def runTaskForUser(
     description: str,
     initialUrl: str = "",
     useMockAgent: bool | None = None,
+    useComputerUse: bool | None = None,  # accepted for back-compat; CU is the only mode
 ) -> TaskRunSummary:
+    """Drive one task to completion through the Computer Use runner.
+
+    `useComputerUse` is accepted for back-compatibility with the API
+    layer but is now ignored — there is only one runner. `useMockAgent`
+    forces the scripted MockComputerUseClient (used for tests / when
+    CUTIEE_ENV is unset for demo mode).
+    """
+    del useComputerUse  # reserved; previously selected DOM vs CU
     state = asyncio.run(
         _runTaskAsync(
             userId = userId,
@@ -64,16 +105,18 @@ def runTaskForUser(
             useMockAgent = useMockAgent,
         )
     )
-    tasksRepo.persistAgentState(userId = userId, taskId = taskId, state = state)
+
+    # Template first, so the execution row can carry the templateId immediately.
     if state.replayed and state.templateId is None and state.history:
-        templateId = upsertTemplate(
+        state.templateId = upsertTemplate(
             userId = userId,
             description = description,
             domain = _domainFromUrl(initialUrl),
             embedding = None,
             actions = [step.action.asDict() if step.action else {} for step in state.history],
         )
-        state.templateId = templateId
+
+    tasksRepo.persistAgentState(userId = userId, taskId = taskId, state = state)
 
     summary = _summarize(state)
     _publishProgress(state.executionId, summary, finished = True)
@@ -89,70 +132,32 @@ async def _runTaskAsync(
     useMockAgent: bool | None,
 ) -> AgentState:
     cutieeEnv = os.environ.get("CUTIEE_ENV", "")
-    forceMock = useMockAgent if useMockAgent is not None else cutieeEnv not in {"local", "production"}
+    forceMock = useMockAgent if useMockAgent is not None else cutieeEnv != "production"
+
+    executionId = str(uuid.uuid4())
 
     if forceMock:
-        orchestrator = _buildMockOrchestrator(initialUrl = initialUrl)
+        runner = buildMockCuRunner(initialUrl = initialUrl)
     else:
-        orchestrator = _buildLiveOrchestratorForUser(userId = userId, initialUrl = initialUrl)
+        runner = buildLiveCuRunnerForUser(
+            userId = str(userId),
+            initialUrl = initialUrl,
+            executionId = executionId,
+            onProgress = _progressCallback,
+            screenshotSink = persistScreenshot,
+            useStubBrowser = USE_STUB_BROWSER,
+        )
 
-    return await orchestrator.runTask(
+    return await runner.run(
         userId = str(userId),
         taskId = taskId,
         taskDescription = description,
+        executionId = executionId,
     )
 
 
-def _buildMockOrchestrator(*, initialUrl: str) -> Orchestrator:
-    mockClient = MockVLMClient(
-        label = "mock-demo",
-        actionsToReturn = [
-            Action(type = ActionType.NAVIGATE, target = initialUrl or "about:blank", reasoning = "open initial url"),
-            Action(type = ActionType.CLICK, target = "button[type='submit']", reasoning = "click primary"),
-            Action(type = ActionType.FINISH, reasoning = "demo complete"),
-        ],
-        fixedConfidence = 0.9,
-        fixedCostUsd = 0.0,
-    )
-    return buildPhase1Orchestrator(vlmClient = mockClient, initialUrl = initialUrl, maxSteps = 6)
-
-
-def _buildLiveOrchestratorForUser(*, userId: str, initialUrl: str) -> Orchestrator:
-    memory = ACEMemory(userId = str(userId))
-    memory.loadFromStore()
-    pipeline = ACEPipeline(memory = memory)
-    replayPlanner = ReplayPlanner(pipeline = pipeline)
-    pruner = RecencyPruner()
-
-    try:
-        router = buildRouter()
-    except RuntimeError:
-        router = buildMockRouter()
-
-    browser: Any
-    try:
-        browser = BrowserController(headless = True)
-    except Exception:
-        browser = StubBrowserController()
-
-    orchestrator = buildLiveOrchestrator(
-        browser = browser,
-        router = router,
-        memory = pipeline,
-        pruner = pruner,
-        approvalGate = ApprovalGate(),
-        onProgress = _makeProgressCallback(),
-        auditSink = lambda payload: appendAudit(payload),
-        initialUrl = initialUrl,
-    )
-    orchestrator.deps.replayPlanner = replayPlanner
-    return orchestrator
-
-
-def _makeProgressCallback():
-    def _cb(state, step):
-        _publishProgress(state.executionId, _summarize(state, latestStep = step), finished = False)
-    return _cb
+def _progressCallback(state: AgentState, step: ObservationStep) -> None:
+    _publishProgress(state.executionId, _summarize(state, latestStep = step), finished = False)
 
 
 def _publishProgress(executionId: str, summary: TaskRunSummary, *, finished: bool) -> None:
@@ -173,7 +178,7 @@ def fetchProgress(executionId: str) -> dict[str, Any] | None:
     return progress_backend.fetchProgress(executionId)
 
 
-def _summarize(state: AgentState, *, latestStep = None) -> TaskRunSummary:
+def _summarize(state: AgentState, *, latestStep: ObservationStep | None = None) -> TaskRunSummary:
     tierUsage: dict[int, int] = {}
     for step in state.history:
         if step.action is None:

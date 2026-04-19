@@ -15,15 +15,25 @@ from typing import Any
 
 
 class ActionType(str, enum.Enum):
-    CLICK = "click"
-    FILL = "fill"
+    # Browser-shell actions the runner emits directly.
     NAVIGATE = "navigate"
-    SELECT = "select"
-    SCROLL = "scroll"
-    PRESS = "press"
     WAIT = "wait"
     FINISH = "finish"
     APPROVE = "approve"
+    # Pixel-coordinate actions returned by the Gemini Computer Use tool.
+    CLICK_AT = "click_at"
+    TYPE_AT = "type_at"
+    KEY_COMBO = "key_combo"
+    SCROLL_AT = "scroll_at"
+    OPEN_BROWSER = "open_browser"
+    # Legacy CSS-selector actions, retained for procedural-memory replay
+    # of pre-CU runs. Not emitted by any current model; the runner ignores
+    # them and they would fail at execute() time on a real browser.
+    CLICK = "click"
+    FILL = "fill"
+    SELECT = "select"
+    SCROLL = "scroll"
+    PRESS = "press"
 
 
 class RiskLevel(str, enum.Enum):
@@ -45,6 +55,12 @@ class Action:
     risk: RiskLevel = RiskLevel.SAFE
     cost_usd: float = 0.0
     requires_approval: bool = False
+    # Pixel-coordinate fields used by the Computer Use tier. Optional so the
+    # JSON-action tiers can stay unchanged.
+    coordinate: tuple[int, int] | None = None
+    keys: list[str] | None = None
+    scrollDx: int = 0
+    scrollDy: int = 0
 
     def isFinish(self) -> bool:
         return self.type == ActionType.FINISH
@@ -60,6 +76,10 @@ class Action:
             "confidence": self.confidence,
             "risk": self.risk.value,
             "cost_usd": self.cost_usd,
+            "coordinate": list(self.coordinate) if self.coordinate else None,
+            "keys": self.keys,
+            "scrollDx": self.scrollDx,
+            "scrollDy": self.scrollDy,
         }
 
 

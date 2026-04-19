@@ -4,7 +4,7 @@
 <section class="cutiee-stack">
     <div>
         <h1>Audit log</h1>
-        <p class="cutiee-mono" style="margin-top: 6px;">Every agent action is written to an immutable :AuditEntry node with model, tier, cost, risk, and approval status. Showing {{ entries|length }} of {{ total }} entries.</p>
+        <p class="cutiee-text-sm cutiee-muted cutiee-mt-1">Every agent action is written to an immutable :AuditEntry node with model, tier, cost, risk, and approval status. Showing {{ entries|length }} of {{ total }} entries.</p>
     </div>
 
     {% if entries %}
@@ -17,7 +17,7 @@
                         <th>Target</th>
                         <th>Model</th>
                         <th>Tier</th>
-                        <th style="text-align: right;">Cost</th>
+                        <th class="cutiee-text-right">Cost</th>
                         <th>Risk</th>
                         <th>Status</th>
                     </tr>
@@ -30,7 +30,7 @@
                         <td class="mono">{{ e.target|truncatechars:50 }}</td>
                         <td class="mono">{{ e.model|default:"-" }}</td>
                         <td>T{{ e.tier }}</td>
-                        <td class="mono" style="text-align: right;">${{ e.cost_usd|floatformat:4 }}</td>
+                        <td class="mono cutiee-text-right">${{ e.cost_usd|floatformat:4 }}</td>
                         <td>
                             {% if e.risk == 'high' %}<span class="cutiee-pill cutiee-pill--danger">high</span>
                             {% elif e.risk == 'medium' %}<span class="cutiee-pill cutiee-pill--warning">medium</span>
@@ -42,17 +42,16 @@
                 </tbody>
             </table>
         </div>
-
     {% else %}
         {% if total %}
-            <div class="cutiee-card"><p class="cutiee-mono" style="margin: 0;">No entries on this page. Use the controls below to navigate back.</p></div>
+            <div class="cutiee-card"><p class="cutiee-text-sm cutiee-muted cutiee-m-0">No entries on this page. Use the controls below to navigate back.</p></div>
         {% else %}
-            <div class="cutiee-card"><p class="cutiee-mono" style="margin: 0;">No audit entries yet.</p></div>
+            <div class="cutiee-card"><p class="cutiee-text-sm cutiee-muted cutiee-m-0">No audit entries yet.</p></div>
         {% endif %}
     {% endif %}
 
     {% if max_page > 1 %}
-    <nav class="cutiee-row" style="justify-content: center; gap: var(--cutiee-space-3);">
+    <nav class="cutiee-row cutiee-row--center">
         {% if page > 1 %}<a href="?page={{ page|add:'-1' }}" class="cutiee-btn-ghost cutiee-btn-sm">← Prev</a>{% endif %}
         <span class="cutiee-mono">page {{ page }} / {{ max_page }}</span>
         {% if has_more %}<a href="?page={{ page|add:'1' }}" class="cutiee-btn-ghost cutiee-btn-sm">Next →</a>{% endif %}

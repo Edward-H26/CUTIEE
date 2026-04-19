@@ -24,10 +24,13 @@ full-context prompt), where the model produced a coherent action plan.
 The audit log captured all three calls; the per-step cost rolled up
 across escalations.
 
-In production this maps directly to escalating from `gemini-3.1-flash-lite`
-to `gemini-3.1-flash` and finally to `gemini-3.1-pro`. The expected cost
-delta on the production stack is around $0.02 for the single slide
-reorder step.
+In production this maps directly to escalating from
+`gemini-3.1-flash-lite-preview` to `gemini-3-flash-preview` (and a
+second flash call at tier 3, since pro is disabled). The expected cost
+delta on the production stack is around $0.005 for the single slide
+reorder step. For canvas-heavy targets the strategy module routes the
+whole task to the Tier-4 Computer Use path up-front instead of
+escalating mid-run.
 
 ## Case C: Google session expired mid-task
 

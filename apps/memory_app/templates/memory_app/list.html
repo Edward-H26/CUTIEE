@@ -5,7 +5,7 @@
     <div class="cutiee-row-between">
         <div>
             <h1>Procedural memory</h1>
-            <p class="cutiee-mono" style="margin-top: 6px;">
+            <p class="cutiee-text-sm cutiee-muted cutiee-mt-1">
                 {{ stats.bullet_count }} bullets · {{ stats.template_count }} templates · {{ stats.total_helpful }} helpful · {{ stats.total_harmful }} harmful
             </p>
         </div>
@@ -14,13 +14,13 @@
 
     {% if templates %}
     <section>
-        <h2 style="margin-bottom: var(--cutiee-space-3);">Procedural templates</h2>
+        <h2 class="cutiee-mb-3">Procedural templates</h2>
         <div class="cutiee-stack-tight">
             {% for tpl in templates %}
                 <div class="cutiee-card cutiee-card-tight cutiee-row-between" data-testid="template-card">
                     <div>
-                        <div style="font-weight: 600;">{{ tpl.description|truncatechars:90 }}</div>
-                        <div class="cutiee-mono">domain: {{ tpl.domain|default:"-" }} · {{ tpl.actions|length }} action(s) · success: {{ tpl.success_count }}</div>
+                        <div class="cutiee-bold">{{ tpl.description|truncatechars:90 }}</div>
+                        <div class="cutiee-text-sm cutiee-muted">domain: {{ tpl.domain|default:"-" }} · {{ tpl.actions|length }} action(s) · success: {{ tpl.success_count }}</div>
                     </div>
                     <form method="post" action="{% url 'memory_app:mark_stale' template_id=tpl.id %}">
                         {% csrf_token %}
@@ -33,7 +33,7 @@
     {% endif %}
 
     <section>
-        <h2 style="margin-bottom: var(--cutiee-space-3);">ACE bullets</h2>
+        <h2 class="cutiee-mb-3">ACE bullets</h2>
         {% if bullets %}
             <div class="cutiee-stack-tight">
             {% for b in bullets %}
@@ -42,16 +42,16 @@
                         <span class="cutiee-pill">{{ b.memory_type }}</span>
                         <span class="cutiee-mono">{{ b.id|truncatechars:14 }}</span>
                     </div>
-                    <p style="margin: 12px 0 8px; font-size: var(--cutiee-text-md); line-height: 1.5;">{{ b.content }}</p>
-                    <div class="cutiee-row" style="gap: var(--cutiee-space-4); font-family: var(--cutiee-font-mono); font-size: var(--cutiee-text-sm); color: var(--cutiee-text-muted);">
-                        <span>semantic: <strong style="color: var(--cutiee-text);">{{ b.semantic_strength|floatformat:2 }}</strong></span>
-                        <span>episodic: <strong style="color: var(--cutiee-text);">{{ b.episodic_strength|floatformat:2 }}</strong></span>
-                        <span>procedural: <strong style="color: var(--cutiee-text);">{{ b.procedural_strength|floatformat:2 }}</strong></span>
-                        <span>helpful: <strong style="color: var(--cutiee-text);">{{ b.helpful_count }}</strong></span>
-                        <span>harmful: <strong style="color: var(--cutiee-text);">{{ b.harmful_count }}</strong></span>
+                    <p class="cutiee-bullet-content">{{ b.content }}</p>
+                    <div class="cutiee-bullet-strength">
+                        <span>semantic: <strong class="cutiee-strong">{{ b.semantic_strength|floatformat:2 }}</strong></span>
+                        <span>episodic: <strong class="cutiee-strong">{{ b.episodic_strength|floatformat:2 }}</strong></span>
+                        <span>procedural: <strong class="cutiee-strong">{{ b.procedural_strength|floatformat:2 }}</strong></span>
+                        <span>helpful: <strong class="cutiee-strong">{{ b.helpful_count }}</strong></span>
+                        <span>harmful: <strong class="cutiee-strong">{{ b.harmful_count }}</strong></span>
                     </div>
                     {% if b.tags %}
-                        <div class="cutiee-row" style="margin-top: var(--cutiee-space-3); gap: 6px;">
+                        <div class="cutiee-row cutiee-row--gap-2 cutiee-mt-3">
                             {% for t in b.tags %}<span class="cutiee-tag">{{ t }}</span>{% endfor %}
                         </div>
                     {% endif %}
@@ -59,7 +59,7 @@
             {% endfor %}
             </div>
         {% else %}
-            <div class="cutiee-card"><p class="cutiee-mono" style="margin: 0;">No bullets yet. Run a task to see them appear here.</p></div>
+            <div class="cutiee-card"><p class="cutiee-text-sm cutiee-muted cutiee-m-0">No bullets yet. Run a task to see them appear here.</p></div>
         {% endif %}
     </section>
 </section>

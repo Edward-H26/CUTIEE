@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}CUTIEE — Computer Use Token-efficient agentIc self-Evolving Engineering{% endblock %}
+{% block title %}CUTIEE — Computer Use agentIc-framework with Token-efficient harnEss Engineering{% endblock %}
 {% block content %}
 <section class="cutiee-hero">
     <span class="cutiee-pill cutiee-pill--success cutiee-hero__badge">
@@ -53,65 +53,4 @@
 <footer class="cutiee-footer">
     &copy; 2026 CUTIEE · INFO490 Final Project · University of Illinois
 </footer>
-
-<style>
-    .cutiee-hero {
-        padding: var(--cutiee-space-8) 0 var(--cutiee-space-7);
-        max-width: 960px;
-        margin: 0 auto;
-    }
-    .cutiee-hero__badge { font-size: var(--cutiee-text-base); padding: 6px 14px; }
-    .cutiee-hero__dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #22c55e;
-        animation: cutiee-pulse 1.6s ease-in-out infinite;
-    }
-    .cutiee-hero__heading {
-        font-size: var(--cutiee-text-4xl);
-        line-height: 1.05;
-        letter-spacing: -2px;
-        margin: var(--cutiee-space-5) 0 var(--cutiee-space-4);
-        font-weight: 800;
-        font-family: var(--cutiee-font-display);
-    }
-    .cutiee-hero__subtitle {
-        font-size: var(--cutiee-text-lg);
-        line-height: 1.6;
-        color: var(--cutiee-text-muted);
-        max-width: 680px;
-        margin-bottom: var(--cutiee-space-6);
-    }
-    .cutiee-hero__cta { display: flex; gap: var(--cutiee-space-3); flex-wrap: wrap; }
-
-    .cutiee-feature-grid {
-        padding: var(--cutiee-space-7) 0;
-        display: grid;
-        gap: var(--cutiee-space-4);
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    }
-
-    .cutiee-cost-strip {
-        padding: var(--cutiee-space-5) 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: var(--cutiee-space-5);
-        font-size: var(--cutiee-text-md);
-        color: var(--cutiee-text-muted);
-        flex-wrap: wrap;
-    }
-    .cutiee-cost-strip strong { color: var(--cutiee-text); font-weight: 700; }
-    .cutiee-cost-strip__sep { opacity: 0.6; }
-
-    .cutiee-footer { padding: var(--cutiee-space-6) 0; text-align: center; color: var(--cutiee-text-muted); font-size: var(--cutiee-text-sm); }
-
-    @media (max-width: 640px) {
-        .cutiee-hero { padding: var(--cutiee-space-7) 0 var(--cutiee-space-5); }
-        .cutiee-hero__heading { font-size: 40px; letter-spacing: -1.5px; }
-        .cutiee-hero__cta { flex-direction: column; }
-        .cutiee-cost-strip { flex-direction: column; gap: var(--cutiee-space-2); }
-    }
-</style>
 {% endblock %}

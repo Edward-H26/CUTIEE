@@ -40,8 +40,18 @@ def _safe_env_float(name: str, default: float) -> float:
     return parsed if parsed >= 0.0 else default
 
 
+_ENV_ALIASES: dict[str, tuple[str, ...]] = {
+    "NEO4J_BOLT_URL": ("NEO4J_URI",),
+}
+
+
 def _required_env(name: str) -> str:
     value = os.getenv(name)
+    if not value:
+        for alias in _ENV_ALIASES.get(name, ()):
+            value = os.getenv(alias)
+            if value:
+                break
     if not value:
         raise RuntimeError(
             f"Neo4j configuration missing: {name}. Start a local Neo4j via "

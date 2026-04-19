@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Implement task-by-task. Each task uses TDD. Stop at the review checkpoints and show test output before proceeding. Never skip a phase.
 
-**Project name:** **CUTIEE** = **C**omputer **U**se **T**oken-efficient agent**I**c self-**E**volving **E**ngineering (renamed from CUITEEE).
+**Project name:** **CUTIEE** = **C**omputer **U**se agent**I**c-framework with **T**oken-efficient harn**E**ss **E**ngineering (renamed from CUITEEE).
 
 **Goal:** Ship a Django web application at `https://github.com/Edward-H26/CUTIEE.git` that demonstrates the CUTIEE framework (procedural memory replay, temporal recency pruning, multi-model routing, self-evolving templates) as a meaningful AI feature integrated into a real user flow. Two deployment targets: local dev runs Qwen3.5 0.8B only; production on Render runs Gemini 3.1 only. Satisfies all four parts of the INFO490 A10 assignment.
 
@@ -280,7 +280,7 @@ CUTIEE/                                    (formerly CUITEEE)
 [project]
 name = "cutiee"
 version = "0.1.0"
-description = "Computer Use Token-efficient agentIc self-Evolving Engineering"
+description = "Computer Use agentIc-framework with Token-efficient harnEss Engineering"
 requires-python = ">=3.11"
 dependencies = [
     "django>=5.0",
@@ -439,7 +439,7 @@ storage_state.json
 ```markdown
 # CUTIEE
 
-**Computer Use Token-efficient agentIc self-Evolving Engineering**
+**Computer Use agentIc-framework with Token-efficient harnEss Engineering**
 
 A Django web application that wraps any computer-use agent with three cost-reduction mechanisms: procedural memory replay, temporal recency pruning, and multi-tier model routing. Templates self-evolve when the underlying UI changes.
 

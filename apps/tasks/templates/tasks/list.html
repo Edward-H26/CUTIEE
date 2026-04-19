@@ -5,7 +5,7 @@
     <div class="cutiee-row-between">
         <div>
             <h1>My tasks</h1>
-            <p class="cutiee-mono" style="margin-top: 6px;">
+            <p class="cutiee-text-sm cutiee-muted cutiee-mt-1">
                 {{ tasks|length }} task(s) · ${{ cost.total_cost|floatformat:4 }} spent · {{ cost.replay_step_count }} replayed step(s)
             </p>
         </div>
@@ -13,7 +13,7 @@
     </div>
 
     <div class="cutiee-card" data-testid="task-form">
-        <h2 style="margin-bottom: var(--cutiee-space-3);">Submit a new task</h2>
+        <h2 class="cutiee-mb-3">Submit a new task</h2>
         <form method="post" action="{% url 'tasks:create' %}" class="cutiee-stack-tight">
             {% csrf_token %}
             {% for field in form %}
@@ -24,7 +24,7 @@
                 </label>
             {% endfor %}
             <div class="cutiee-row-between">
-                <p class="cutiee-mono" style="margin: 0;">Tip: paste a Google Sheets URL and ask CUTIEE to sort, sum, or rename a column.</p>
+                <p class="cutiee-text-sm cutiee-muted cutiee-m-0">Tip: paste a Google Sheets URL and ask CUTIEE to sort, sum, or rename a column.</p>
                 <button type="submit" class="cta" data-testid="submit-task">Submit task</button>
             </div>
         </form>
@@ -57,24 +57,8 @@
         </div>
     {% else %}
         <div class="cutiee-card">
-            <p class="cutiee-mono" style="margin: 0;">No tasks yet. Submit your first task above to see CUTIEE in action.</p>
+            <p class="cutiee-text-sm cutiee-muted cutiee-m-0">No tasks yet. Submit your first task above to see CUTIEE in action.</p>
         </div>
     {% endif %}
 </section>
-
-<style>
-    .cutiee-task-row {
-        display: grid;
-        grid-template-columns: 1fr auto auto auto;
-        gap: var(--cutiee-space-4);
-        align-items: center;
-        text-decoration: none;
-        color: inherit;
-    }
-    .cutiee-task-row:hover { text-decoration: none; box-shadow: var(--cutiee-shadow-sm); }
-    .cutiee-task-row__title { font-weight: 600; color: var(--cutiee-text); }
-    @media (max-width: 640px) {
-        .cutiee-task-row { grid-template-columns: 1fr; }
-    }
-</style>
 {% endblock %}

@@ -28,7 +28,12 @@ from apps.memory_app.repo import (
     memoryDashboardStats,
 )
 from apps.tasks import repo as tasksRepo
-from apps.tasks.services import fetchProgress, runTaskForUser
+from apps.tasks.approval_queue import (
+    pendingApprovalFor,
+    submitDecision,
+)
+from apps.tasks.partials import renderApprovalModal, renderStatusPartial
+from apps.tasks.services import _screenshotStore, fetchProgress, runTaskForUser
 
 
 @require_POST
@@ -66,13 +71,15 @@ def _runInBackground(**kwargs: object) -> None:
 
 @require_GET
 @login_required
-def task_status(request: HttpRequest, execution_id: str) -> JsonResponse:
+def task_status(request: HttpRequest, execution_id: str):
     snapshot = fetchProgress(str(execution_id))
     if snapshot is None:
         execution = tasksRepo.getExecution(str(request.user.pk), str(execution_id))
         if execution is None:
+            if request.headers.get("HX-Request") == "true":
+                return HttpResponse("<span class='cutiee-text-sm cutiee-muted'>Execution not found.</span>", status = 404)
             return JsonResponse({"status": "unknown"}, status = 404)
-        return JsonResponse({
+        snapshot = {
             "executionId": execution["id"],
             "stepCount": execution.get("step_count", 0),
             "totalCostUsd": execution.get("total_cost_usd", 0.0),
@@ -81,7 +88,11 @@ def task_status(request: HttpRequest, execution_id: str) -> JsonResponse:
             "replayed": execution.get("replayed", False),
             "tierUsage": {},
             "finished": True,
-        })
+        }
+    if request.headers.get("HX-Request") == "true":
+        snapshot = dict(snapshot)
+        snapshot["_pollUrl"] = request.path
+        return renderStatusPartial(snapshot)
     return JsonResponse(snapshot)
 
 
@@ -149,7 +160,7 @@ def vlm_health(request: HttpRequest) -> HttpResponse:
         payload = {
             "status": "ready" if ready else "loading",
             "env": "production",
-            "model": os.environ.get("GEMINI_MODEL_TIER2", "gemini-3.1-flash"),
+            "model": os.environ.get("GEMINI_MODEL_TIER2", "gemini-3-flash-preview"),
         }
     elif env == "local":
         url = os.environ.get("QWEN_SERVER_URL", "http://localhost:8001")
@@ -187,6 +198,49 @@ def vlm_health(request: HttpRequest) -> HttpResponse:
 def delete_task(request: HttpRequest, task_id: str) -> JsonResponse:
     tasksRepo.deleteTask(str(request.user.pk), str(task_id))
     return JsonResponse({"status": "deleted", "task_id": str(task_id)})
+
+
+@require_GET
+@login_required
+def approval_pending(request: HttpRequest, execution_id: str) -> HttpResponse:
+    """HTMX poll endpoint that returns the modal HTML when an approval is waiting."""
+    userId = str(request.user.pk)
+    if tasksRepo.getExecution(userId, str(execution_id)) is None:
+        return HttpResponse(status = 404)
+    pending = pendingApprovalFor(str(execution_id))
+    return renderApprovalModal(str(execution_id), pending)
+
+
+@require_POST
+@login_required
+def approval_decide(request: HttpRequest, execution_id: str, decision: str) -> JsonResponse:
+    userId = str(request.user.pk)
+    if tasksRepo.getExecution(userId, str(execution_id)) is None:
+        return JsonResponse({"error": "execution not found"}, status = 404)
+    approved = decision.lower() in {"approve", "approved", "yes", "ok"}
+    delivered = submitDecision(str(execution_id), approved)
+    return JsonResponse({"delivered": delivered, "approved": approved})
+
+
+@require_GET
+@login_required
+def step_screenshot(request: HttpRequest, execution_id: str, step_index: int) -> HttpResponse:
+    """Serve a single per-step PNG from the Neo4j screenshot store.
+
+    Auth: must own the execution. Cached for 1 hour because step images
+    never change after capture (TTL cleanup at the store level handles
+    eventual deletion).
+    """
+    userId = str(request.user.pk)
+    execution = tasksRepo.getExecution(userId, str(execution_id))
+    if execution is None:
+        return HttpResponse(status = 404)
+    png = _screenshotStore().fetch(str(execution_id), int(step_index))
+    if png is None:
+        return HttpResponse(status = 404)
+    response = HttpResponse(png, content_type = "image/png")
+    response["Cache-Control"] = "private, max-age=3600"
+    return response
 
 
 @require_GET

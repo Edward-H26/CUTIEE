@@ -1,13 +1,10 @@
 # Render deployment for CUTIEE.
 #
-# Two services + one managed Redis:
-#   1) `cutiee-web` — Gunicorn + Whitenoise serving Django.
-#   2) `cutiee-redis` — managed Redis used for the cross-process progress
-#      cache so multiple Gunicorn workers can share live status.
-#
-# Neo4j AuraDB Free is provisioned out-of-band and wired in via the env
-# variables NEO4J_BOLT_URL / NEO4J_USERNAME / NEO4J_PASSWORD. AuraDB is
-# not a Render service, so it doesn't appear in this file.
+# Single web service. The cross-process progress cache lives on the
+# AuraDB instance we already pay for, so no Redis dyno is required.
+# A lazy sweep on every publish drops snapshots older than 5 minutes
+# and the post-finish purge drops them on the next HTMX poll, so the
+# graph stays bounded for 2-5 concurrent demo users.
 
 services:
   - type: web
@@ -39,12 +36,11 @@ services:
         value: "sqlite:///data/django_internals.sqlite3"
       - key: GEMINI_API_KEY
         sync: false
-      - key: GEMINI_MODEL_TIER1
-        value: "gemini-3.1-flash-lite"
-      - key: GEMINI_MODEL_TIER2
-        value: "gemini-3.1-flash"
-      - key: GEMINI_MODEL_TIER3
-        value: "gemini-3.1-pro"
+      # Computer Use model. Defaults to gemini-flash-latest (auto-tracks
+      # Google's current Flash). Pin to gemini-3-flash-preview for
+      # deterministic replay across Google model swaps.
+      - key: CUTIEE_CU_MODEL
+        value: "gemini-flash-latest"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -61,27 +57,17 @@ services:
         value: "3"
       - key: CUTIEE_TEMPLATE_MATCH_THRESHOLD
         value: "0.85"
-      - key: CUTIEE_CONFIDENCE_THRESHOLD_TIER1
-        value: "0.75"
-      - key: CUTIEE_CONFIDENCE_THRESHOLD_TIER2
-        value: "0.65"
-      - key: CUTIEE_CONFIDENCE_THRESHOLD_TIER3
-        value: "0.50"
       - key: CUTIEE_REQUIRE_APPROVAL_HIGH_RISK
         value: "true"
+      # Aura-backed progress: 30 ms / publish, no Redis dyno needed.
+      # Demo-sized: lazy sweep + post-finish purge keep the graph bounded.
       - key: CUTIEE_PROGRESS_BACKEND
-        value: "redis"
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: cutiee-redis
-          property: connectionString
+        value: "neo4j"
+      # Demo posture: no chromium binary in the web tier, so every action
+      # routes through StubBrowserController. To run against a real browser,
+      # add `uv run playwright install chromium` to buildCommand and set
+      # CUTIEE_USE_STUB_BROWSER=0 here.
+      - key: CUTIEE_USE_STUB_BROWSER
+        value: "true"
       - key: CUTIEE_CREDENTIAL_KEY
         sync: false
-
-  - type: redis
-    name: cutiee-redis
-    region: oregon
-    plan: free
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []   # restrict access to Render-internal traffic only

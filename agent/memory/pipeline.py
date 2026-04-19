@@ -14,7 +14,7 @@ from agent.memory.ace_memory import ACEMemory
 from agent.memory.curator import Curator
 from agent.memory.quality_gate import QualityGate, QualityGateDiagnostics
 from agent.memory.reflector import HeuristicReflector
-from apps.memory_app.bullet import Bullet, DeltaUpdate
+from agent.memory.bullet import Bullet, DeltaUpdate
 
 
 @dataclass

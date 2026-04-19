@@ -20,9 +20,9 @@ from agent.memory.decay import (
     dominantChannel,
     totalDecayedStrength,
 )
+from agent.memory.bullet import Bullet, DeltaUpdate
 from agent.memory.embeddings import cosineSimilarity, embedTexts
-from apps.memory_app import repo as memoryRepo
-from apps.memory_app.bullet import Bullet, DeltaUpdate
+from agent.memory.store import BulletStore, InMemoryBulletStore
 
 LEARNED_BONUS = 0.08
 SEED_PENALTY = 0.25
@@ -41,10 +41,11 @@ class ACEMemory:
     bullets: dict[str, Bullet] = field(default_factory = dict)
     useHashEmbedding: bool = True
     loaded: bool = False
+    store: BulletStore = field(default_factory = InMemoryBulletStore)
 
     def loadFromStore(self) -> None:
         self.bullets.clear()
-        for bullet in memoryRepo.listAllBulletObjectsForUser(self.userId):
+        for bullet in self.store.loadAll(self.userId):
             self.bullets[bullet.id] = bullet
         self.loaded = True
 
@@ -149,7 +150,7 @@ class ACEMemory:
             patch["procedural_access_index"] = self.accessClock
             patch["procedural_last_access"] = nowIso
         bullet.helpful_count += 1
-        memoryRepo.updateBulletFields(self.userId, bullet.id, patch)
+        self.store.updateBulletFields(self.userId, bullet.id, patch)
 
     def applyDelta(self, delta: DeltaUpdate) -> None:
         self.ensureLoaded()
@@ -173,7 +174,7 @@ class ACEMemory:
         for bulletId in delta.remove_bullets:
             self.bullets.pop(bulletId, None)
 
-        memoryRepo.applyDelta(self.userId, delta)
+        self.store.applyDelta(self.userId, delta)
 
     def refine(self) -> int:
         """Dedup similar bullets and prune below `maxBullets`. Returns deletions."""

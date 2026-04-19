@@ -6,6 +6,7 @@ on disk for the Django ORM.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import environ
@@ -33,12 +34,16 @@ if CUTIEE_ENV == "production" and not env("GEMINI_API_KEY", default = ""):
 if CUTIEE_ENV == "local" and not env("QWEN_SERVER_URL", default = ""):
     raise RuntimeError("QWEN_SERVER_URL required when CUTIEE_ENV=local.")
 
+if not env("NEO4J_BOLT_URL", default = "") and env("NEO4J_URI", default = ""):
+    # Back-compat: miramemoria-style .env files use NEO4J_URI.
+    os.environ["NEO4J_BOLT_URL"] = env("NEO4J_URI")
+
 for required_key in ("NEO4J_BOLT_URL", "NEO4J_USERNAME", "NEO4J_PASSWORD"):
     if not env(required_key, default = ""):
         raise RuntimeError(
             f"{required_key} is required. Neo4j is the default database. "
             "Start it locally via `./scripts/neo4j_up.sh`, or set AuraDB "
-            "credentials for production."
+            "credentials for production. NEO4J_URI is also accepted."
         )
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default = "cutiee-insecure-dev-only-change-me")
@@ -136,7 +141,16 @@ LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/tasks/"
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
-ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_EMAIL_VERIFICATION = env("ACCOUNT_EMAIL_VERIFICATION", default = "optional")
+ACCOUNT_EMAIL_NOTIFICATIONS = env.bool("ACCOUNT_EMAIL_NOTIFICATIONS", default = False)
+
+# Email backend defaults to the console in dev so signup never blocks on
+# an SMTP connection. Production sets DJANGO_EMAIL_BACKEND explicitly.
+EMAIL_BACKEND = env(
+    "DJANGO_EMAIL_BACKEND",
+    default = "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = env("DJANGO_DEFAULT_FROM_EMAIL", default = "no-reply@cutiee.local")
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {

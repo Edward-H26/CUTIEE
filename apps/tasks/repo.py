@@ -189,33 +189,38 @@ def appendStep(
     executionId: str,
     step: ObservationStep,
 ) -> None:
+    """Idempotent step write keyed on (executionId, index).
+
+    Computer Use auto-retry can call appendStep twice with the same
+    step.index; we MERGE on the natural key so the latest attempt
+    overwrites the previous record instead of creating duplicate
+    `:Step` nodes that inflate `e.step_count`. The cost/step counters
+    on `:Execution` are recomputed in `finalizeExecution` from the
+    actual step set, so we don't double-count cost on retry either.
+    """
     if step.action is None:
         return
     run_query(
         """
-        MATCH (e:Execution {id: $execution_id})
-        CREATE (s:Step {
-          id: $id,
-          index: $index,
-          url: $url,
-          dom_hash: $dom_hash,
-          action_type: $action_type,
-          target: $target,
-          value: $value,
-          reasoning: $reasoning,
-          model: $model,
-          tier: $tier,
-          confidence: $confidence,
-          risk: $risk,
-          cost_usd: $cost_usd,
-          verification_ok: $verification_ok,
-          verification_note: $verification_note,
-          duration_ms: $duration_ms,
-          timestamp: $timestamp
-        })
-        MERGE (e)-[r:HAS_STEP {index: $index}]->(s)
-        SET e.step_count = coalesce(e.step_count, 0) + 1,
-            e.total_cost_usd = coalesce(e.total_cost_usd, 0.0) + $cost_usd
+        MATCH (:User {id: $user_id})-[:OWNS]->(:Task)-[:EXECUTED_AS]->(e:Execution {id: $execution_id})
+        MERGE (s:Step {execution_id: $execution_id, index: $index})
+        ON CREATE SET s.id = $id, s.created_at = $timestamp
+        SET s.url = $url,
+            s.dom_hash = $dom_hash,
+            s.action_type = $action_type,
+            s.target = $target,
+            s.value = $value,
+            s.reasoning = $reasoning,
+            s.model = $model,
+            s.tier = $tier,
+            s.confidence = $confidence,
+            s.risk = $risk,
+            s.cost_usd = $cost_usd,
+            s.verification_ok = $verification_ok,
+            s.verification_note = $verification_note,
+            s.duration_ms = $duration_ms,
+            s.timestamp = $timestamp
+        MERGE (e)-[:HAS_STEP {index: $index}]->(s)
         """,
         execution_id = str(executionId),
         user_id = str(userId),
@@ -246,12 +251,23 @@ def finalizeExecution(
     status: str,
     completionReason: str = "",
 ) -> None:
+    """Recompute step_count and total_cost_usd from the actual step set.
+
+    With idempotent appendStep (MERGE-based), retries no longer inflate
+    the execution counters at write time. We do a single COUNT/SUM at
+    finalization so the numbers reflect the final state, regardless of
+    how many retries happened during the run.
+    """
     run_query(
         """
-        MATCH (e:Execution {id: $execution_id})
+        MATCH (:User {id: $user_id})-[:OWNS]->(:Task)-[:EXECUTED_AS]->(e:Execution {id: $execution_id})
+        OPTIONAL MATCH (e)-[:HAS_STEP]->(s:Step)
+        WITH e, count(s) AS step_count, coalesce(sum(s.cost_usd), 0.0) AS total_cost
         SET e.status = $status,
             e.finished_at = $finished_at,
-            e.completion_reason = $completion_reason
+            e.completion_reason = $completion_reason,
+            e.step_count = step_count,
+            e.total_cost_usd = total_cost
         """,
         user_id = str(userId),
         execution_id = str(executionId),
@@ -276,7 +292,7 @@ def getExecution(userId: str, executionId: str) -> ExecutionRow | None:
 
 
 def listStepsForExecution(userId: str, executionId: str) -> list[dict[str, Any]]:
-    return run_query(
+    rows = run_query(
         """
         MATCH (:User {id: $user_id})-[:OWNS]->(:Task)-[:EXECUTED_AS]->(:Execution {id: $execution_id})-[r:HAS_STEP]->(s:Step)
         RETURN s {.*} AS step
@@ -285,10 +301,11 @@ def listStepsForExecution(userId: str, executionId: str) -> list[dict[str, Any]]
         user_id = str(userId),
         execution_id = str(executionId),
     )
+    return [row["step"] for row in rows]
 
 
 def listExecutionsForTask(userId: str, taskId: str) -> list[dict[str, Any]]:
-    return run_query(
+    rows = run_query(
         """
         MATCH (:User {id: $user_id})-[:OWNS]->(:Task {id: $task_id})-[r:EXECUTED_AS]->(e:Execution)
         RETURN e {.*} AS execution
@@ -297,6 +314,7 @@ def listExecutionsForTask(userId: str, taskId: str) -> list[dict[str, Any]]:
         user_id = str(userId),
         task_id = str(taskId),
     )
+    return [row["execution"] for row in rows]
 
 
 def persistAgentState(userId: str, taskId: str, state: AgentState) -> None:
@@ -326,15 +344,19 @@ def persistAgentState(userId: str, taskId: str, state: AgentState) -> None:
 
 
 def costSummaryForUser(userId: str) -> dict[str, Any]:
+    # `replay_step_count` is the number of steps that ran inside an execution
+    # marked `replayed = true`. We can't proxy on `s.cost_usd = 0` because the
+    # mock VLM also reports zero cost on every step.
     row = run_single(
         """
         MATCH (u:User {id: $user_id})-[:OWNS]->(t:Task)-[:EXECUTED_AS]->(e:Execution)
         OPTIONAL MATCH (e)-[:HAS_STEP]->(s:Step)
-        RETURN coalesce(sum(s.cost_usd), 0.0) AS total_cost,
+        WITH t, e, count(s) AS step_count, coalesce(sum(s.cost_usd), 0.0) AS exec_cost
+        RETURN coalesce(sum(exec_cost), 0.0) AS total_cost,
                count(DISTINCT t) AS task_count,
                count(DISTINCT e) AS execution_count,
-               count(s) AS step_count,
-               coalesce(sum(CASE WHEN s.cost_usd = 0 THEN 1 ELSE 0 END), 0) AS replay_step_count
+               coalesce(sum(step_count), 0) AS step_count,
+               coalesce(sum(CASE WHEN e.replayed THEN step_count ELSE 0 END), 0) AS replay_step_count
         """,
         user_id = str(userId),
     )
@@ -350,11 +372,15 @@ def costSummaryForUser(userId: str) -> dict[str, Any]:
 
 
 def costTimeseriesForUser(userId: str, days: int = 14) -> list[dict[str, Any]]:
+    # Step.timestamp is stored as an ISO string, so cast it before any
+    # datetime comparison; the original query silently returned zero rows
+    # because string >= datetime evaluates to null.
     return run_query(
         """
         MATCH (u:User {id: $user_id})-[:OWNS]->(:Task)-[:EXECUTED_AS]->(e:Execution)-[:HAS_STEP]->(s:Step)
-        WHERE s.timestamp >= datetime() - duration({days: $days})
-        WITH date(datetime(s.timestamp)) AS day, sum(s.cost_usd) AS daily_cost, count(s) AS step_count
+        WITH datetime(s.timestamp) AS ts, s.cost_usd AS cost
+        WHERE ts >= datetime() - duration({days: $days})
+        WITH date(ts) AS day, sum(cost) AS daily_cost, count(*) AS step_count
         RETURN toString(day) AS day, daily_cost, step_count
         ORDER BY day ASC
         """,
