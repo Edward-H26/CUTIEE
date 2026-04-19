@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from agent.harness.state import AgentState
-from agent.memory.reflector import LessonCandidate
+from ..harness.state import AgentState
+from .reflector import LessonCandidate
 
 ACCEPT_THRESHOLD = 0.60
 MIN_TOP_CONFIDENCE = 0.70

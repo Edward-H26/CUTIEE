@@ -54,28 +54,25 @@ After every successful run, the reflector emits one structured
 procedural-type bullet per step. The bullets cluster by `topic`, which is
 derived from a slug of the task description. The `ReplayPlanner`
 retrieves bullets above the match threshold (default 0.85), reconstructs
-an ordered action list, and the orchestrator runs those actions through
-the browser controller without invoking any VLM. A failed step falls back
-to the router for re-grounding and emits a `DeltaUpdate` that decreases
-the strength of the bad bullet and adds a replacement.
+an ordered action list, and `ComputerUseRunner._executeReplay` runs those
+actions through the browser without invoking the model. A failed replay
+step finalizes the run as `replay_failed`, decreasing the bullet's
+procedural strength so the next attempt prefers a fresh CU pass.
 
-### Temporal recency pruning
+### Two-tier cost model
 
-The `RecencyPruner` partitions the trajectory into three zones. The most
-recent N steps (default 3) keep their full DOM markdown. The middle zone
-keeps a one-line action summary per step. The distant tail collapses
-into a deterministic rollup that counts actions per type and lists the
-unique domains touched. A 15-step trace compresses to roughly 25% of its
-raw size.
+After the 2026-04 pivot to screenshot-everywhere, the tier system collapsed
+to two semantic states:
 
-### Multi-model routing
+- **Tier 0 — zero cost.** Memory replay (`model_used="replay"`) and
+  harness-emitted browser navigation (`model_used="harness"`). No model
+  call happens.
+- **Tier 1 — Computer Use.** Every step that calls the Gemini ComputerUse
+  tool. Default model is `gemini-flash-latest`; pin to
+  `gemini-3-flash-preview` via `CUTIEE_CU_MODEL` for deterministic replay.
 
-The `AdaptiveRouter` picks an initial tier from `classifyDifficulty`,
-calls the tier client, and escalates if the returned confidence falls
-below the per-tier threshold. The thresholds are environment-overridable
-via `CUTIEE_CONFIDENCE_THRESHOLD_TIER{1,2,3}`. The router records the
-cumulative cost across escalations so the audit log captures every
-decision.
+The dashboard's tier-distribution chart now answers a simpler question:
+"how often did procedural memory save us a model call?"
 
 ## Self-evolving memory
 

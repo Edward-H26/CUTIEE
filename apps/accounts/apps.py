@@ -8,3 +8,5 @@ class AccountsConfig(AppConfig):
 
     def ready(self) -> None:
         from apps.accounts import signals  # noqa: F401
+        from cutiee_site._internal_db import ensureInternalSchema
+        ensureInternalSchema()

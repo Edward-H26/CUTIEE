@@ -10,7 +10,7 @@ import sys
 
 from neo4j.exceptions import ClientError
 
-from agent.persistence.neo4j_client import run_query
+from .neo4j_client import run_query
 
 CONSTRAINTS: list[str] = [
     "CREATE CONSTRAINT user_id           IF NOT EXISTS FOR (u:User)               REQUIRE u.id           IS UNIQUE",

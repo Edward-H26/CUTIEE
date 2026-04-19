@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from agent.harness.state import Action, ActionType
+from ..harness.state import Action, ActionType
 
 
 @dataclass
@@ -205,7 +205,28 @@ class StubBrowserController:
         return None
 
 
-def browserFromEnv(*, defaultHeadless: bool = False, domain: str = "") -> "BrowserController":
+import re as _re
+
+# RFC 1035 hostname charset: letters, digits, hyphens, dots only. No slashes,
+# no backslashes, no dot-dot, no leading/trailing dots or hyphens. Used to
+# guard against path traversal when `domain` is derived from user-supplied URLs.
+_VALID_DOMAIN_RE = _re.compile(r"^(?!-)[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,253}[a-zA-Z0-9])?$")
+
+
+def _isSafeDomain(domain: str) -> bool:
+    if not domain or len(domain) > 253:
+        return False
+    if ".." in domain or domain.startswith(".") or domain.endswith("."):
+        return False
+    return bool(_VALID_DOMAIN_RE.match(domain))
+
+
+def browserFromEnv(
+    *,
+    defaultHeadless: bool = False,
+    domain: str = "",
+    userId: str = "",
+) -> "BrowserController":
     """Build a BrowserController from CUTIEE_BROWSER_* env vars.
 
     Reads:
@@ -214,16 +235,18 @@ def browserFromEnv(*, defaultHeadless: bool = False, domain: str = "") -> "Brows
       - CUTIEE_BROWSER_SLOW_MO_MS (delay between actions for visibility)
       - CUTIEE_BROWSER_CDP_URL (Chrome DevTools attach URL, e.g. http://localhost:9222)
 
-    `domain` (optional): used to look for a domain-scoped storage_state file
-    at `data/storage_state/<domain>.json` first, falling back to the
-    global path. This avoids leaking google.com cookies into github.com runs.
+    `domain` and `userId` (both optional): used to look for a per-user,
+    per-domain storage_state at `data/storage_state/<userId>/<domain>.json`
+    first, then `data/storage_state/<domain>.json` (legacy global path),
+    then `CUTIEE_STORAGE_STATE_PATH`. The user_id scoping prevents one
+    user's auth cookies from leaking into another user's CU run.
     """
     from agent.harness.env_utils import envBool, envInt, envStr
 
     headless = envBool("CUTIEE_BROWSER_HEADLESS", defaultHeadless)
     slowMo = envInt("CUTIEE_BROWSER_SLOW_MO_MS", 0)
     cdpUrl = envStr("CUTIEE_BROWSER_CDP_URL") or None
-    storage = _resolveStorageStatePath(domain)
+    storage = _resolveStorageStatePath(domain, userId)
     return BrowserController(
         headless = headless,
         storageStatePath = storage,
@@ -232,13 +255,34 @@ def browserFromEnv(*, defaultHeadless: bool = False, domain: str = "") -> "Brows
     )
 
 
-def _resolveStorageStatePath(domain: str) -> str | None:
+def _resolveStorageStatePath(domain: str, userId: str = "") -> str | None:
     """Pick the most-specific storage_state file that exists.
 
-    Order: data/storage_state/<domain>.json → CUTIEE_STORAGE_STATE_PATH.
-    Returning None means "fresh cookie jar".
+    Lookup order:
+      1. `data/storage_state/<userId>/<domain>.json`  (per-user, per-domain)
+      2. `data/storage_state/<domain>.json`           (legacy global per-domain)
+      3. `CUTIEE_STORAGE_STATE_PATH`                  (env-configured default)
+
+    `domain` is validated against an RFC 1035 hostname regex before being
+    used in a filesystem path so user-supplied URLs can't trigger path
+    traversal. Returning None means "fresh cookie jar".
     """
+    if domain and not _isSafeDomain(domain):
+        # Defensive: refuse to construct a path from an unsafe domain string.
+        # The agent will run with a fresh cookie jar instead.
+        domain = ""
+
+    safeUserId = ""
+    if userId:
+        # User IDs are normally numeric strings (Django pk) but be defensive:
+        # strip anything that isn't alphanumeric / underscore / hyphen.
+        safeUserId = _re.sub(r"[^A-Za-z0-9_-]", "", userId)[:64]
+
     if domain:
+        if safeUserId:
+            perUser = Path("data/storage_state") / safeUserId / f"{domain}.json"
+            if perUser.exists():
+                return str(perUser)
         scoped = Path("data/storage_state") / f"{domain}.json"
         if scoped.exists():
             return str(scoped)

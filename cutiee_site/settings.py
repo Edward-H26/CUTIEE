@@ -1,8 +1,10 @@
 """Django settings for CUTIEE.
 
-All domain data lives in Neo4j. Django's framework tables (contenttypes,
-admin, sites, allauth) use an in-memory SQLite so no state is persisted
-on disk for the Django ORM.
+All domain data lives in Neo4j. Django's framework-only bookkeeping
+(contenttypes, admin, sites, allauth) runs against an ephemeral
+in-memory SQLite that never touches disk. The Django ORM holds zero
+application state — every domain entity (User, Task, Bullet, Audit,
+Procedure) is persisted via Cypher in `apps/*/repo.py`.
 """
 from __future__ import annotations
 
@@ -31,8 +33,9 @@ for required_key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"):
 
 if CUTIEE_ENV == "production" and not env("GEMINI_API_KEY", default = ""):
     raise RuntimeError("GEMINI_API_KEY required when CUTIEE_ENV=production.")
-if CUTIEE_ENV == "local" and not env("QWEN_SERVER_URL", default = ""):
-    raise RuntimeError("QWEN_SERVER_URL required when CUTIEE_ENV=local.")
+# CUTIEE_ENV=local uses MockComputerUseClient (post-pivot — no Qwen
+# server required). Local mode just needs Neo4j; the model client is
+# the scripted demo stand-in.
 
 if not env("NEO4J_BOLT_URL", default = "") and env("NEO4J_URI", default = ""):
     # Back-compat: miramemoria-style .env files use NEO4J_URI.
@@ -120,8 +123,22 @@ TEMPLATES = [
 WSGI_APPLICATION = "cutiee_site.wsgi.application"
 ASGI_APPLICATION = "cutiee_site.asgi.application"
 
+# Shared-cache in-memory SQLite. Lives only inside the running Python
+# process; all Django connections in that process see the same tables.
+# Worker boundaries reset state, which is intentional: the only data
+# stored here is Django's framework bookkeeping (contenttypes,
+# auth_permission seed rows, allauth config). Application data lives
+# exclusively in Neo4j via apps/*/repo.py Cypher queries.
+#
+# Hard-coded by design: this is a Neo4j-only framework. There is no env
+# escape hatch to a disk-backed SQLite, and `DJANGO_INTERNAL_DB_URL` is
+# intentionally ignored.
 DATABASES = {
-    "default": env.db("DJANGO_INTERNAL_DB_URL", default = f"sqlite:///{BASE_DIR / 'data' / 'django_internals.sqlite3'}"),
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": "file:cutiee_internals?mode=memory&cache=shared",
+        "OPTIONS": {"uri": True, "transaction_mode": "IMMEDIATE"},
+    },
 }
 
 NEO4J_BOLT_URL = env("NEO4J_BOLT_URL")

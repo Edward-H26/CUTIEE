@@ -88,18 +88,21 @@ shipping product.
 flowchart LR
     User[Browser] -->|HTTP| Django[Django views]
     Django --> Services[apps.tasks.services]
-    Services --> Orchestrator[agent.harness.orchestrator]
-    Orchestrator -->|observe / execute| Browser[agent.browser.controller]
-    Orchestrator -->|prune| Pruner[agent.pruning.context_window]
-    Orchestrator -->|retrieve| Memory[agent.memory.ace_memory]
-    Orchestrator -->|route| Router[agent.routing.router]
-    Router --> Qwen[Qwen3.5 0.8B] & Gemini[Gemini 3.1]
-    Orchestrator --> Safety[agent.safety.approval_gate]
+    Services --> Factory[apps.tasks.runner_factory]
+    Factory --> Runner[agent.harness.computer_use_loop:ComputerUseRunner]
+    Runner -->|screenshot / pixel-execute| Browser[agent.browser.controller]
+    Runner -->|retrieve| Memory[agent.memory.ace_memory]
+    Runner -->|replay check| Replay[agent.memory.replay:ReplayPlanner]
+    Runner -->|model call| CuClient[agent.routing.models.gemini_cu:GeminiComputerUseClient]
+    CuClient --> Gemini[Gemini Flash + ComputerUse tool]
+    Runner --> Safety[agent.safety.approval_gate]
     Memory --> Pipeline[agent.memory.pipeline]
     Pipeline --> Reflector --> Gate[QualityGate] --> Curator
     Curator -->|DeltaUpdate| Memory
     Memory --> Neo4j[(Neo4j)]
-    Orchestrator --> Audit[agent.safety.audit] --> Neo4j
+    Runner --> Audit[agent.safety.audit] --> Neo4j
+    Runner -->|per-step PNG| Screenshots[apps.audit.screenshot_store]
+    Screenshots --> Neo4j
     Services --> TasksRepo[apps.tasks.repo] --> Neo4j
 ```
 

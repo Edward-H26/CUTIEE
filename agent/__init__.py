@@ -23,52 +23,52 @@ Quick start:
         MockComputerUseClient,
     )
 """
-from agent.browser.controller import (
+from .browser.controller import (
     BrowserController,
     StepResult,
     StubBrowserController,
     browserFromEnv,
 )
-from agent.harness.computer_use_loop import ComputerUseRunner, buildComputerUseRunner
-from agent.harness.config import Config
-from agent.harness.env_utils import envBool, envFloat, envInt, envStr
-from agent.harness.state import (
+from .harness.computer_use_loop import ComputerUseRunner, buildComputerUseRunner
+from .harness.config import Config
+from .harness.env_utils import envBool, envFloat, envInt, envStr
+from .harness.state import (
     Action,
     ActionType,
     AgentState,
     ObservationStep,
     RiskLevel,
 )
-from agent.memory.ace_memory import ACEMemory
-from agent.memory.bullet import (
+from .memory.ace_memory import ACEMemory
+from .memory.bullet import (
     MEMORY_TYPES,
     TYPE_PRIORITY,
     Bullet,
     DeltaUpdate,
     hashContent,
 )
-from agent.memory.curator import Curator
-from agent.memory.decay import (
+from .memory.curator import Curator
+from .memory.decay import (
     EPISODIC_DECAY_RATE,
     PROCEDURAL_DECAY_RATE,
     SEMANTIC_DECAY_RATE,
     decayedStrength,
     totalDecayedStrength,
 )
-from agent.memory.pipeline import ACEPipeline, PipelineResult
-from agent.memory.quality_gate import QualityGate, QualityGateDiagnostics
-from agent.memory.reflector import HeuristicReflector, LessonCandidate
-from agent.memory.replay import ReplayPlan, ReplayPlanner
-from agent.memory.semantic import SemanticCredentialStore
-from agent.memory.store import BulletStore, InMemoryBulletStore
-from agent.routing.models.gemini_cu import (
+from .memory.pipeline import ACEPipeline, PipelineResult
+from .memory.quality_gate import QualityGate, QualityGateDiagnostics
+from .memory.reflector import HeuristicReflector, LessonCandidate
+from .memory.replay import ReplayPlan, ReplayPlanner
+from .memory.semantic import SemanticCredentialStore
+from .memory.store import BulletStore, InMemoryBulletStore
+from .routing.models.gemini_cu import (
     ComputerUseStep,
     GeminiComputerUseClient,
     MockComputerUseClient,
 )
-from agent.safety.approval_gate import ApprovalGate, ApprovalRequest
-from agent.safety.audit import AuditPayload, buildAuditPayload
-from agent.safety.risk_classifier import classifyRisk
+from .safety.approval_gate import ApprovalGate, ApprovalRequest
+from .safety.audit import AuditPayload, buildAuditPayload
+from .safety.risk_classifier import classifyRisk
 
 __all__ = [
     "BrowserController", "StubBrowserController", "StepResult", "browserFromEnv",

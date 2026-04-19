@@ -11,7 +11,7 @@ from typing import Any
 
 from django.contrib.auth.hashers import check_password, make_password
 
-from agent.persistence.neo4j_client import run_query, run_single
+from .neo4j_client import run_query, run_single
 
 
 def create_user(

@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from agent.harness.state import ObservationStep
+from ..harness.state import ObservationStep
 
 
 @dataclass

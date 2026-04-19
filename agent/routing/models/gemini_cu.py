@@ -27,7 +27,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from agent.harness.state import Action, ActionType
+from ...harness.state import Action, ActionType
 
 # Default tracks Google's "latest flash" alias so a Google-side promotion
 # of a new flash variant flows through automatically. Pin to

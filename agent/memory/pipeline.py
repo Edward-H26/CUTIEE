@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from agent.harness.state import AgentState
-from agent.memory.ace_memory import ACEMemory
-from agent.memory.curator import Curator
-from agent.memory.quality_gate import QualityGate, QualityGateDiagnostics
-from agent.memory.reflector import HeuristicReflector
-from agent.memory.bullet import Bullet, DeltaUpdate
+from typing import Any
+
+from ..harness.state import AgentState
+from .ace_memory import ACEMemory
+from .curator import Curator
+from .quality_gate import QualityGate, QualityGateDiagnostics
+from .reflector import HeuristicReflector, Reflector, buildReflector
+from .bullet import Bullet, DeltaUpdate
 
 
 @dataclass
@@ -28,10 +30,19 @@ class PipelineResult:
 @dataclass
 class ACEPipeline:
     memory: ACEMemory
-    reflector: HeuristicReflector = field(default_factory = HeuristicReflector)
+    # `reflector` accepts anything implementing the Reflector Protocol —
+    # `HeuristicReflector` (default), `LlmReflector`, or a custom one
+    # (e.g., a CU-specific reflector that emits structured action graphs).
+    # Use `buildReflector()` to pick based on `CUTIEE_REFLECTOR` env.
+    reflector: Any = field(default_factory = HeuristicReflector)
     qualityGate: QualityGate = field(default_factory = QualityGate)
     curator: Curator = field(default_factory = Curator)
     refineAfterApply: bool = True
+
+    @classmethod
+    def fromEnv(cls, memory: ACEMemory) -> "ACEPipeline":
+        """Build a pipeline picking the Reflector based on CUTIEE_REFLECTOR."""
+        return cls(memory = memory, reflector = buildReflector())
 
     def processExecution(self, state: AgentState) -> PipelineResult:
         candidates = self.reflector.reflect(state)

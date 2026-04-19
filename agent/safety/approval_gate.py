@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from agent.harness.state import Action, RiskLevel
+from ..harness.state import Action, RiskLevel
 
 
 @dataclass

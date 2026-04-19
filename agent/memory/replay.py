@@ -13,10 +13,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from agent.harness.state import Action, ActionType, RiskLevel
-from agent.memory.embeddings import cosineSimilarity, embedTexts
-from agent.memory.pipeline import ACEPipeline
-from agent.memory.bullet import Bullet
+from ..harness.state import Action, ActionType, RiskLevel
+from .embeddings import cosineSimilarity, embedTexts
+from .pipeline import ACEPipeline
+from .bullet import Bullet
 
 
 @dataclass
@@ -96,10 +96,10 @@ def _actionFromBullet(bullet: Bullet) -> Action | None:
     scrollDy = int(scrollMatch.group(2)) if scrollMatch else 0
     requiresApproval = "risk:high" in bullet.tags
     risk = RiskLevel.HIGH if requiresApproval else RiskLevel.LOW
-    # CU bullets get tier=4 on replay so the audit log distinguishes
-    # replayed-from-CU steps from replayed-from-DOM steps; cost stays $0
-    # either way because no model call is made.
-    isCu = "tier:cu" in bullet.tags or coordinate is not None
+    # All replay steps are tier 0 — no model call, no cost. The model
+    # column distinguishes "replay" (procedural memory hit) from "harness"
+    # (initial navigation). The CU/DOM origin of the bullet doesn't
+    # matter at replay time since we just execute the recorded action.
     return Action(
         type = actionType,
         target = target,
@@ -109,8 +109,8 @@ def _actionFromBullet(bullet: Bullet) -> Action | None:
         scrollDx = scrollDx,
         scrollDy = scrollDy,
         reasoning = f"replay:{bullet.id[:8]}",
-        model_used = "replay-cu" if isCu else "replay",
-        tier = 4 if isCu else 0,
+        model_used = "replay",
+        tier = 0,
         confidence = 1.0,
         risk = risk,
         cost_usd = 0.0,

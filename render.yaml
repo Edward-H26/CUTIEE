@@ -11,13 +11,19 @@ services:
     name: cutiee-web
     env: python
     region: oregon
-    plan: starter
+    # Standard plan (2 GB RAM) is the floor for real Chromium. Starter's
+    # 512 MB OOM-kills the browser on the first heavy page.
+    plan: standard
     buildCommand: |
       uv sync &&
+      uv run playwright install chromium &&
+      uv run python manage.py migrate --no-input &&
       uv run python manage.py collectstatic --no-input &&
       uv run python -m agent.persistence.bootstrap
+    # Single worker keeps Chromium memory bounded. Threads still fan out
+    # for HTMX polls and other non-CU requests.
     startCommand: |
-      uv run gunicorn cutiee_site.wsgi --bind 0.0.0.0:$PORT --workers 2 --threads 4
+      uv run gunicorn cutiee_site.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
@@ -32,8 +38,11 @@ services:
         value: "cutiee-web.onrender.com,cutiee.onrender.com"
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         value: "https://cutiee-web.onrender.com,https://cutiee.onrender.com"
-      - key: DJANGO_INTERNAL_DB_URL
-        value: "sqlite:///data/django_internals.sqlite3"
+      # DJANGO_INTERNAL_DB_URL is intentionally not exported. CUTIEE
+      # hard-codes a shared-cache in-memory SQLite for Django framework
+      # bookkeeping (contenttypes, auth_permission, allauth_*, sites,
+      # sessions). Zero application data lives in SQLite — every domain
+      # entity round-trips through Neo4j via Cypher in apps/*/repo.py.
       - key: GEMINI_API_KEY
         sync: false
       # Computer Use model. Defaults to gemini-flash-latest (auto-tracks
@@ -63,11 +72,16 @@ services:
       # Demo-sized: lazy sweep + post-finish purge keep the graph bounded.
       - key: CUTIEE_PROGRESS_BACKEND
         value: "neo4j"
-      # Demo posture: no chromium binary in the web tier, so every action
-      # routes through StubBrowserController. To run against a real browser,
-      # add `uv run playwright install chromium` to buildCommand and set
-      # CUTIEE_USE_STUB_BROWSER=0 here.
+      # Real-browser posture: buildCommand installs chromium via
+      # `playwright install chromium`, so the agent drives the page directly.
+      # Set CUTIEE_USE_STUB_BROWSER=true to fall back to the no-op stub
+      # (useful for cost-only demos without burning Chromium memory).
       - key: CUTIEE_USE_STUB_BROWSER
+        value: "false"
+      # Render dynos have no display server, so the browser must be
+      # headless. The controller defaults to headed for the dev demo;
+      # this env var flips it to headless in production.
+      - key: CUTIEE_BROWSER_HEADLESS
         value: "true"
       - key: CUTIEE_CREDENTIAL_KEY
         sync: false

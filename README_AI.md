@@ -49,10 +49,18 @@ in Django."
 CUTIEE supports two model stacks; the active stack is decided by
 `CUTIEE_ENV`.
 
-### Local stack (`CUTIEE_ENV=local`)
+> **NOTE — pre-pivot architecture below.** The 3-tier DOM router with
+> Qwen and the per-tier prompt envelopes were removed in 2026-04 when
+> CUTIEE collapsed to screenshot-based Computer Use (single tier).
+> Local mode now uses `MockComputerUseClient` (scripted demo actions,
+> no model). The text below is preserved as a record of the original
+> design exploration. See `CLAUDE.md` and `agent/README.md` for the
+> current architecture.
 
-A single Qwen3.5 0.8B Q4_K_M GGUF backs all three router tiers. The
-prompt envelope changes per tier:
+### Local stack (`CUTIEE_ENV=local`) — historical
+
+A single Qwen3.5 0.8B Q4_K_M GGUF backed all three router tiers. The
+prompt envelope changed per tier:
 
 - Tier 1 (`simple`): task + 600 chars of DOM. ~250 input tokens.
 - Tier 2 (`general`): task + 2,400 chars of DOM + 1,200 chars of pruned
@@ -60,9 +68,9 @@ prompt envelope changes per tier:
 - Tier 3 (`full_context`): task + full DOM + full pruned history. ~5,000
   input tokens.
 
-`llama-server --logprobs 5` exposes top-token probabilities so the
-confidence probe can read mean-logprob and exponentiate. Inference cost
-is treated as zero.
+`llama-server --logprobs 5` exposed top-token probabilities so the
+confidence probe could read mean-logprob and exponentiate. Inference cost
+was treated as zero.
 
 ### Production stack (`CUTIEE_ENV=production`)
 
@@ -260,7 +268,7 @@ boots and tests in milliseconds. Operators flip
 | Click path | Code path |
 |------------|-----------|
 | `/tasks/` → "Submit task" | `apps/tasks/forms.py` → `apps/tasks/views.py:create_task` → `apps/tasks/repo.py:createTask` |
-| `/tasks/<id>/` → "Run task now" | `apps/tasks/api.py:run_task_view` → `apps/tasks/services.py:runTaskForUser` → `agent/harness/orchestrator.py:Orchestrator.runTask` |
+| `/tasks/<id>/` → "Run task now" | `apps/tasks/api.py:run_task_view` → `apps/tasks/services.py:runTaskForUser` → `apps/tasks/runner_factory.py:buildLiveCuRunnerForUser` → `agent/harness/computer_use_loop.py:ComputerUseRunner.run` |
 | HTMX progress | `apps/tasks/api.py:task_status` → `apps/tasks/progress_backend.py:fetchProgress` |
 | `/memory/` | `apps/memory_app/views.py:bullet_list` → `apps/memory_app/repo.py:listBulletsForUser` |
 | `/memory/export/` | `apps/tasks/api.py:memory_export` |

@@ -13,7 +13,6 @@ import logging
 import os
 import threading
 
-import httpx
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -96,32 +95,64 @@ def task_status(request: HttpRequest, execution_id: str):
     return JsonResponse(snapshot)
 
 
+_DEFAULT_COST = {"total_cost": 0.0, "task_count": 0, "execution_count": 0,
+                 "step_count": 0, "replay_step_count": 0}
+_DEFAULT_MEMORY = {"bullet_count": 0, "template_count": 0,
+                   "stale_template_count": 0, "avg_strength": 0.0}
+
+
+def _safeJson(builder, fallback):
+    """Run a Cypher-backed builder and degrade to fallback on Neo4j errors."""
+    try:
+        return JsonResponse(builder())
+    except Exception:  # noqa: BLE001 - fail soft for UI-facing JSON
+        logger.warning("Neo4j fetch failed for JSON endpoint", exc_info = True)
+        payload = dict(fallback)
+        payload["db_error"] = "Database temporarily unavailable."
+        return JsonResponse(payload)
+
+
 @require_GET
 @login_required
 def cost_summary(request: HttpRequest) -> JsonResponse:
-    return JsonResponse(tasksRepo.costSummaryForUser(str(request.user.pk)))
+    userId = str(request.user.pk)
+    return _safeJson(lambda: tasksRepo.costSummaryForUser(userId), _DEFAULT_COST)
 
 
 @require_GET
 @login_required
 def cost_timeseries(request: HttpRequest) -> JsonResponse:
     days = int(request.GET.get("days", "14") or "14")
-    rows = tasksRepo.costTimeseriesForUser(str(request.user.pk), days = days)
-    return JsonResponse({"series": rows})
+    userId = str(request.user.pk)
+    return _safeJson(
+        lambda: {"series": tasksRepo.costTimeseriesForUser(userId, days = days)},
+        {"series": []},
+    )
 
 
 @require_GET
 @login_required
 def tier_distribution(request: HttpRequest) -> JsonResponse:
-    return JsonResponse({"distribution": tasksRepo.tierDistributionForUser(str(request.user.pk))})
+    userId = str(request.user.pk)
+    return _safeJson(
+        lambda: {"distribution": tasksRepo.tierDistributionForUser(userId)},
+        {"distribution": []},
+    )
 
 
 @require_GET
 @login_required
 def memory_stats(request: HttpRequest) -> JsonResponse:
-    stats = memoryDashboardStats(str(request.user.pk))
-    stats["bullets"] = listBulletsForUser(str(request.user.pk))[:5]
-    return JsonResponse(stats)
+    userId = str(request.user.pk)
+
+    def build():
+        stats = memoryDashboardStats(userId)
+        stats["bullets"] = listBulletsForUser(userId)[:5]
+        return stats
+
+    fallback = dict(_DEFAULT_MEMORY)
+    fallback["bullets"] = []
+    return _safeJson(build, fallback)
 
 
 @require_GET
@@ -144,14 +175,24 @@ def memory_export(request: HttpRequest) -> HttpResponse:
 def audit_feed(request: HttpRequest) -> JsonResponse:
     limit = min(int(request.GET.get("limit", "50") or "50"), 200)
     offset = int(request.GET.get("offset", "0") or "0")
-    return JsonResponse({
-        "entries": listAuditForUser(str(request.user.pk), limit = limit, offset = offset),
-        "total": auditCountForUser(str(request.user.pk)),
-    })
+    userId = str(request.user.pk)
+    return _safeJson(
+        lambda: {
+            "entries": listAuditForUser(userId, limit = limit, offset = offset),
+            "total": auditCountForUser(userId),
+        },
+        {"entries": [], "total": 0},
+    )
 
 
 @require_GET
 def vlm_health(request: HttpRequest) -> HttpResponse:
+    """Status banner for the Computer Use model.
+
+    Production reports Gemini readiness based on `GEMINI_API_KEY`.
+    Local mode uses `MockComputerUseClient` (post-pivot — no Qwen server),
+    so the banner is always "ready" with the mock model.
+    """
     env = os.environ.get("CUTIEE_ENV", "")
     isHtmx = request.headers.get("HX-Request") == "true"
 
@@ -160,17 +201,10 @@ def vlm_health(request: HttpRequest) -> HttpResponse:
         payload = {
             "status": "ready" if ready else "loading",
             "env": "production",
-            "model": os.environ.get("GEMINI_MODEL_TIER2", "gemini-3-flash-preview"),
+            "model": os.environ.get("CUTIEE_CU_MODEL", "gemini-flash-latest"),
         }
     elif env == "local":
-        url = os.environ.get("QWEN_SERVER_URL", "http://localhost:8001")
-        try:
-            with httpx.Client(timeout = 1.0) as client:
-                resp = client.get(f"{url}/health")
-            status = "ready" if resp.status_code == 200 else "loading"
-        except (httpx.ConnectError, httpx.TimeoutException):
-            status = "loading"
-        payload = {"status": status, "env": "local", "model": "qwen3.5-0.8b"}
+        payload = {"status": "ready", "env": "local", "model": "mock-cu-client"}
     else:
         payload = {"status": "unavailable", "env": env or "unknown", "model": "n/a"}
 
@@ -181,7 +215,7 @@ def vlm_health(request: HttpRequest) -> HttpResponse:
         return HttpResponse(
             f"<div id='vlm-status-banner' data-status='ready' data-model='{payload['model']}'></div>"
         )
-    label = "Connecting to Gemini" if payload["env"] == "production" else "Warming up Qwen3.5 0.8B"
+    label = "Connecting to Gemini" if payload["env"] == "production" else f"Loading {payload['model']}"
     return HttpResponse(
         f"""
         <div id='vlm-status-banner' class='vlm-banner vlm-banner--{payload['status']}'

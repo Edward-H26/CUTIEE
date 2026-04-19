@@ -18,21 +18,21 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
-from agent.browser.controller import BrowserController
-from agent.harness.state import (
+from ..browser.controller import BrowserController
+from .state import (
     Action,
     ActionType,
     AgentState,
     ObservationStep,
     RiskLevel,
 )
-from agent.routing.models.gemini_cu import GeminiComputerUseClient
-from agent.safety.approval_gate import ApprovalGate
-from agent.safety.audit import AuditPayload, buildAuditPayload
-from agent.safety.risk_classifier import classifyRisk
+from ..routing.models.gemini_cu import GeminiComputerUseClient
+from ..safety.approval_gate import ApprovalGate
+from ..safety.audit import AuditPayload, buildAuditPayload
+from ..safety.risk_classifier import classifyRisk
 
 logger = logging.getLogger("cutiee.cu_runner")
 
@@ -65,6 +65,10 @@ class ComputerUseRunner:
     initialUrl: str = ""
     maxSteps: int = 20
     maxRetriesPerStep: int = 1
+    # Pre-matched ActionNodes from subgraph matcher (Phase 3 hybrid replay).
+    # Set externally before run(); the runner replays them at zero cost
+    # then continues with the model loop for any remaining steps.
+    prematchedNodes: list = field(default_factory = list)
 
     async def run(
         self,
@@ -83,6 +87,7 @@ class ComputerUseRunner:
             state.executionId = executionId
         await self.browser.start()
         try:
+            # Replay path 1: whole-template procedural memory (pre-Phase-3)
             replayPlan = None
             if self.replayPlanner is not None:
                 replayPlan = await _maybe(
@@ -94,7 +99,14 @@ class ComputerUseRunner:
                 await self._executeReplay(state, replayPlan)
                 state.replayed = True
             else:
-                if self.initialUrl:
+                # Replay path 2: Phase 3 hybrid replay — execute pre-matched
+                # ActionNodes at zero cost, then drive CU for the remaining
+                # steps. The state is NOT marked replayed because we still
+                # invoke the model afterwards; the bandit gets to see real
+                # rewards for the suffix.
+                if self.prematchedNodes:
+                    await self._executePrematchedNodes(state)
+                elif self.initialUrl:
                     await self._recordInitialNavigation(state)
                 if not state.isComplete:
                     await self._runLoop(state)
@@ -110,6 +122,103 @@ class ComputerUseRunner:
             await _maybe(self.memory.processExecution(state))
 
         return state
+
+    async def _executePrematchedNodes(self, state: AgentState) -> None:
+        """Execute the subgraph-matcher's pre-matched prefix at zero cost,
+        with Phase 4 state verification before each replay.
+
+        Each pre-matched ActionNode becomes an Action with tier=0,
+        cost_usd=0, model_used="replay-graph". Before executing, the
+        StateVerifier compares current URL + screenshot phash to the
+        node's recorded `expected_url` / `expected_phash`. If verification
+        fails, the runner stops replay and falls through to the model
+        loop — better to pay one extra Gemini call than to click the
+        wrong thing.
+        """
+        from ..memory.state_verifier import StateVerifier
+        verifier = StateVerifier()
+
+        for offset, node in enumerate(self.prematchedNodes):
+            # Convert ActionNode → Action
+            try:
+                actionType = ActionType(node.action_type)
+            except ValueError:
+                logger.warning("Skipping pre-matched node with unknown type: %s", node.action_type)
+                continue
+
+            # Phase 4 state verification (skipped for the very first node since
+            # it always runs against the initial page state; verifier handles
+            # missing expected_* fields gracefully).
+            try:
+                currentUrl = await self.browser.currentUrl()
+                currentScreenshot = await self.browser.captureScreenshot()
+            except Exception:  # noqa: BLE001 - browser hiccups don't block run
+                currentUrl = ""
+                currentScreenshot = b""
+
+            verification = verifier.verify(
+                node = node,
+                currentUrl = currentUrl,
+                currentScreenshot = currentScreenshot,
+            )
+            if not verification.safe:
+                logger.info(
+                    "Replay halt at offset %d: verification failed (%s); falling through to model",
+                    offset, verification.reason,
+                )
+                return
+
+            coord = None
+            if node.coord_x is not None and node.coord_y is not None:
+                coord = (int(node.coord_x), int(node.coord_y))
+
+            action = Action(
+                type = actionType,
+                target = node.target or "",
+                value = node.value or None,
+                coordinate = coord,
+                reasoning = f"replay-graph: {node.description} ({verification.reason})" if node.description else f"graph-replay ({verification.reason})",
+                model_used = "replay-graph",
+                tier = 0,
+                confidence = 1.0,
+                cost_usd = 0.0,
+            )
+            action.risk = classifyRisk(action, state.taskDescription)
+            action.requires_approval = action.risk == RiskLevel.HIGH
+
+            approvalStatus = "auto"
+            if action.requires_approval:
+                approved = await self.approvalGate.requestApproval(action)
+                approvalStatus = "approved" if approved else "rejected"
+                if not approved:
+                    state.markComplete("rejected_by_user_graph_replay")
+                    return
+
+            result = await self.browser.execute(action)
+            currentUrl = await self.browser.currentUrl()
+            step = ObservationStep(
+                index = state.stepCount(),
+                url = currentUrl,
+                action = action,
+                verificationOk = result.success,
+                verificationNote = result.detail,
+                durationMs = result.durationMs,
+            )
+            state.appendStep(step)
+            await self._emitProgress(state, step)
+            await self._writeAudit(state, step, approvalStatus)
+
+            if not result.success:
+                logger.info(
+                    "Pre-matched replay failed at step %d (%s); falling through to model",
+                    offset, result.detail,
+                )
+                return
+
+        logger.info(
+            "Hybrid replay: executed %d pre-matched nodes at $0; continuing with model",
+            len(self.prematchedNodes),
+        )
 
     async def _executeReplay(self, state: AgentState, plan: Any) -> None:
         """Run a memorized template at zero inference cost."""
@@ -231,7 +340,11 @@ class ComputerUseRunner:
         while True:
             cuStep = await self.client.nextAction(screenshot, currentUrl)
             action = cuStep.action
-            action.tier = 4
+            # Tier 1 = the only model-call tier in CUTIEE. Tier 0 is reserved
+            # for zero-cost steps (memory replay, harness-emitted navigation).
+            # The "T0 vs T1" split is what the dashboard chart uses to show
+            # how often memory saved a model call.
+            action.tier = 1
             action.risk = classifyRisk(action, state.taskDescription)
             action.requires_approval = action.risk == RiskLevel.HIGH
 

@@ -63,7 +63,7 @@
                         <td>T{{ step.tier }} ({{ step.model|default:"-" }})</td>
                         <td class="mono cutiee-text-right">${{ step.cost_usd|floatformat:4 }}</td>
                         <td>{% if step.verification_ok %}<span class="cutiee-pill cutiee-pill--success">ok</span>{% else %}<span class="cutiee-pill cutiee-pill--danger">fail</span>{% endif %}</td>
-                        <td>{% if step.tier == 4 %}<a href="{% url 'tasks:step_screenshot' execution_id=executions.0.id step_index=step.index %}" target="_blank" rel="noreferrer" class="cutiee-text-sm">screenshot</a>{% else %}<span class="cutiee-text-sm cutiee-muted">-</span>{% endif %}</td>
+                        <td>{% if step.model != "replay" %}<a href="{% url 'tasks:step_screenshot' execution_id=executions.0.id step_index=step.index %}" target="_blank" rel="noreferrer" class="cutiee-text-sm">screenshot</a>{% else %}<span class="cutiee-text-sm cutiee-muted">-</span>{% endif %}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="7" class="cutiee-text-sm cutiee-muted">No steps recorded yet.</td></tr>

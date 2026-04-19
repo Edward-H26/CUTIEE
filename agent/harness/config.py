@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from agent.harness.env_utils import envBool, envFloat, envInt
+from .env_utils import envBool, envFloat, envInt
 
 
 @dataclass(frozen = True)

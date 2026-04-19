@@ -32,8 +32,6 @@ INFO490 final project (A10).
 - Python 3.11+
 - `uv` (https://docs.astral.sh/uv/) or `pip`
 - Docker (for the local Neo4j container)
-- llama.cpp (`brew install llama.cpp` on macOS) for local Qwen3.5
-
 ### Local setup
 
 ```bash
@@ -44,18 +42,27 @@ uv run playwright install chromium
 
 # Copy the env template and fill in values
 cp .env.example .env
-# CUTIEE_ENV=local, NEO4J_*, GOOGLE_CLIENT_ID/SECRET, optional GEMINI_API_KEY
+# CUTIEE_ENV=local (mock CU) or production (real Gemini),
+# NEO4J_*, GOOGLE_CLIENT_ID/SECRET, GEMINI_API_KEY (production only)
 
-# Start Neo4j (local) + the Qwen llama-server + Django (one shot)
+# Start Neo4j (local) + Django (one shot)
 ./scripts/dev.sh
 ```
 
-The dev script starts Neo4j in Docker, downloads the Qwen GGUF if needed,
-launches `llama-server` in the background on port 8001, and runs
-`manage.py runserver` in the foreground on port 8000. The UI surfaces
-"Warming up Qwen3.5 0.8B…" until the model responds.
+The dev script starts Neo4j in Docker and runs `manage.py runserver` on
+port 8000. With `CUTIEE_ENV=local` the agent uses `MockComputerUseClient`
+(scripted demo actions, no API calls). With `CUTIEE_ENV=production` and a
+`GEMINI_API_KEY`, every task runs through the live Gemini Computer Use tool.
 
 Open http://localhost:8000 . Sign in with Google.
+
+### Reuse the agent in your own project
+
+The `agent/` package is Django-free and persistence-agnostic. You can
+vendor it directly (`cp -r CUTIEE/agent ~/myproject/cutiee_agent`) or
+pip install the parent package. See `agent/README.md` for the standalone
+import surface and `examples/standalone_cu_run.py` for a 50-line working
+demo.
 
 ### Running each piece individually
 
@@ -94,8 +101,9 @@ uv run pytest
 The AI feature is the agent itself. It enters the application at:
 
 1. `apps/tasks/services.runTaskForUser` — the Django bridge.
-2. `agent/harness/orchestrator.Orchestrator.runTask` — the loop.
-3. `agent/routing/router.AdaptiveRouter.routeAndPredict` — the model call.
+2. `apps/tasks/runner_factory.buildLiveCuRunnerForUser` — wires browser + memory + replay + screenshot sink.
+3. `agent/harness/computer_use_loop.ComputerUseRunner.run` — the screenshot ↔ function-call loop.
+4. `agent/routing/models/gemini_cu.GeminiComputerUseClient.nextAction` — the model call.
 
 Open `/tasks/` to submit a task, click "Run task now" on a task detail
 page to trigger the agent, and watch the live HTMX progress + audit log.
@@ -110,20 +118,19 @@ CUTIEE/
 ├── cutiee_site/         Django project (settings, urls, sessions backend)
 ├── apps/
 │   ├── accounts/        allauth + Neo4j auth backend
-│   ├── tasks/           task submission, services bridge, JSON API, HTMX views
+│   ├── tasks/           task submission, services bridge, runner_factory, JSON API, HTMX views
 │   ├── memory_app/      ACE bullet + template dashboard, JSON export
-│   ├── audit/           paginated audit log
+│   ├── audit/           paginated audit log + Neo4j screenshot store
 │   └── landing/         marketing landing page
 ├── agent/
-│   ├── harness/         state, config, orchestrator
-│   ├── browser/         Playwright controller, DOM extractor
+│   ├── harness/         state, config, env_utils, computer_use_loop (the only runner)
+│   ├── browser/         Playwright controller (pixel actions), env-aware factory
 │   ├── memory/          ACE memory + reflector / quality_gate / curator / pipeline / replay / semantic
-│   ├── pruning/         RecencyPruner, fg/bg budgets, summarizer
-│   ├── routing/         AdaptiveRouter, factory, difficulty + confidence probes, tier clients
+│   ├── routing/         models/gemini_cu (real + mock CU clients) — the only routing module
 │   ├── safety/          risk classifier, approval gate, audit writer
 │   └── persistence/     Neo4j driver, Cypher repos, bootstrap
 ├── demo_sites/          three Flask test targets (spreadsheet, slides, form)
-├── scripts/             dev.sh, neo4j_up.sh, start_llama_server.sh, benchmark_costs.py
+├── scripts/             dev.sh, neo4j_up.sh, capture_storage_state.py, benchmark_costs.py
 ├── docs/                Part-1 product refinement, technical report, evaluation
 ├── static/css/          unified design tokens (cutiee.css)
 ├── templates/           base.html + allauth overrides
@@ -142,9 +149,12 @@ the legacy `.env.cutiee.template`). Required keys:
 | `DJANGO_SECRET_KEY` | always | Django session signing |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | always | Google OAuth |
 | `NEO4J_BOLT_URL`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | always | Neo4j domain DB |
-| `QWEN_SERVER_URL` | local | Local llama-server URL |
-| `GEMINI_API_KEY` | production | Gemini 3.1 |
-| `GEMINI_MODEL_TIER1/2/3` | production | Gemini variant per tier |
+| `GEMINI_API_KEY` | production | Gemini Flash with the ComputerUse tool |
+| `CUTIEE_CU_MODEL` | optional | Override default `gemini-flash-latest`; pin to `gemini-3-flash-preview` for deterministic replay |
+| `CUTIEE_CREDENTIAL_KEY` | always | Fernet key for encrypted SemanticCredentialStore |
+| `CUTIEE_BROWSER_HEADLESS` | optional | `true` for CI; default `false` (visible browser) |
+| `CUTIEE_STORAGE_STATE_PATH` | optional | Path to a Playwright storage_state.json so CU runs are pre-authenticated |
+| `CUTIEE_BROWSER_CDP_URL` | optional | Attach to your real Chrome via `--remote-debugging-port=9222` instead of launching a fresh chromium |
 | `CUTIEE_PROGRESS_BACKEND` | production multi-worker | `memory`, `redis`, or `neo4j` (default `memory`; demo deploys use `neo4j`) |
 | `REDIS_URL` | only when `CUTIEE_PROGRESS_BACKEND=redis` | Render Redis URL |
 | `CUTIEE_CREDENTIAL_KEY` | optional | Fernet key for credential bullets |

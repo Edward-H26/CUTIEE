@@ -14,20 +14,31 @@ Storage shape:
         created_at: datetime
     })
 
-A lazy sweep on every `save()` deletes anything older than `ttlDays`,
-so the AuraDB Free cap stays well below quota for 2-5 demo users
-without needing a cron. Hit rate matters: don't sweep on `fetch()`
-because the post-finish polls would pay for cleanup nobody asked for.
+Two safety mechanisms keep the AuraDB Free 50MB quota safe under abuse:
+
+  1. **Lazy TTL sweep** on every `save()` deletes anything older than
+     `ttlDays`. No cron needed.
+  2. **Global byte cap** (`maxTotalBytes`, default 40 MB): when the total
+     stored size approaches the Aura quota, new saves silently drop
+     instead of pushing the database past its limit. A logged warning
+     surfaces so operators see the throttle.
+
+Hit rate matters: don't sweep on `fetch()` because the post-finish
+polls would pay for cleanup nobody asked for.
 """
 from __future__ import annotations
 
 import base64
+import logging
 from dataclasses import dataclass
 
 from agent.harness.env_utils import envInt
 from agent.persistence.neo4j_client import run_query, run_single
 
 DEFAULT_TTL_DAYS = 3
+DEFAULT_MAX_TOTAL_BYTES = 40 * 1024 * 1024  # 40 MB; Aura free tier is 50 MB
+
+_logger = logging.getLogger("cutiee.screenshot_store")
 
 
 @dataclass
@@ -38,12 +49,40 @@ class ScreenshotRecord:
 
 
 class Neo4jScreenshotStore:
-    def __init__(self, ttlDays: int | None = None) -> None:
+    def __init__(
+        self,
+        ttlDays: int | None = None,
+        maxTotalBytes: int | None = None,
+    ) -> None:
         self.ttlDays = ttlDays if ttlDays is not None else envInt(
             "CUTIEE_SCREENSHOT_TTL_DAYS", DEFAULT_TTL_DAYS
         )
+        self.maxTotalBytes = maxTotalBytes if maxTotalBytes is not None else envInt(
+            "CUTIEE_SCREENSHOT_MAX_TOTAL_BYTES", DEFAULT_MAX_TOTAL_BYTES
+        )
 
-    def save(self, executionId: str, stepIndex: int, pngBytes: bytes) -> ScreenshotRecord:
+    def save(self, executionId: str, stepIndex: int, pngBytes: bytes) -> ScreenshotRecord | None:
+        """Persist a PNG; returns None when the global byte cap is exceeded.
+
+        Sweep first so the cap check sees the post-TTL footprint, then
+        enforce the cap before adding more bytes. Callers must treat
+        the result as best-effort (returns None on cap-hit, never raises).
+        """
+        size = len(pngBytes)
+        # Sweep stale entries before the cap check so old screenshots
+        # don't artificially inflate the "current" total.
+        self._sweep()
+
+        currentBytes = self._totalBytes()
+        if currentBytes + size > self.maxTotalBytes:
+            _logger.warning(
+                "Screenshot save dropped: global byte cap reached "
+                "(current=%s + new=%s > cap=%s). Older screenshots will "
+                "free space at the next TTL sweep.",
+                currentBytes, size, self.maxTotalBytes,
+            )
+            return None
+
         encoded = base64.b64encode(pngBytes).decode("ascii")
         run_query(
             """
@@ -55,16 +94,19 @@ class Neo4jScreenshotStore:
             eid = str(executionId),
             idx = int(stepIndex),
             data = encoded,
-            size = len(pngBytes),
+            size = size,
         )
-        # Lazy sweep so we don't need a cron. Cheap when the table is small;
-        # AuraDB query planner short-circuits when no rows match the WHERE.
-        self._sweep()
         return ScreenshotRecord(
             executionId = str(executionId),
             stepIndex = int(stepIndex),
-            sizeBytes = len(pngBytes),
+            sizeBytes = size,
         )
+
+    def _totalBytes(self) -> int:
+        row = run_single(
+            "MATCH (s:Screenshot) RETURN coalesce(sum(s.size_bytes), 0) AS total"
+        )
+        return int(row["total"]) if row else 0
 
     def fetch(self, executionId: str, stepIndex: int) -> bytes | None:
         row = run_single(

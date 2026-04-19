@@ -37,12 +37,16 @@ INFO490 deliverable.
 
 ## Rate limits
 
-Gemini 3.1 has free-tier and paid-tier rate caps. The router does not
-implement client-side rate limiting; in production the recommended
+Gemini Flash has free-tier and paid-tier rate caps. The CU client does
+not implement client-side rate limiting; in production the recommended
 pattern is to wrap the Gemini client in `tenacity` retries with
-exponential backoff. The local Qwen path has no external rate limit but
-will queue on the single llama-server worker; for production we would
-spawn one llama-server per CPU core.
+exponential backoff.
+
+> **Note — pre-pivot:** The original design also discussed scaling a
+> local llama-server (Qwen 0.8B) per CPU core for offline inference.
+> That path was removed in 2026-04 when the agent collapsed to
+> screenshot-based Computer Use (no Qwen-scale model supports the
+> ComputerUse tool). Local mode now runs `MockComputerUseClient`.
 
 ## Failure modes and handling
 

@@ -7,7 +7,7 @@ bullet.
 """
 from __future__ import annotations
 
-from agent.harness.state import Action, ActionType, RiskLevel
+from ..harness.state import Action, ActionType, RiskLevel
 
 HIGH_RISK_KEYWORDS = (
     "delete",

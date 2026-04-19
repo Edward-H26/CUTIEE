@@ -74,7 +74,7 @@ def buildLiveCuRunnerForUser(
     browser = (
         StubBrowserController()
         if useStubBrowser
-        else browserFromEnv(defaultHeadless = False, domain = domain)
+        else browserFromEnv(defaultHeadless = False, domain = domain, userId = str(userId))
     )
 
     decider = buildExecutionGate(executionId) if executionId else None
