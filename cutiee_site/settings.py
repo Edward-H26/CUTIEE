@@ -42,8 +42,25 @@ for required_key in ("NEO4J_BOLT_URL", "NEO4J_USERNAME", "NEO4J_PASSWORD"):
         )
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", default = "cutiee-insecure-dev-only-change-me")
+if CUTIEE_ENV == "production" and SECRET_KEY.startswith("cutiee-insecure"):
+    raise RuntimeError(
+        "DJANGO_SECRET_KEY must be set to a long random value when CUTIEE_ENV=production. "
+        "Render's `generateValue: true` produces a suitable secret automatically."
+    )
+
 DEBUG = env.bool("DJANGO_DEBUG", default = CUTIEE_ENV == "local")
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default = ["localhost", "127.0.0.1"])
+# Defaults are scoped to the localhost dev box. Production deployments must
+# enumerate their own host(s) via DJANGO_ALLOWED_HOSTS / DJANGO_CSRF_TRUSTED_ORIGINS
+# (set in render.yaml). This avoids trusting every *.onrender.com tenant by
+# default, which would let any sibling subdomain pass the CSRF origin check.
+ALLOWED_HOSTS = env.list(
+    "DJANGO_ALLOWED_HOSTS",
+    default = ["localhost", "127.0.0.1"],
+)
+CSRF_TRUSTED_ORIGINS = env.list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    default = [],
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -152,4 +169,48 @@ CUTIEE_CONFIDENCE_THRESHOLDS = {
     1: env.float("CUTIEE_CONFIDENCE_THRESHOLD_TIER1", default = 0.75),
     2: env.float("CUTIEE_CONFIDENCE_THRESHOLD_TIER2", default = 0.65),
     3: env.float("CUTIEE_CONFIDENCE_THRESHOLD_TIER3", default = 0.50),
+}
+
+# Production hardening. Local mode runs over plain HTTP, so these are gated.
+if CUTIEE_ENV == "production":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env.bool("DJANGO_SECURE_SSL_REDIRECT", default = True)
+    # Default to 1 year (preload-eligible). Operators can lower this via
+    # DJANGO_SECURE_HSTS_SECONDS during the initial rollout to avoid
+    # accidentally pinning HTTPS for a year on a misconfigured host.
+    SECURE_HSTS_SECONDS = env.int("DJANGO_SECURE_HSTS_SECONDS", default = 60 * 60 * 24 * 365)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default = True)
+    SECURE_HSTS_PRELOAD = env.bool("DJANGO_SECURE_HSTS_PRELOAD", default = SECURE_HSTS_SECONDS >= 31536000)
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = False  # HTMX needs JS access to read the CSRF cookie
+    CSRF_COOKIE_SAMESITE = "Lax"
+    X_FRAME_OPTIONS = "DENY"
+
+# Logging — structured enough for Render's log drain.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "level": env("DJANGO_LOG_LEVEL", default = "INFO"),
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {"handlers": ["console"], "level": env("DJANGO_LOG_LEVEL", default = "INFO")},
+    "loggers": {
+        "django": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "cutiee": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
 }

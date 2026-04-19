@@ -40,13 +40,17 @@ class DOMState:
     elements: list[DOMElement] = field(default_factory = list)
     markdown: str = ""
     elementCount: int = 0
+    _cachedHash: str = ""
 
     @property
     def domHash(self) -> str:
+        if self._cachedHash:
+            return self._cachedHash
         digest = hashlib.sha256()
         digest.update(self.url.encode("utf-8"))
         digest.update(self.markdown.encode("utf-8"))
-        return digest.hexdigest()[:16]
+        object.__setattr__(self, "_cachedHash", digest.hexdigest()[:16])
+        return self._cachedHash
 
 
 async def extractDomState(page: Any, *, maxElements: int = 60) -> DOMState:

@@ -1,49 +1,59 @@
 {% extends "base.html" %}
 {% block title %}Cost dashboard · CUTIEE{% endblock %}
+{% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
 {% block content %}
-<section style="display: grid; gap: 24px;">
-    <h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px; margin: 0;">Cost dashboard</h1>
+<section class="cutiee-stack">
+    <h1>Cost dashboard</h1>
 
-    <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));" data-testid="cost-cards">
-        <div class="glass">
-            <div style="font-size: 13px; color: var(--text-muted);">Total spend</div>
-            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">${{ cost.total_cost|floatformat:4 }}</div>
+    <div class="cutiee-metric-grid" data-testid="cost-cards">
+        <div class="cutiee-metric">
+            <div class="cutiee-metric-label">Total spend</div>
+            <div class="cutiee-metric-value">${{ cost.total_cost|floatformat:4 }}</div>
         </div>
-        <div class="glass">
-            <div style="font-size: 13px; color: var(--text-muted);">Tasks</div>
-            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">{{ cost.task_count }}</div>
+        <div class="cutiee-metric">
+            <div class="cutiee-metric-label">Tasks</div>
+            <div class="cutiee-metric-value">{{ cost.task_count }}</div>
         </div>
-        <div class="glass">
-            <div style="font-size: 13px; color: var(--text-muted);">Steps</div>
-            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">{{ cost.step_count }}</div>
+        <div class="cutiee-metric">
+            <div class="cutiee-metric-label">Steps</div>
+            <div class="cutiee-metric-value">{{ cost.step_count }}</div>
         </div>
-        <div class="glass">
-            <div style="font-size: 13px; color: var(--text-muted);">Replayed steps</div>
-            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">{{ cost.replay_step_count }}</div>
+        <div class="cutiee-metric">
+            <div class="cutiee-metric-label">Replayed steps</div>
+            <div class="cutiee-metric-value">{{ cost.replay_step_count }}</div>
         </div>
     </div>
 
-    <div class="glass">
-        <h2 style="margin: 0 0 12px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 18px;">Cost over time</h2>
+    <div class="cutiee-card">
+        <h2>Cost over time</h2>
         <canvas id="costChart" height="120" data-testid="cost-chart"></canvas>
     </div>
 
-    <div class="glass">
-        <h2 style="margin: 0 0 12px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 18px;">Tier distribution</h2>
+    <div class="cutiee-card">
+        <h2>Tier distribution</h2>
         <canvas id="tierChart" height="120" data-testid="tier-chart"></canvas>
     </div>
 </section>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .cutiee-metric-grid {
+        display: grid;
+        gap: var(--cutiee-space-4);
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+</style>
+
 <script>
-async function fetchJson(url) { const r = await fetch(url, {credentials: "same-origin"}); return r.json(); }
+async function fetchJson(url) {
+    const r = await fetch(url, {credentials: "same-origin"});
+    return r.json();
+}
 
 (async () => {
     const ts = await fetchJson("{% url 'tasks:cost_timeseries' %}");
     const labels = ts.series.map(r => r.day);
     const costs = ts.series.map(r => r.daily_cost);
-    const ctx = document.getElementById("costChart").getContext("2d");
-    new Chart(ctx, {
+    new Chart(document.getElementById("costChart").getContext("2d"), {
         type: "line",
         data: {
             labels: labels,
@@ -62,14 +72,13 @@ async function fetchJson(url) { const r = await fetch(url, {credentials: "same-o
     const tier = await fetchJson("{% url 'tasks:tier_distribution' %}");
     const tierLabels = tier.distribution.map(r => "Tier " + r.tier);
     const tierCounts = tier.distribution.map(r => r.count);
-    const tctx = document.getElementById("tierChart").getContext("2d");
-    new Chart(tctx, {
+    new Chart(document.getElementById("tierChart").getContext("2d"), {
         type: "doughnut",
         data: {
             labels: tierLabels.length ? tierLabels : ["No data"],
             datasets: [{
                 data: tierCounts.length ? tierCounts : [1],
-                backgroundColor: ["#6C86C0", "#8B6CC0", "#cf6cc0"],
+                backgroundColor: ["#6C86C0", "#8B6CC0", "#cf6cc0", "#94a3b8"],
             }],
         },
         options: { plugins: { legend: { position: "bottom" } } },

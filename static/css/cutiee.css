@@ -1,0 +1,410 @@
+/* CUTIEE design system.
+ *
+ * Single source of truth for color, typography, spacing, and surface tokens.
+ * Every template references the classes defined here instead of inlining
+ * styles. The miramemoria-derived gradient (#6C86C0 → #8B6CC0) is exposed
+ * under both `--cutiee-primary` and the legacy `--mm-primary` aliases so
+ * older snippets keep working during the migration.
+ */
+
+:root {
+    /* Primary palette */
+    --cutiee-primary: #6C86C0;
+    --cutiee-primary-end: #8B6CC0;
+    --cutiee-accent: #cf6cc0;
+
+    /* Text */
+    --cutiee-text: #1e293b;
+    --cutiee-text-muted: #64748b;
+    --cutiee-text-soft: #94a3b8;
+
+    /* Surfaces */
+    --cutiee-bg-page: #f8fafc;
+    --cutiee-glass: rgba(255, 255, 255, 0.55);
+    --cutiee-glass-strong: rgba(255, 255, 255, 0.7);
+    --cutiee-border: rgba(108, 134, 192, 0.18);
+    --cutiee-border-strong: rgba(108, 134, 192, 0.32);
+
+    /* State colors */
+    --cutiee-success: #166534;
+    --cutiee-success-bg: rgba(34, 197, 94, 0.1);
+    --cutiee-warning: #92400e;
+    --cutiee-warning-bg: rgba(254, 243, 199, 0.7);
+    --cutiee-danger: #991b1b;
+    --cutiee-danger-bg: rgba(254, 226, 226, 0.7);
+
+    /* Spacing scale (4px base) */
+    --cutiee-space-1: 4px;
+    --cutiee-space-2: 8px;
+    --cutiee-space-3: 12px;
+    --cutiee-space-4: 16px;
+    --cutiee-space-5: 24px;
+    --cutiee-space-6: 32px;
+    --cutiee-space-7: 48px;
+    --cutiee-space-8: 64px;
+
+    /* Radii */
+    --cutiee-radius-sm: 8px;
+    --cutiee-radius-md: 12px;
+    --cutiee-radius-lg: 16px;
+    --cutiee-radius-pill: 999px;
+
+    /* Typography */
+    --cutiee-font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    --cutiee-font-display: "Manrope", "Inter", sans-serif;
+    --cutiee-font-mono: "SF Mono", ui-monospace, "Menlo", monospace;
+
+    --cutiee-text-xs: 11px;
+    --cutiee-text-sm: 12px;
+    --cutiee-text-base: 14px;
+    --cutiee-text-md: 15px;
+    --cutiee-text-lg: 17px;
+    --cutiee-text-xl: 20px;
+    --cutiee-text-2xl: 24px;
+    --cutiee-text-3xl: 32px;
+    --cutiee-text-4xl: 56px;
+
+    /* Shadows */
+    --cutiee-shadow-sm: 0 4px 12px rgba(108, 134, 192, 0.10);
+    --cutiee-shadow-md: 0 8px 20px rgba(108, 134, 192, 0.18);
+    --cutiee-shadow-lg: 0 16px 32px rgba(108, 134, 192, 0.22);
+
+    /* Legacy aliases for templates ported from miramemoria */
+    --primary-blue: var(--cutiee-primary);
+    --primary-blue-end: var(--cutiee-primary-end);
+    --text-primary: var(--cutiee-text);
+    --text-muted: var(--cutiee-text-muted);
+    --border: var(--cutiee-border);
+    --bg-glass: var(--cutiee-glass);
+    --mm-primary: var(--cutiee-primary);
+    --mm-primary-end: var(--cutiee-primary-end);
+    --mm-text: var(--cutiee-text);
+    --mm-muted: var(--cutiee-text-muted);
+    --mm-border: var(--cutiee-border);
+}
+
+/* Reset + base */
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: var(--cutiee-font-body);
+    color: var(--cutiee-text);
+    background:
+        radial-gradient(at 20% 10%, #ffe4f1 0%, transparent 55%),
+        radial-gradient(at 80% 20%, #e0ecff 0%, transparent 60%),
+        radial-gradient(at 60% 80%, #f3e9ff 0%, transparent 55%),
+        linear-gradient(180deg, var(--cutiee-bg-page) 0%, #eef2f7 100%);
+    min-height: 100vh;
+}
+
+a { color: var(--cutiee-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1, h2, h3, h4 {
+    font-family: var(--cutiee-font-display);
+    font-weight: 700;
+    color: var(--cutiee-text);
+    margin: 0;
+    line-height: 1.2;
+}
+
+h1 { font-size: var(--cutiee-text-3xl); font-weight: 800; letter-spacing: -1px; }
+h2 { font-size: var(--cutiee-text-xl); }
+h3 { font-size: var(--cutiee-text-lg); }
+
+/* Header */
+.cutiee-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--cutiee-space-6);
+    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.55);
+    border-bottom: 1px solid var(--cutiee-border);
+}
+
+.cutiee-brand {
+    font-family: var(--cutiee-font-display);
+    font-weight: 800;
+    font-size: var(--cutiee-text-xl);
+    letter-spacing: -1px;
+    text-decoration: none;
+    background: linear-gradient(90deg, var(--cutiee-primary), var(--cutiee-primary-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.cutiee-nav { display: flex; gap: var(--cutiee-space-3); align-items: center; }
+.cutiee-nav a {
+    font-size: var(--cutiee-text-base);
+    color: var(--cutiee-text-muted);
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: var(--cutiee-radius-sm);
+    transition: background 120ms ease, color 120ms ease;
+}
+.cutiee-nav a:hover { color: var(--cutiee-text); background: rgba(255,255,255,0.6); text-decoration: none; }
+.cutiee-nav a.is-active { color: var(--cutiee-text); background: rgba(108,134,192,0.12); }
+
+/* Layout */
+.cutiee-main {
+    padding: var(--cutiee-space-7) var(--cutiee-space-6);
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.cutiee-stack { display: grid; gap: var(--cutiee-space-5); }
+.cutiee-stack-tight { display: grid; gap: var(--cutiee-space-3); }
+.cutiee-row { display: flex; gap: var(--cutiee-space-3); align-items: center; flex-wrap: wrap; }
+.cutiee-row-between { display: flex; gap: var(--cutiee-space-4); align-items: end; justify-content: space-between; flex-wrap: wrap; }
+
+/* Glass surfaces */
+.glass, .cutiee-card {
+    backdrop-filter: blur(20px);
+    background: var(--cutiee-glass);
+    border: 1px solid var(--cutiee-border);
+    border-radius: var(--cutiee-radius-lg);
+    padding: var(--cutiee-space-5);
+}
+
+.cutiee-card-tight { padding: var(--cutiee-space-4); }
+
+/* Buttons */
+.cta, .btn-gradient, .cutiee-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cutiee-space-2);
+    padding: 10px 20px;
+    border-radius: var(--cutiee-radius-md);
+    font-weight: 600;
+    font-size: var(--cutiee-text-base);
+    text-decoration: none;
+    color: #fff;
+    background: linear-gradient(90deg, var(--cutiee-primary), var(--cutiee-primary-end));
+    box-shadow: var(--cutiee-shadow-md);
+    border: none;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 200ms ease;
+    font-family: var(--cutiee-font-body);
+}
+.cta:hover, .cutiee-btn:hover { transform: translateY(-1px); text-decoration: none; box-shadow: var(--cutiee-shadow-lg); }
+
+.cta-ghost, .cutiee-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cutiee-space-2);
+    padding: 10px 20px;
+    border-radius: var(--cutiee-radius-md);
+    font-weight: 600;
+    font-size: var(--cutiee-text-base);
+    text-decoration: none;
+    color: var(--cutiee-text);
+    background: var(--cutiee-glass-strong);
+    border: 1px solid var(--cutiee-border);
+    cursor: pointer;
+    font-family: var(--cutiee-font-body);
+}
+.cta-ghost:hover, .cutiee-btn-ghost:hover { background: rgba(255,255,255,0.85); text-decoration: none; }
+
+.cutiee-btn-sm {
+    padding: 6px 12px;
+    font-size: var(--cutiee-text-sm);
+}
+
+/* Form inputs */
+.cutiee-input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+textarea,
+select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--cutiee-radius-md);
+    border: 1px solid var(--cutiee-border);
+    background: var(--cutiee-glass-strong);
+    font-family: var(--cutiee-font-body);
+    font-size: var(--cutiee-text-base);
+    color: var(--cutiee-text);
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.cutiee-input:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--cutiee-primary);
+    box-shadow: 0 0 0 3px rgba(108, 134, 192, 0.15);
+}
+
+.cutiee-label { display: grid; gap: 6px; font-size: var(--cutiee-text-sm); color: var(--cutiee-text-muted); }
+.cutiee-error { color: #b45309; font-size: var(--cutiee-text-sm); }
+
+/* Pills + badges */
+.cutiee-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--cutiee-space-2);
+    padding: 4px 10px;
+    border-radius: var(--cutiee-radius-pill);
+    background: rgba(108, 134, 192, 0.15);
+    color: var(--cutiee-primary);
+    font-size: var(--cutiee-text-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.cutiee-pill--success { background: var(--cutiee-success-bg); color: var(--cutiee-success); }
+.cutiee-pill--warning { background: var(--cutiee-warning-bg); color: var(--cutiee-warning); }
+.cutiee-pill--danger { background: var(--cutiee-danger-bg); color: var(--cutiee-danger); }
+.cutiee-pill--accent { background: rgba(139, 108, 192, 0.12); color: #7c5ebf; }
+
+.cutiee-tag {
+    padding: 3px 10px;
+    border-radius: var(--cutiee-radius-pill);
+    background: rgba(139, 108, 192, 0.12);
+    color: #7c5ebf;
+    font-size: var(--cutiee-text-xs);
+}
+
+/* Tables */
+.cutiee-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--cutiee-text-base);
+}
+.cutiee-table thead {
+    background: rgba(108, 134, 192, 0.08);
+}
+.cutiee-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--cutiee-text-muted);
+    font-size: var(--cutiee-text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.cutiee-table td {
+    padding: 12px 16px;
+    border-top: 1px solid var(--cutiee-border);
+}
+.cutiee-table .mono {
+    font-family: var(--cutiee-font-mono);
+    font-size: var(--cutiee-text-sm);
+    color: var(--cutiee-text-muted);
+}
+.cutiee-table-wrap { padding: 0; overflow: hidden; }
+
+/* Status banner */
+.vlm-banner {
+    padding: 12px 16px;
+    border-radius: var(--cutiee-radius-md);
+    font-size: var(--cutiee-text-base);
+    border: 1px solid var(--cutiee-border);
+    backdrop-filter: blur(20px);
+    background: var(--cutiee-glass);
+}
+.vlm-banner--ready { background: var(--cutiee-success-bg); color: var(--cutiee-success); border-color: rgba(34, 197, 94, 0.25); }
+.vlm-banner--loading { background: var(--cutiee-warning-bg); color: var(--cutiee-warning); border-color: rgba(245, 158, 11, 0.25); }
+.vlm-banner--unavailable { background: var(--cutiee-danger-bg); color: var(--cutiee-danger); border-color: rgba(239, 68, 68, 0.25); }
+.vlm-banner .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    margin-right: var(--cutiee-space-2);
+    animation: cutiee-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cutiee-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+/* Feature cards (landing page) */
+.feature-card, .cutiee-feature {
+    backdrop-filter: blur(20px);
+    background: var(--cutiee-glass);
+    border: 1px solid var(--cutiee-border);
+    border-radius: var(--cutiee-radius-lg);
+    padding: 28px 24px;
+    transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.feature-card:hover, .cutiee-feature:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--cutiee-shadow-lg);
+}
+.cutiee-feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--cutiee-radius-md);
+    margin-bottom: var(--cutiee-space-3);
+    background: linear-gradient(135deg, var(--cutiee-primary), var(--cutiee-primary-end));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: var(--cutiee-font-display);
+    font-weight: 700;
+    font-size: var(--cutiee-text-lg);
+}
+
+/* Gradient text helper */
+.cutiee-gradient-text {
+    background: linear-gradient(90deg, var(--cutiee-primary), var(--cutiee-primary-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Cost / metric cards */
+.cutiee-metric {
+    backdrop-filter: blur(20px);
+    background: var(--cutiee-glass);
+    border: 1px solid var(--cutiee-border);
+    border-radius: var(--cutiee-radius-lg);
+    padding: var(--cutiee-space-4) var(--cutiee-space-5);
+}
+.cutiee-metric-label { font-size: var(--cutiee-text-sm); color: var(--cutiee-text-muted); }
+.cutiee-metric-value {
+    font-family: var(--cutiee-font-display);
+    font-weight: 800;
+    font-size: var(--cutiee-text-2xl);
+    color: var(--cutiee-text);
+}
+
+/* Mono helpers */
+.cutiee-mono {
+    font-family: var(--cutiee-font-mono);
+    font-size: var(--cutiee-text-sm);
+    color: var(--cutiee-text-muted);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .cutiee-main { padding: var(--cutiee-space-5) var(--cutiee-space-4); }
+    .cutiee-row-between { align-items: flex-start; }
+    h1 { font-size: var(--cutiee-text-2xl); }
+}
+
+/* Visually hidden helper for accessible labels */
+.cutiee-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

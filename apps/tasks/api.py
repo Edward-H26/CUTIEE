@@ -9,15 +9,17 @@ the single-worker Render instance is fine.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 
 import httpx
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
+
+logger = logging.getLogger("cutiee")
 
 from apps.audit.repo import auditCountForUser, listAuditForUser
 from apps.memory_app.repo import (
@@ -58,8 +60,8 @@ def run_task_view(request: HttpRequest, task_id: str) -> JsonResponse:
 def _runInBackground(**kwargs: object) -> None:
     try:
         runTaskForUser(**kwargs)  # type: ignore[arg-type]
-    except Exception:  # noqa: BLE001 - background thread, surface in audit instead
-        pass
+    except Exception as exc:  # noqa: BLE001 - background thread, log and surface
+        logger.exception("Background task run failed: %s", exc)
 
 
 @require_GET
@@ -190,18 +192,12 @@ def delete_task(request: HttpRequest, task_id: str) -> JsonResponse:
 @require_GET
 @login_required
 def task_detail_json(request: HttpRequest, task_id: str) -> JsonResponse:
-    task = get_object_or_404_helper(str(request.user.pk), str(task_id))
-    executions = tasksRepo.listExecutionsForTask(str(request.user.pk), str(task_id))
-    steps = []
-    if executions:
-        steps = tasksRepo.listStepsForExecution(str(request.user.pk), executions[0]["id"])
-    return JsonResponse({"task": task, "executions": executions, "steps": steps})
-
-
-def get_object_or_404_helper(userId: str, taskId: str) -> dict:
-    task = tasksRepo.getTask(userId, taskId)
+    userId = str(request.user.pk)
+    task = tasksRepo.getTask(userId, str(task_id))
     if task is None:
-        from django.http import Http404
-
-        raise Http404("task not found")
-    return task
+        return JsonResponse({"error": "task not found"}, status = 404)
+    executions = tasksRepo.listExecutionsForTask(userId, str(task_id))
+    steps: list[dict] = []
+    if executions:
+        steps = tasksRepo.listStepsForExecution(userId, executions[0]["id"])
+    return JsonResponse({"task": task, "executions": executions, "steps": steps})

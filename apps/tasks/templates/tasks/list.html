@@ -1,83 +1,80 @@
 {% extends "base.html" %}
 {% block title %}Tasks · CUTIEE{% endblock %}
 {% block content %}
-<section style="display: grid; gap: 24px;">
-    <div style="display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap;">
+<section class="cutiee-stack">
+    <div class="cutiee-row-between">
         <div>
-            <h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px; margin: 0;">My tasks</h1>
-            <p style="color: var(--text-muted); margin: 6px 0 0;">{{ tasks|length }} task(s) · ${{ cost.total_cost|floatformat:4 }} spent · {{ cost.replay_step_count }} replayed step(s)</p>
+            <h1>My tasks</h1>
+            <p class="cutiee-mono" style="margin-top: 6px;">
+                {{ tasks|length }} task(s) · ${{ cost.total_cost|floatformat:4 }} spent · {{ cost.replay_step_count }} replayed step(s)
+            </p>
         </div>
-        <a href="{% url 'tasks:dashboard' %}" class="cta">View cost dashboard</a>
+        <a href="{% url 'tasks:dashboard' %}" class="cta-ghost">View cost dashboard</a>
     </div>
 
-    <div class="glass" data-testid="task-form">
-        <h2 style="margin: 0 0 14px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 18px;">Submit a new task</h2>
-        <form method="post" action="{% url 'tasks:create' %}" style="display: grid; gap: 12px;">
+    <div class="cutiee-card" data-testid="task-form">
+        <h2 style="margin-bottom: var(--cutiee-space-3);">Submit a new task</h2>
+        <form method="post" action="{% url 'tasks:create' %}" class="cutiee-stack-tight">
             {% csrf_token %}
             {% for field in form %}
-                <label style="display: grid; gap: 6px; font-size: 13px; color: var(--text-muted);">
+                <label class="cutiee-label">
                     {{ field.label }}
                     {{ field }}
-                    {% if field.errors %}<span style="color: #b45309; font-size: 12px;">{{ field.errors|join:', ' }}</span>{% endif %}
+                    {% if field.errors %}<span class="cutiee-error">{{ field.errors|join:', ' }}</span>{% endif %}
                 </label>
             {% endfor %}
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                <p style="font-size: 12px; color: var(--text-muted); margin: 0;">Tip: paste a Google Sheets URL and ask CUTIEE to sort, sum, or rename a column.</p>
+            <div class="cutiee-row-between">
+                <p class="cutiee-mono" style="margin: 0;">Tip: paste a Google Sheets URL and ask CUTIEE to sort, sum, or rename a column.</p>
                 <button type="submit" class="cta" data-testid="submit-task">Submit task</button>
             </div>
         </form>
     </div>
 
-    <div data-testid="vlm-banner" style="display: grid; gap: 8px;">
-        <div id="vlm-status-banner" class="glass" hx-get="/api/vlm-health/" hx-trigger="load, every 4s" hx-swap="outerHTML" hx-target="this">
-            <span style="color: var(--text-muted);">Checking model status…</span>
+    <div data-testid="vlm-banner">
+        <div id="vlm-status-banner"
+             class="vlm-banner vlm-banner--loading"
+             hx-get="/api/vlm-health/"
+             hx-trigger="load, every 4s"
+             hx-swap="outerHTML"
+             hx-target="this">
+            <span class="dot"></span> Checking model status…
         </div>
     </div>
 
     {% if tasks %}
-        <div style="display: grid; gap: 12px;">
+        <div class="cutiee-stack-tight">
             {% for task in tasks %}
-                <a href="{% url 'tasks:detail' task_id=task.id %}" class="glass" style="display: grid; grid-template-columns: 1fr auto auto auto; gap: 16px; align-items: center; text-decoration: none; color: inherit;" data-testid="task-row">
-                    <div>
-                        <div style="font-weight: 600;">{{ task.description|truncatechars:80 }}</div>
-                        <div style="font-size: 12px; color: var(--text-muted);">{{ task.initial_url|default:"no starting url" }}</div>
+                <a href="{% url 'tasks:detail' task_id=task.id %}" class="cutiee-card cutiee-card-tight cutiee-task-row" data-testid="task-row">
+                    <div class="cutiee-task-row__main">
+                        <div class="cutiee-task-row__title">{{ task.description|truncatechars:90 }}</div>
+                        <div class="cutiee-mono">{{ task.initial_url|default:"no starting url" }}</div>
                     </div>
-                    <span style="padding: 4px 10px; border-radius: 999px; background: rgba(108,134,192,0.15); color: var(--primary-blue); font-size: 12px; font-weight: 600; text-transform: uppercase;">{{ task.status }}</span>
-                    <span style="font-family: monospace; color: var(--text-muted); font-size: 12px;">${{ task.total_cost_usd|floatformat:4 }}</span>
-                    <span style="font-family: monospace; color: var(--text-muted); font-size: 12px;">{{ task.run_count }} runs</span>
+                    <span class="cutiee-pill">{{ task.status }}</span>
+                    <span class="cutiee-mono">${{ task.total_cost_usd|floatformat:4 }}</span>
+                    <span class="cutiee-mono">{{ task.run_count }} runs</span>
                 </a>
             {% endfor %}
         </div>
     {% else %}
-        <div class="glass">
-            <p style="margin: 0; color: var(--text-muted);">No tasks yet. Submit your first task above to see CUTIEE in action.</p>
+        <div class="cutiee-card">
+            <p class="cutiee-mono" style="margin: 0;">No tasks yet. Submit your first task above to see CUTIEE in action.</p>
         </div>
     {% endif %}
 </section>
 
 <style>
-    .task-input {
-        width: 100%;
-        padding: 10px 12px;
-        border-radius: 10px;
-        border: 1px solid var(--border);
-        background: rgba(255,255,255,0.7);
-        font-family: inherit;
-        font-size: 14px;
-        color: var(--text-primary);
+    .cutiee-task-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto;
+        gap: var(--cutiee-space-4);
+        align-items: center;
+        text-decoration: none;
+        color: inherit;
     }
-    .task-input:focus {
-        outline: 2px solid rgba(108,134,192,0.4);
-        border-color: var(--primary-blue);
+    .cutiee-task-row:hover { text-decoration: none; box-shadow: var(--cutiee-shadow-sm); }
+    .cutiee-task-row__title { font-weight: 600; color: var(--cutiee-text); }
+    @media (max-width: 640px) {
+        .cutiee-task-row { grid-template-columns: 1fr; }
     }
-    .vlm-banner {
-        padding: 12px 16px;
-        border-radius: 12px;
-        font-size: 13px;
-    }
-    .vlm-banner--loading { background: rgba(254, 243, 199, 0.7); color: #92400e; }
-    .vlm-banner--unavailable { background: rgba(254, 226, 226, 0.7); color: #991b1b; }
-    .vlm-banner .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 8px; animation: pulse 1.4s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:0.5;transform:scale(1.3);} }
 </style>
 {% endblock %}

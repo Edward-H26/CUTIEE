@@ -2,22 +2,22 @@
 {% block title %}Create an account · CUTIEE{% endblock %}
 {% block content %}
 <section style="display: grid; place-items: center; min-height: 60vh;">
-    <div class="glass" style="padding: 36px; max-width: 420px; width: 100%;">
-        <h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 28px; margin: 0 0 6px;">Create your CUTIEE account</h1>
-        <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 22px;">Email + password is the secondary path. Most users sign in with Google.</p>
-        <form method="post" action="{% url 'account_signup' %}" style="display: grid; gap: 12px;">
+    <div class="cutiee-card" style="padding: 36px; max-width: 420px; width: 100%;">
+        <h1>Create your CUTIEE account</h1>
+        <p class="cutiee-mono" style="margin: 6px 0 var(--cutiee-space-5);">Email + password is the secondary path. Most users sign in with Google.</p>
+        <form method="post" action="{% url 'account_signup' %}" class="cutiee-stack-tight">
             {% csrf_token %}
             {% for field in form %}
-                <label style="display: grid; gap: 4px; font-size: 13px; color: var(--text-muted);">
+                <label class="cutiee-label">
                     {{ field.label }}
                     {{ field }}
-                    {% if field.errors %}<span style="color:#b45309; font-size: 12px;">{{ field.errors|join:', ' }}</span>{% endif %}
+                    {% if field.errors %}<span class="cutiee-error">{{ field.errors|join:', ' }}</span>{% endif %}
                 </label>
             {% endfor %}
-            <button type="submit" class="cta" style="width: 100%; padding: 12px;" data-testid="signup-submit">Create account</button>
+            <button type="submit" class="cta" style="width: 100%; justify-content: center; padding: 12px;" data-testid="signup-submit">Create account</button>
         </form>
-        <p style="text-align: center; color: var(--text-muted); font-size: 13px; margin: 16px 0 0;">
-            Already have an account? <a href="{% url 'account_login' %}" style="color: var(--primary-blue);">Sign in</a>
+        <p style="text-align: center; color: var(--cutiee-text-muted); font-size: var(--cutiee-text-sm); margin-top: var(--cutiee-space-4);">
+            Already have an account? <a href="{% url 'account_login' %}">Sign in</a>
         </p>
     </div>
 </section>

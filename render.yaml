@@ -33,6 +33,8 @@ services:
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
         value: "cutiee-web.onrender.com,cutiee.onrender.com"
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        value: "https://cutiee-web.onrender.com,https://cutiee.onrender.com"
       - key: DJANGO_INTERNAL_DB_URL
         value: "sqlite:///data/django_internals.sqlite3"
       - key: GEMINI_API_KEY

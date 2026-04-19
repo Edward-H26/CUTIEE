@@ -1,67 +1,68 @@
 {% extends "base.html" %}
 {% block title %}{{ task.description|truncatechars:40 }} · CUTIEE{% endblock %}
 {% block content %}
-<section style="display: grid; gap: 20px;">
+<section class="cutiee-stack">
     <div>
-        <a href="{% url 'tasks:list' %}" style="font-size: 13px; color: var(--text-muted); text-decoration: none;">&larr; back to all tasks</a>
-        <h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 28px; margin: 8px 0 4px;">{{ task.description }}</h1>
-        <div style="display: flex; gap: 14px; color: var(--text-muted); font-size: 13px; flex-wrap: wrap;">
+        <a href="{% url 'tasks:list' %}" class="cutiee-mono">&larr; back to all tasks</a>
+        <h1 style="margin: 8px 0 4px;">{{ task.description }}</h1>
+        <div class="cutiee-row" style="font-size: var(--cutiee-text-sm); color: var(--cutiee-text-muted); gap: var(--cutiee-space-4);">
             <span>status: <strong>{{ task.status }}</strong></span>
             <span>runs: <strong>{{ task.run_count }}</strong></span>
             <span>spent: <strong>${{ task.total_cost_usd|floatformat:4 }}</strong></span>
-            {% if task.initial_url %}<span>url: <a href="{{ task.initial_url }}" target="_blank">{{ task.initial_url }}</a></span>{% endif %}
+            {% if task.initial_url %}<span>url: <a href="{{ task.initial_url }}" target="_blank" rel="noreferrer">{{ task.initial_url|truncatechars:60 }}</a></span>{% endif %}
         </div>
     </div>
 
-    <div class="glass" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    <div class="cutiee-card cutiee-row" data-testid="run-task-row">
         <button type="button" class="cta" data-testid="run-task"
                 hx-post="{% url 'tasks:run' task_id=task.id %}"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-swap="none">Run task now</button>
-        <span style="color: var(--text-muted); font-size: 13px;">CUTIEE will check procedural memory, replay if possible, otherwise run the full pipeline.</span>
+        <span class="cutiee-mono">CUTIEE will check procedural memory, replay if possible, otherwise run the full pipeline.</span>
     </div>
 
     {% if executions %}
-        <div class="glass" data-testid="latest-execution">
-            <h2 style="margin: 0 0 12px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 18px;">Latest execution · run #{{ executions.0.run_index }}</h2>
+        <div class="cutiee-card" data-testid="latest-execution">
+            <h2>Latest execution · run #{{ executions.0.run_index }}</h2>
             <div id="exec-progress"
                  hx-get="{% url 'tasks:status' execution_id=executions.0.id %}"
                  hx-trigger="load, every 2s"
-                 hx-swap="innerHTML">
-                <span style="color: var(--text-muted);">Loading status…</span>
+                 hx-swap="innerHTML"
+                 style="margin-top: var(--cutiee-space-3);">
+                <span class="cutiee-mono">Loading status…</span>
             </div>
         </div>
 
-        <div class="glass" style="padding: 0; overflow: hidden;">
-            <table style="width:100%; border-collapse: collapse; font-size: 14px;">
+        <div class="cutiee-card cutiee-table-wrap">
+            <table class="cutiee-table">
                 <thead>
-                    <tr style="background: rgba(108,134,192,0.08);">
-                        <th style="padding: 12px 14px; text-align: left;">#</th>
-                        <th style="padding: 12px 14px; text-align: left;">Action</th>
-                        <th style="padding: 12px 14px; text-align: left;">Target</th>
-                        <th style="padding: 12px 14px; text-align: left;">Tier</th>
-                        <th style="padding: 12px 14px; text-align: right;">Cost</th>
-                        <th style="padding: 12px 14px; text-align: left;">OK</th>
+                    <tr>
+                        <th>#</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Tier</th>
+                        <th style="text-align: right;">Cost</th>
+                        <th>OK</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for step in steps %}
-                    <tr style="border-top: 1px solid var(--border);" data-testid="step-row">
-                        <td style="padding: 10px 14px; font-family: monospace; color: var(--text-muted);">{{ step.index }}</td>
-                        <td style="padding: 10px 14px;">{{ step.action_type }}</td>
-                        <td style="padding: 10px 14px; font-family: monospace; font-size: 12px;">{{ step.target|truncatechars:60 }}</td>
-                        <td style="padding: 10px 14px;">T{{ step.tier }} ({{ step.model|default:"-" }})</td>
-                        <td style="padding: 10px 14px; font-family: monospace; text-align: right;">${{ step.cost_usd|floatformat:4 }}</td>
-                        <td style="padding: 10px 14px;">{% if step.verification_ok %}ok{% else %}<span style="color:#b91c1c;">fail</span>{% endif %}</td>
+                    <tr data-testid="step-row">
+                        <td class="mono">{{ step.index }}</td>
+                        <td>{{ step.action_type }}</td>
+                        <td class="mono">{{ step.target|truncatechars:60 }}</td>
+                        <td>T{{ step.tier }} ({{ step.model|default:"-" }})</td>
+                        <td class="mono" style="text-align: right;">${{ step.cost_usd|floatformat:4 }}</td>
+                        <td>{% if step.verification_ok %}<span class="cutiee-pill cutiee-pill--success">ok</span>{% else %}<span class="cutiee-pill cutiee-pill--danger">fail</span>{% endif %}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="6" style="padding: 16px; color: var(--text-muted);">No steps recorded yet.</td></tr>
+                    <tr><td colspan="6" class="cutiee-mono">No steps recorded yet.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     {% else %}
-        <div class="glass"><p style="margin:0; color: var(--text-muted);">This task has not been run yet. Click &ldquo;Run task now&rdquo; to start.</p></div>
+        <div class="cutiee-card"><p class="cutiee-mono" style="margin: 0;">This task has not been run yet. Click "Run task now" to start.</p></div>
     {% endif %}
 </section>
 {% endblock %}
