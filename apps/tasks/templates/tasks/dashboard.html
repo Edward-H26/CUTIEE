@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Cost dashboard · CUTIEE{% endblock %}
+{% block content %}
+<section style="display: grid; gap: 24px;">
+    <h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px; margin: 0;">Cost dashboard</h1>
+
+    <div style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));" data-testid="cost-cards">
+        <div class="glass">
+            <div style="font-size: 13px; color: var(--text-muted);">Total spend</div>
+            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">${{ cost.total_cost|floatformat:4 }}</div>
+        </div>
+        <div class="glass">
+            <div style="font-size: 13px; color: var(--text-muted);">Tasks</div>
+            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">{{ cost.task_count }}</div>
+        </div>
+        <div class="glass">
+            <div style="font-size: 13px; color: var(--text-muted);">Steps</div>
+            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">{{ cost.step_count }}</div>
+        </div>
+        <div class="glass">
+            <div style="font-size: 13px; color: var(--text-muted);">Replayed steps</div>
+            <div style="font-family: Manrope; font-weight: 800; font-size: 26px;">{{ cost.replay_step_count }}</div>
+        </div>
+    </div>
+
+    <div class="glass">
+        <h2 style="margin: 0 0 12px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 18px;">Cost over time</h2>
+        <canvas id="costChart" height="120" data-testid="cost-chart"></canvas>
+    </div>
+
+    <div class="glass">
+        <h2 style="margin: 0 0 12px; font-family: Manrope, sans-serif; font-weight: 700; font-size: 18px;">Tier distribution</h2>
+        <canvas id="tierChart" height="120" data-testid="tier-chart"></canvas>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+async function fetchJson(url) { const r = await fetch(url, {credentials: "same-origin"}); return r.json(); }
+
+(async () => {
+    const ts = await fetchJson("{% url 'tasks:cost_timeseries' %}");
+    const labels = ts.series.map(r => r.day);
+    const costs = ts.series.map(r => r.daily_cost);
+    const ctx = document.getElementById("costChart").getContext("2d");
+    new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Daily spend (USD)",
+                data: costs,
+                borderColor: "#6C86C0",
+                backgroundColor: "rgba(108,134,192,0.18)",
+                tension: 0.3,
+                fill: true,
+            }],
+        },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    const tier = await fetchJson("{% url 'tasks:tier_distribution' %}");
+    const tierLabels = tier.distribution.map(r => "Tier " + r.tier);
+    const tierCounts = tier.distribution.map(r => r.count);
+    const tctx = document.getElementById("tierChart").getContext("2d");
+    new Chart(tctx, {
+        type: "doughnut",
+        data: {
+            labels: tierLabels.length ? tierLabels : ["No data"],
+            datasets: [{
+                data: tierCounts.length ? tierCounts : [1],
+                backgroundColor: ["#6C86C0", "#8B6CC0", "#cf6cc0"],
+            }],
+        },
+        options: { plugins: { legend: { position: "bottom" } } },
+    });
+})();
+</script>
+{% endblock %}

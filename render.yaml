@@ -1,0 +1,85 @@
+# Render deployment for CUTIEE.
+#
+# Two services + one managed Redis:
+#   1) `cutiee-web` — Gunicorn + Whitenoise serving Django.
+#   2) `cutiee-redis` — managed Redis used for the cross-process progress
+#      cache so multiple Gunicorn workers can share live status.
+#
+# Neo4j AuraDB Free is provisioned out-of-band and wired in via the env
+# variables NEO4J_BOLT_URL / NEO4J_USERNAME / NEO4J_PASSWORD. AuraDB is
+# not a Render service, so it doesn't appear in this file.
+
+services:
+  - type: web
+    name: cutiee-web
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      uv sync &&
+      uv run python manage.py collectstatic --no-input &&
+      uv run python -m agent.persistence.bootstrap
+    startCommand: |
+      uv run gunicorn cutiee_site.wsgi --bind 0.0.0.0:$PORT --workers 2 --threads 4
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: CUTIEE_ENV
+        value: production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "cutiee-web.onrender.com,cutiee.onrender.com"
+      - key: DJANGO_INTERNAL_DB_URL
+        value: "sqlite:///data/django_internals.sqlite3"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_TIER1
+        value: "gemini-3.1-flash-lite"
+      - key: GEMINI_MODEL_TIER2
+        value: "gemini-3.1-flash"
+      - key: GEMINI_MODEL_TIER3
+        value: "gemini-3.1-pro"
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: NEO4J_BOLT_URL
+        sync: false
+      - key: NEO4J_USERNAME
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      - key: NEO4J_DATABASE
+        value: "neo4j"
+      - key: CUTIEE_RECENCY_WINDOW
+        value: "3"
+      - key: CUTIEE_TEMPLATE_MATCH_THRESHOLD
+        value: "0.85"
+      - key: CUTIEE_CONFIDENCE_THRESHOLD_TIER1
+        value: "0.75"
+      - key: CUTIEE_CONFIDENCE_THRESHOLD_TIER2
+        value: "0.65"
+      - key: CUTIEE_CONFIDENCE_THRESHOLD_TIER3
+        value: "0.50"
+      - key: CUTIEE_REQUIRE_APPROVAL_HIGH_RISK
+        value: "true"
+      - key: CUTIEE_PROGRESS_BACKEND
+        value: "redis"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cutiee-redis
+          property: connectionString
+      - key: CUTIEE_CREDENTIAL_KEY
+        sync: false
+
+  - type: redis
+    name: cutiee-redis
+    region: oregon
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []   # restrict access to Render-internal traffic only

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Memory · CUTIEE{% endblock %}
+{% block content %}
+<section style="display: grid; gap: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 32px; margin: 0;">Procedural memory</h1>
+            <p style="color: var(--text-muted); margin: 6px 0 0;">
+                {{ stats.bullet_count }} bullets · {{ stats.template_count }} templates · {{ stats.total_helpful }} helpful · {{ stats.total_harmful }} harmful
+            </p>
+        </div>
+        <a href="{% url 'memory_export' %}" class="cta" data-testid="export-memory">Export JSON</a>
+    </div>
+
+    {% if templates %}
+    <div>
+        <h2 style="font-family: Manrope, sans-serif; font-weight: 700; font-size: 20px; margin: 0 0 12px;">Procedural templates</h2>
+        <div style="display: grid; gap: 12px;">
+            {% for tpl in templates %}
+                <div class="glass" data-testid="template-card">
+                    <div style="display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                        <div>
+                            <div style="font-weight: 600;">{{ tpl.description|truncatechars:80 }}</div>
+                            <div style="color: var(--text-muted); font-size: 12px;">domain: {{ tpl.domain|default:"-" }} · {{ tpl.actions|length }} action(s) · success: {{ tpl.success_count }}</div>
+                        </div>
+                        <form method="post" action="{% url 'memory_app:mark_stale' template_id=tpl.id %}">
+                            {% csrf_token %}
+                            <button type="submit" style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.6); cursor: pointer;">{% if tpl.stale %}Stale{% else %}Mark stale{% endif %}</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div>
+        <h2 style="font-family: Manrope, sans-serif; font-weight: 700; font-size: 20px; margin: 0 0 12px;">ACE bullets</h2>
+        {% if bullets %}
+            <div style="display: grid; gap: 16px;">
+            {% for b in bullets %}
+                <div class="glass" data-testid="bullet-card">
+                    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: baseline;">
+                        <div style="display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(108,134,192,0.15); color: var(--primary-blue); font-size: 12px; font-weight: 600; text-transform: uppercase;">{{ b.memory_type }}</div>
+                        <div style="color: var(--text-muted); font-size: 12px; font-family: monospace;">{{ b.id|truncatechars:14 }}</div>
+                    </div>
+                    <p style="margin: 12px 0 8px; font-size: 15px; line-height: 1.5;">{{ b.content }}</p>
+                    <div style="display: flex; gap: 18px; font-size: 12px; color: var(--text-muted); font-family: monospace; flex-wrap: wrap;">
+                        <span>semantic: <strong style="color: var(--text-primary);">{{ b.semantic_strength|floatformat:2 }}</strong></span>
+                        <span>episodic: <strong style="color: var(--text-primary);">{{ b.episodic_strength|floatformat:2 }}</strong></span>
+                        <span>procedural: <strong style="color: var(--text-primary);">{{ b.procedural_strength|floatformat:2 }}</strong></span>
+                        <span>helpful: <strong style="color: var(--text-primary);">{{ b.helpful_count }}</strong></span>
+                        <span>harmful: <strong style="color: var(--text-primary);">{{ b.harmful_count }}</strong></span>
+                    </div>
+                    {% if b.tags %}
+                        <div style="margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;">
+                            {% for t in b.tags %}<span style="padding: 3px 10px; border-radius: 999px; background: rgba(139,108,192,0.12); color: #7c5ebf; font-size: 11px;">{{ t }}</span>{% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            </div>
+        {% else %}
+            <div class="glass"><p style="margin: 0; color: var(--text-muted);">No bullets yet. Run a task to see them appear here.</p></div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Audit · CUTIEE{% endblock %}
+{% block content %}
+<h1 style="font-family: Manrope, sans-serif; font-weight: 800; font-size: 32px; letter-spacing: -1px;">Audit log</h1>
+<p style="color: var(--text-muted);">Every agent action is written to an immutable `:AuditEntry` node with model, tier, cost, risk, and approval status.</p>
+
+{% if entries %}
+    <div class="glass" style="padding: 0; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+            <thead>
+                <tr style="background: rgba(108,134,192,0.08); text-align: left;">
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Time</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Action</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Model</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Tier</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Cost</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Risk</th>
+                    <th style="padding: 12px 16px; font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for e in entries %}
+                <tr style="border-top: 1px solid var(--border);">
+                    <td style="padding: 12px 16px; font-family: monospace; font-size: 12px; color: var(--text-muted);">{{ e.timestamp|slice:":19" }}</td>
+                    <td style="padding: 12px 16px;">{{ e.action }}</td>
+                    <td style="padding: 12px 16px; font-family: monospace; font-size: 13px;">{{ e.model }}</td>
+                    <td style="padding: 12px 16px;">T{{ e.tier }}</td>
+                    <td style="padding: 12px 16px; font-family: monospace;">${{ e.cost_usd|floatformat:4 }}</td>
+                    <td style="padding: 12px 16px;">{{ e.risk }}</td>
+                    <td style="padding: 12px 16px;">{{ e.approval_status }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="glass"><p style="margin: 0;">No audit entries yet.</p></div>
+{% endif %}
+{% endblock %}
