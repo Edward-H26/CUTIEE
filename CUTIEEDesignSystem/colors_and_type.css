@@ -1,0 +1,190 @@
+/* ============================================================
+   CUTIEE Design System — Colors & Type
+   Derived from CUTIEE static/css/cutiee.css + MIRA static/css/base.css
+   Primary gradient: #6C86C0 → #8B6CC0 (from cutiee.css)
+   Fonts: Inter (body) + Manrope (display) via Google Fonts
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=block");
+
+:root {
+  /* ---------- PRIMARY PALETTE ---------- */
+  --cutiee-primary:       #6C86C0;   /* brand blue */
+  --cutiee-primary-end:   #8B6CC0;   /* gradient endpoint — indigo/violet */
+  --cutiee-accent:        #CF6CC0;   /* magenta accent for approvals/high-risk */
+  --cutiee-primary-hover: #5A74AD;
+  --cutiee-primary-active:#4A6399;
+  --cutiee-primary-tint:  rgba(108, 134, 192, 0.12);
+  --cutiee-primary-tint-ultra: rgba(108, 134, 192, 0.06);
+
+  /* ---------- NEUTRALS / TEXT ---------- */
+  --cutiee-text:          #1e293b;   /* slate-800 */
+  --cutiee-text-muted:    #64748b;   /* slate-500 */
+  --cutiee-text-soft:     #94a3b8;   /* slate-400 */
+  --cutiee-text-dark:     #1C1E2E;   /* inky — from MIRA */
+  --cutiee-icon:          #6B7280;
+
+  /* ---------- SURFACES ---------- */
+  --cutiee-bg-page:       #f8fafc;
+  --cutiee-content-bg:    #ffffff;
+  --cutiee-sidebar-bg:    #f0f4f8;
+  --cutiee-header-bg:     #f6fafe;
+  --cutiee-hover-bg:      #F5F6FA;
+
+  --cutiee-glass:         rgba(255, 255, 255, 0.55);
+  --cutiee-glass-strong:  rgba(255, 255, 255, 0.70);
+  --cutiee-glass-soft:    rgba(253, 253, 253, 0.60);
+
+  --cutiee-border:        rgba(108, 134, 192, 0.18);
+  --cutiee-border-strong: rgba(108, 134, 192, 0.32);
+  --cutiee-border-hair:   #E5E7EB;
+
+  /* ---------- SEMANTIC STATE COLORS ---------- */
+  --cutiee-success:       #166534;
+  --cutiee-success-bg:    rgba(34, 197, 94, 0.10);
+  --cutiee-warning:       #92400e;
+  --cutiee-warning-bg:    rgba(254, 243, 199, 0.70);
+  --cutiee-danger:        #991b1b;
+  --cutiee-danger-bg:     rgba(254, 226, 226, 0.70);
+  --cutiee-info:          var(--cutiee-primary);
+
+  /* Tier colors (for model routing tier 1..4) */
+  --cutiee-tier-1: #6C86C0;
+  --cutiee-tier-2: #8B6CC0;
+  --cutiee-tier-3: #CF6CC0;
+  --cutiee-tier-4: #94a3b8;
+
+  /* ---------- ATMOSPHERIC BG GRADIENTS ---------- */
+  --cutiee-bg-aurora:
+      radial-gradient(at 20% 10%, #ffe4f1 0%, transparent 55%),
+      radial-gradient(at 80% 20%, #e0ecff 0%, transparent 60%),
+      radial-gradient(at 60% 80%, #f3e9ff 0%, transparent 55%),
+      linear-gradient(180deg, var(--cutiee-bg-page) 0%, #eef2f7 100%);
+  /* Heavier, MIRA-style saturated aurora (used for landing/hero variants) */
+  --cutiee-bg-aurora-deep:
+      radial-gradient(ellipse 55% 50% at 85% 12%, rgba(235, 170, 195, 0.65) 0%, transparent 70%),
+      radial-gradient(ellipse 70% 60% at 15% 40%, rgba(150, 190, 245, 0.60) 0%, transparent 70%),
+      radial-gradient(ellipse 55% 55% at 82% 85%, rgba(165, 150, 215, 0.55) 0%, transparent 65%),
+      linear-gradient(135deg, #c4d8f5 0%, #cddcf8 20%, #d6e2fb 40%, #d8d4f2 65%, #c8bfe8 85%, #bfb8e4 100%);
+
+  /* Gradient fills */
+  --cutiee-gradient-primary: linear-gradient(90deg, var(--cutiee-primary), var(--cutiee-primary-end));
+  --cutiee-gradient-primary-135: linear-gradient(135deg, var(--cutiee-primary), var(--cutiee-primary-end));
+
+  /* ---------- SPACING (4px base) ---------- */
+  --cutiee-space-1: 4px;
+  --cutiee-space-2: 8px;
+  --cutiee-space-3: 12px;
+  --cutiee-space-4: 16px;
+  --cutiee-space-5: 24px;
+  --cutiee-space-6: 32px;
+  --cutiee-space-7: 48px;
+  --cutiee-space-8: 64px;
+
+  /* ---------- RADII ---------- */
+  --cutiee-radius-sm:   8px;
+  --cutiee-radius-md:   12px;
+  --cutiee-radius-lg:   16px;
+  --cutiee-radius-xl:   20px;
+  --cutiee-radius-pill: 999px;
+
+  /* ---------- SHADOWS ---------- */
+  --cutiee-shadow-sm: 0 4px 12px rgba(108, 134, 192, 0.10);
+  --cutiee-shadow-md: 0 8px 20px rgba(108, 134, 192, 0.18);
+  --cutiee-shadow-lg: 0 16px 32px rgba(108, 134, 192, 0.22);
+  --cutiee-shadow-btn: 0 4px 12px rgba(108, 134, 192, 0.25);
+  --cutiee-shadow-pop: 0 10px 15px -3px rgba(0,0,0,0.10), 0 4px 6px -4px rgba(0,0,0,0.10);
+
+  /* ---------- MOTION ---------- */
+  --cutiee-ease:     cubic-bezier(0.4, 0, 0.2, 1);
+  --cutiee-dur-fast: 120ms;
+  --cutiee-dur-base: 180ms;
+  --cutiee-dur-slow: 280ms;
+
+  /* ---------- TYPOGRAPHY FAMILIES ---------- */
+  /* MIRA brand: Instrument Sans for display/headings, system sans for body */
+  --cutiee-font-body:    "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --cutiee-font-display: "Instrument Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --cutiee-font-mono:    "JetBrains Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+
+  /* ---------- TYPE SCALE ---------- */
+  --cutiee-text-xs:   11px;
+  --cutiee-text-sm:   12px;
+  --cutiee-text-base: 14px;
+  --cutiee-text-md:   15px;
+  --cutiee-text-lg:   17px;
+  --cutiee-text-xl:   20px;
+  --cutiee-text-2xl:  24px;
+  --cutiee-text-3xl:  32px;
+  --cutiee-text-4xl:  56px;
+
+  /* ---------- LEGACY ALIASES (from CUTIEE/MIRA) ---------- */
+  --primary-blue:      var(--cutiee-primary);
+  --primary-hover:     var(--cutiee-primary-hover);
+  --primary-active:    var(--cutiee-primary-active);
+  --text-dark:         var(--cutiee-text-dark);
+  --text-muted:        var(--cutiee-text-muted);
+  --border-color:      var(--cutiee-border-hair);
+  --mm-primary:        var(--cutiee-primary);
+  --mm-primary-end:    var(--cutiee-primary-end);
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT STYLES
+   ============================================================ */
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  font-family: var(--cutiee-font-body);
+  color: var(--cutiee-text);
+  background: var(--cutiee-bg-aurora);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--cutiee-font-display);
+  font-weight: 700;
+  color: var(--cutiee-text);
+  margin: 0;
+  line-height: 1.2;
+}
+
+h1 { font-size: var(--cutiee-text-3xl); font-weight: 800; letter-spacing: -1px; }
+h2 { font-size: var(--cutiee-text-xl);  font-weight: 700; }
+h3 { font-size: var(--cutiee-text-lg);  font-weight: 700; }
+h4 { font-size: var(--cutiee-text-md);  font-weight: 600; }
+
+/* Display — extra large for hero */
+.cutiee-display {
+  font-family: var(--cutiee-font-display);
+  font-size: var(--cutiee-text-4xl);
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.05;
+}
+
+/* Body */
+p { font-size: var(--cutiee-text-base); line-height: 1.55; margin: 0 0 var(--cutiee-space-3); }
+small, .cutiee-small { font-size: var(--cutiee-text-sm); color: var(--cutiee-text-muted); }
+
+/* Mono / code */
+code, kbd, samp, pre {
+  font-family: var(--cutiee-font-mono);
+  font-size: 0.92em;
+}
+
+a { color: var(--cutiee-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Gradient text helper */
+.cutiee-gradient-text {
+  background: var(--cutiee-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}

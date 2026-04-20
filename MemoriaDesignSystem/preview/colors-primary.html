@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#fafafa;font-family:var(--mm-font-body);}
+  .row{display:flex;gap:12px;align-items:stretch;}
+  .swatch{flex:1;border-radius:var(--mm-radius-lg);padding:14px 14px 12px;display:flex;flex-direction:column;justify-content:space-between;min-height:90px;border:1px solid rgba(0,0,0,.06);}
+  .swatch.lg{flex:1.6;}
+  .name{font-weight:600;font-size:13px;line-height:1.2;}
+  .hex{font-family:var(--mm-font-mono);font-size:11px;opacity:.85;margin-top:2px;}
+  .pair{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;}
+</style></head>
+<body>
+<div class="row">
+  <div class="swatch lg" style="background:#6C86C0;color:#fff;">
+    <div><div class="name">Primary</div><div class="hex">--mm-primary</div></div>
+    <div class="hex">#6C86C0</div>
+  </div>
+  <div class="swatch" style="background:#5A74AD;color:#fff;">
+    <div><div class="name">Hover</div><div class="hex">--mm-primary-hover</div></div>
+    <div class="hex">#5A74AD</div>
+  </div>
+  <div class="swatch" style="background:#4A6399;color:#fff;">
+    <div><div class="name">Active</div><div class="hex">--mm-primary-active</div></div>
+    <div class="hex">#4A6399</div>
+  </div>
+  <div class="swatch" style="background:rgba(108,134,192,0.12);color:#4A6399;">
+    <div><div class="name">Tint 12%</div><div class="hex">--mm-primary-tint</div></div>
+    <div class="hex">rgba(108,134,192,.12)</div>
+  </div>
+</div>
+</body></html>

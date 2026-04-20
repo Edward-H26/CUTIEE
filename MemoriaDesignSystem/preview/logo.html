@@ -1,0 +1,198 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--mm-font-body);
+    background:var(--mm-aurora);
+    padding:28px 32px;
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:20px;
+    align-items:stretch;
+    min-height:100vh;
+    box-sizing:border-box;
+  }
+  .tile{
+    border-radius:20px;
+    padding:22px;
+    min-height:240px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    position:relative;
+    overflow:hidden;
+  }
+  .mark-wrap{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .caption{
+    font-family:var(--mm-font-mono);
+    font-size:12px;
+    color:#64748b;
+    line-height:1.5;
+  }
+  .caption b{
+    display:block;
+    font-family:var(--mm-font-display);
+    font-weight:700;
+    font-size:14px;
+    color:#0f172a;
+    letter-spacing:-.01em;
+    margin-bottom:2px;
+  }
+
+  /* Tile 1 — slate solid */
+  .t-slate{
+    background:#6C86C0;
+  }
+  .t-slate .caption b{ color:#fff; }
+  .t-slate .caption{ color:rgba(255,255,255,.75); }
+
+  /* Tile 2 — aurora deep (linear blue → violet → #F1D6E1 pink) */
+  .t-aurora{
+    background:
+      linear-gradient(115deg,
+        #7fa0d4 0%,
+        #9fabd2 30%,
+        #bfb4cf 60%,
+        #ddc5d7 85%,
+        #F1D6E1 100%);
+  }
+  .t-aurora .caption b{ color:#fff; }
+  .t-aurora .caption{ color:rgba(255,255,255,.8); }
+
+  /* Tile 3 — white glass */
+  .t-white{
+    background:rgba(255,255,255,.75);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.7);
+  }
+
+  /* Tile 4 — wordmark on glass */
+  .t-word{
+    background:rgba(255,255,255,.55);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.6);
+    grid-column:span 2;
+  }
+  .t-word .mark-wrap{
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .mark-img{
+    width:120px;
+    height:120px;
+    display:block;
+  }
+  .mark-img-sm{
+    width:40px;
+    height:40px;
+    display:block;
+  }
+
+  .wordmark{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .word{
+    font-family:var(--mm-font-display);
+    font-weight:800;
+    font-size:44px;
+    letter-spacing:-1.5px;
+    color:#6C86C0;
+    line-height:1;
+  }
+  .inv-tile{
+    background:#1C1E2E;
+    grid-column:span 2;
+  }
+  .inv-tile .word{ color:#fff; }
+  .inv-tile .caption b{ color:#fff; }
+  .inv-tile .caption{ color:rgba(255,255,255,.6); }
+  .inv-tile .mark-img{
+    filter:brightness(0) invert(1);
+  }
+</style></head>
+<body>
+
+  <div class="tile t-slate">
+    <div class="mark-wrap">
+      <img class="mark-img" src="../assets/logo-mark.png" alt="Memoria mark" style="filter:brightness(0) invert(1);">
+    </div>
+    <div class="caption">
+      <b>Mark · slate</b>
+      #6C86C0 on brand blue
+    </div>
+  </div>
+
+  <div class="tile t-aurora">
+    <div class="mark-wrap">
+      <img class="mark-img" src="../assets/logo-mark.png" alt="Memoria mark" style="filter:brightness(0) invert(1);">
+    </div>
+    <div class="caption">
+      <b>Mark · aurora</b>
+      white on aurora-deep
+    </div>
+  </div>
+
+  <div class="tile t-white">
+    <div class="mark-wrap">
+      <img class="mark-img" src="../assets/logo-mark.png" alt="Memoria mark">
+    </div>
+    <div class="caption">
+      <b>Mark · primary</b>
+      #6C86C0 on glass
+    </div>
+  </div>
+
+  <div class="tile t-white">
+    <div class="mark-wrap" style="gap:18px;">
+      <img class="mark-img-sm" src="../assets/logo-mark.png" alt="">
+      <img class="mark-img-sm" src="../assets/logo-mark.png" alt="" style="width:28px;height:28px;">
+      <img class="mark-img-sm" src="../assets/logo-mark.png" alt="" style="width:20px;height:20px;">
+    </div>
+    <div class="caption">
+      <b>Sizes</b>
+      40 · 28 · 20 px
+    </div>
+  </div>
+
+  <div class="tile t-word">
+    <div class="mark-wrap">
+      <div class="wordmark">
+        <img class="mark-img-sm" src="../assets/logo-mark.png" alt="" style="width:48px;height:48px;">
+        <span class="word">Memoria</span>
+      </div>
+    </div>
+    <div class="caption">
+      <b>Wordmark</b>
+      Manrope 800 · −1.5px tracking · slate #6C86C0 · 48px mark + 44px text
+    </div>
+  </div>
+
+  <div class="tile inv-tile">
+    <div class="mark-wrap">
+      <div class="wordmark">
+        <img class="mark-img-sm" src="../assets/logo-mark.png" alt="" style="width:48px;height:48px;">
+        <span class="word">Memoria</span>
+      </div>
+    </div>
+    <div class="caption">
+      <b>Wordmark · dark</b>
+      white on near-black #1C1E2E · use on dark / photographic backgrounds
+    </div>
+  </div>
+
+</body></html>

@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Sans:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=block">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+body{margin:0;padding:32px 24px;background:var(--cutiee-bg-aurora);font-family:Inter,sans-serif}
+.m{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+
+.metric{
+  position:relative;overflow:hidden;
+  padding:18px 20px;border-radius:18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.06) 60%, rgba(255,255,255,.12) 100%);
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  border:1px solid rgba(255,255,255,.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(255,255,255,.15),
+    0 1px 2px rgba(108,134,192,.1),
+    0 14px 30px -12px rgba(108,134,192,.28);
+
+  /* Entry animation: fade + rise + scale, staggered */
+  opacity: 0; transform: translateY(24px) scale(.96);
+  animation: metricIn .8s cubic-bezier(.2,.8,.2,1) forwards;
+}
+.metric:nth-child(1){animation-delay:.05s}
+.metric:nth-child(2){animation-delay:.15s}
+.metric:nth-child(3){animation-delay:.25s}
+.metric:nth-child(4){animation-delay:.35s}
+@keyframes metricIn {
+  0%   { opacity: 0; transform: translateY(24px) scale(.96); filter: blur(4px); }
+  60%  { opacity: 1; transform: translateY(-2px) scale(1.01); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.metric::before{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(160deg, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 40%);
+  mix-blend-mode:screen;
+}
+.metric.spend::after{content:"";position:absolute;inset:-30%;z-index:-1;background:radial-gradient(50% 50% at 30% 30%, rgba(108,134,192,.3), transparent 70%);filter:blur(22px)}
+.metric.tasks::after{content:"";position:absolute;inset:-30%;z-index:-1;background:radial-gradient(50% 50% at 30% 30%, rgba(207,108,192,.26), transparent 70%);filter:blur(22px)}
+.metric.steps::after{content:"";position:absolute;inset:-30%;z-index:-1;background:radial-gradient(50% 50% at 30% 30%, rgba(126,200,220,.32), transparent 70%);filter:blur(22px)}
+.metric.replay::after{content:"";position:absolute;inset:-30%;z-index:-1;background:radial-gradient(50% 50% at 30% 30%, rgba(232,183,168,.36), transparent 70%);filter:blur(22px)}
+
+.lbl{position:relative;font-size:11px;color:rgba(30,41,59,.65);text-transform:uppercase;letter-spacing:.6px;font-weight:600;font-family:"JetBrains Mono", monospace;
+  opacity: 0; animation: fadeUp .6s ease forwards;}
+.val{position:relative;font-family:"Instrument Sans",sans-serif;font-weight:800;font-size:26px;letter-spacing:-.5px;color:#1e293b;margin-top:6px;text-shadow:0 1px 0 rgba(255,255,255,.35);
+  opacity: 0; animation: fadeUp .6s ease forwards;}
+.delta{position:relative;margin-top:2px;font-size:11px;color:rgba(30,41,59,.55);font-family:"JetBrains Mono", monospace;
+  opacity: 0; animation: fadeUp .6s ease forwards;}
+
+/* staggered inner content */
+.metric:nth-child(1) .lbl{animation-delay:.35s} .metric:nth-child(1) .val{animation-delay:.45s} .metric:nth-child(1) .delta{animation-delay:.55s}
+.metric:nth-child(2) .lbl{animation-delay:.45s} .metric:nth-child(2) .val{animation-delay:.55s} .metric:nth-child(2) .delta{animation-delay:.65s}
+.metric:nth-child(3) .lbl{animation-delay:.55s} .metric:nth-child(3) .val{animation-delay:.65s} .metric:nth-child(3) .delta{animation-delay:.75s}
+.metric:nth-child(4) .lbl{animation-delay:.65s} .metric:nth-child(4) .val{animation-delay:.75s} .metric:nth-child(4) .delta{animation-delay:.85s}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* continuous subtle breathing glow on the tint */
+.metric::after{ animation: breathe 5s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+</style><style>html{visibility:hidden}html.fonts-ready{visibility:visible}</style><script>document.fonts.ready.then(()=>document.documentElement.classList.add('fonts-ready'));setTimeout(()=>document.documentElement.classList.add('fonts-ready'),1500);</script></head><body>
+<div class="m">
+<div class="metric spend"><div class="lbl">Total spend</div><div class="val">$0.1842</div><div class="delta">↓ 98.7% vs baseline</div></div>
+<div class="metric tasks"><div class="lbl">Tasks</div><div class="val">12</div><div class="delta">3 running</div></div>
+<div class="metric steps"><div class="lbl">Steps</div><div class="val">418</div><div class="delta">avg 34.8 / task</div></div>
+<div class="metric replay"><div class="lbl">Replayed</div><div class="val">227</div><div class="delta">54.3% zero-cost</div></div>
+</div>
+</body></html>

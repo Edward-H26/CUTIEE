@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Memoria Web App — UI Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:"Inter",sans-serif;color:#1C1E2E;
+    background:
+      radial-gradient(ellipse 55% 50% at 85% 12%, rgba(235,170,195,.55) 0%, transparent 70%),
+      radial-gradient(ellipse 70% 60% at 15% 40%, rgba(150,190,245,.55) 0%, transparent 70%),
+      radial-gradient(ellipse 55% 55% at 82% 85%, rgba(165,150,215,.5) 0%, transparent 65%),
+      linear-gradient(135deg,#e9f0fc 0%,#ecf0fb 25%,#efedf9 55%,#ebe5f4 85%,#e6dff0 100%);
+    background-attachment:fixed;
+  }
+  #root{height:100vh;display:flex;flex-direction:column;}
+  *{box-sizing:border-box;}
+  input,button{font-family:inherit;}
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:6px;}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="./Primitives.jsx"></script>
+<script type="text/babel" src="./Chrome.jsx"></script>
+<script type="text/babel" src="./Conversation.jsx"></script>
+<script type="text/babel" src="./MemoryAndAgents.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+const SEED_THREADS = [
+  { id: "t1", title: "Onboarding — Acme pilot",   preview: "Amy's agent is reviewing the budget…", when: "2m" },
+  { id: "t2", title: "Slack integration scope",   preview: "Kevin: similar to the Acme build",    when: "1h" },
+  { id: "t3", title: "Q2 planning notes",         preview: "Summary + action items",               when: "Wed" },
+  { id: "t4", title: "Design review: memory tab", preview: "Confidence bars feel right",           when: "Mon" },
+  { id: "t5", title: "Vacation handoff — Kevin",  preview: "Agent will answer integration Qs",    when: "May 2" },
+];
+
+const SEED_MSGS = [
+  { role: "user", text: "A new client needs a Slack integration. Can you and Amy's agent scope it?" },
+  { role: "agent", agent: { name: "Kevin's agent", initials: "K", color: "linear-gradient(135deg,#6C86C0,#4A6399)" },
+    text: "We built something similar for Acme last quarter — about 3 days of work for OAuth + inbox routing. I'll pull the spec.",
+    memories: ["Acme Slack build: 3d", "Prefers concise scoping"] },
+  { role: "agent", agent: { name: "Amy's agent", initials: "A", color: "linear-gradient(135deg,#C97DB0,#8B4F80)" },
+    text: "Checked the Q2 budget — $12k available for integrations this month. Matches Kevin's estimate. Ready to draft the SOW when you approve.",
+    memories: ["Q2 integrations budget: $12k"] },
+  { role: "user", text: "Approved. Draft the SOW and loop in the client tomorrow 10am." },
+];
+
+const AGENTS = [
+  { name: "Kevin's agent", role: "Engineering", initials: "K", color: "linear-gradient(135deg,#6C86C0,#4A6399)", memories: 248, skills: 7, connections: 4 },
+  { name: "Amy's agent",   role: "Finance",     initials: "A", color: "linear-gradient(135deg,#C97DB0,#8B4F80)", memories: 192, skills: 5, connections: 3 },
+  { name: "Priya's agent", role: "Design",      initials: "P", color: "linear-gradient(135deg,#8BC5D6,#4A8FA3)", memories: 164, skills: 6, connections: 2 },
+];
+
+const MEMORIES = [
+  { category: "Work pattern",   text: "Reviews SOWs in the morning before standup; prefers one-page summaries with budget line items.", learned: "3 days ago", confidence: 0.92, type: "pattern" },
+  { category: "Communication",  text: "Uses short Slack messages for quick Qs, email for decisions that need a paper trail.",           learned: "1 week ago", confidence: 0.86, type: "pattern" },
+  { category: "Skill",          text: "Can draft client-facing SOWs using the Acme template; 3-day turnaround typical.",               learned: "2 weeks ago", confidence: 0.95, type: "skill"   },
+  { category: "Collaborator",   text: "Amy (Finance) handles all budget approvals over $5k; always loop her in early.",                learned: "1 month ago", confidence: 0.88, type: "pattern" },
+  { category: "Decision",       text: "Don't propose enterprise features to pilot customers unless they ask — founder preference.",     learned: "5 days ago",  confidence: 0.71, type: "pattern" },
+];
+
+function App() {
+  const [nav, setNav] = useState("chat");
+  const [activeThread, setActiveThread] = useState("t1");
+  const [msgs, setMsgs] = useState(SEED_MSGS);
+
+  const onSend = (text) => {
+    setMsgs(m => [...m, { role: "user", text }, {
+      role: "agent", agent: AGENTS[0],
+      text: "Got it. I'll incorporate that and ping you once the draft is ready.",
+      memories: ["Follow-up: 10am client meeting"],
+    }]);
+  };
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <TopBar
+        title={{ chat: "Chat", agent: "My Agent", team: "Team", dashboard: "Dashboard", help: "Help", privacy: "Privacy" }[nav] || ""}
+        subtitle={nav === "chat" ? "Onboarding — Acme pilot · 3 agents" : null}
+      />
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        <Sidebar active={nav} onNav={setNav} />
+        <main style={{ flex: 1, display: "flex", minWidth: 0,
+          background: "rgba(255,255,255,.2)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)" }}>
+          {nav === "chat" && (
+            <>
+              <ConversationList threads={SEED_THREADS} activeId={activeThread} onPick={setActiveThread} onNew={() => {}} />
+              <Conversation messages={msgs} onSend={onSend} participants={AGENTS.slice(0,2)} />
+            </>
+          )}
+          {nav === "agent" && <AgentView />}
+          {nav === "team" && <TeamView />}
+          {nav === "dashboard" && <DashboardView />}
+          {(nav === "help" || nav === "privacy") && (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#6B7280", fontSize: 14 }}>
+              {nav === "help" ? "Help" : "Privacy"} — coming soon
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function HomeView({ onGoChat }) {
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "40px 32px", display: "flex", justifyContent: "center" }}>
+      <div style={{ width: "100%", maxWidth: 680 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: 18, margin: "0 auto 18px",
+            background: "linear-gradient(135deg,#6C86C0,#4A6399)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 10px 24px rgba(108,134,192,.28)",
+          }}>
+            <Icon name="message" size={26} color="#fff" />
+          </div>
+          <h1 style={{
+            fontFamily: '"Manrope",sans-serif', fontWeight: 800, fontSize: 32,
+            letterSpacing: "-1px", margin: "0 0 6px",
+            background: "linear-gradient(135deg,#6C86C0,#6C86C0)",
+            WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+          }}>Welcome to Memoria</h1>
+          <p style={{ color: "#6B7280", fontSize: 15, margin: 0 }}>What would you like to do?</p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 32 }}>
+          <Glass onClick={onGoChat} style={{ padding: 24, cursor: "pointer" }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: "#6C86C0",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 14, boxShadow: "0 4px 12px rgba(108,134,192,.25)",
+            }}><Icon name="sparkles" size={20} color="#fff" /></div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>My Agent</div>
+            <div style={{ color: "#6B7280", fontSize: 13, lineHeight: 1.5 }}>
+              Configure your personal AI, manage skills and memory.
+            </div>
+          </Glass>
+          <Glass style={{ padding: 24 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: "#6C86C0",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 14, boxShadow: "0 4px 12px rgba(108,134,192,.25)",
+            }}><Icon name="users" size={20} color="#fff" /></div>
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Start a Group</div>
+            <div style={{ color: "#6B7280", fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+              Pull in teammates' agents for agent-to-agent collaboration.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input placeholder="Group name…" style={{
+                flex: 1, background: "rgba(255,255,255,.7)", border: "1px solid rgba(255,255,255,.4)",
+                borderRadius: 8, padding: "8px 10px", fontSize: 13, outline: "none", color: "#1C1E2E",
+              }} />
+              <Btn variant="primary" style={{ minHeight: 36, padding: "8px 14px", fontSize: 13 }}>Create</Btn>
+            </div>
+          </Glass>
+        </div>
+        <div style={{
+          fontSize: 11, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase",
+          letterSpacing: 1.5, marginBottom: 12,
+        }}>Recent chats</div>
+        <Glass style={{ padding: 8 }}>
+          {SEED_THREADS.slice(0,4).map((t, i) => (
+            <div key={t.id} onClick={onGoChat} style={{
+              padding: "10px 12px", borderRadius: 10, cursor: "pointer",
+              borderBottom: i < 3 ? "1px solid rgba(255,255,255,.35)" : "none",
+              display: "flex", justifyContent: "space-between",
+            }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{t.title}</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>{t.preview}</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#9CA3AF" }}>{t.when}</div>
+            </div>
+          ))}
+        </Glass>
+      </div>
+    </div>
+  );
+}
+
+function MemoryView() {
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "32px 32px" }}>
+      <div style={{ maxWidth: 820, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <h2 style={{
+              fontFamily: '"Manrope",sans-serif', fontWeight: 700, fontSize: 24,
+              letterSpacing: "-.015em", margin: "0 0 4px",
+            }}>What your agent has learned</h2>
+            <p style={{ color: "#6B7280", fontSize: 13, margin: 0 }}>
+              {MEMORIES.length} memories · rate or edit any one to steer future behaviour
+            </p>
+          </div>
+          <Btn variant="secondary" icon="plus" style={{ minHeight: 36, padding: "8px 14px", fontSize: 13 }}>Add manually</Btn>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {MEMORIES.map((m, i) => <MemoryBullet key={i} mem={m} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamView() {
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "32px 32px" }}>
+      <div style={{ maxWidth: 820, margin: "0 auto" }}>
+        <h2 style={{
+          fontFamily: '"Manrope",sans-serif', fontWeight: 700, fontSize: 24,
+          letterSpacing: "-.015em", margin: "0 0 4px",
+        }}>Your team's agents</h2>
+        <p style={{ color: "#6B7280", fontSize: 13, margin: "0 0 20px" }}>
+          Each teammate has their own agent. Pull any of them into a chat.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 28 }}>
+          {AGENTS.map(a => <AgentCard key={a.name} agent={a} />)}
+        </div>
+        <h3 style={{
+          fontFamily: '"Manrope",sans-serif', fontWeight: 700, fontSize: 18, margin: "0 0 12px",
+        }}>Integrations</h3>
+        <Glass style={{ padding: 8 }}>
+          <IntegrationRow logo="../../assets/integrations/slack.svg"    name="Slack"             connected />
+          <IntegrationRow logo="../../assets/integrations/notion.svg"   name="Notion"            connected />
+          <IntegrationRow logo="../../assets/integrations/github.svg"   name="GitHub"            connected={false} />
+          <IntegrationRow logo="../../assets/integrations/gmail.svg"    name="Gmail"             connected />
+          <IntegrationRow logo="../../assets/integrations/gcal.svg"     name="Google Calendar"   connected={false} />
+        </Glass>
+      </div>
+    </div>
+  );
+}
+
+function AgentView() {
+  const [tab, setTab] = useState("profile");
+  const tabs = [
+    { id: "profile", label: "Profile" },
+    { id: "skills",  label: "Skills" },
+    { id: "files",   label: "Files" },
+    { id: "memory",  label: "Memory" },
+  ];
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "32px 32px" }}>
+      <div style={{ maxWidth: 820, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 18,
+            background: "linear-gradient(135deg,#6C86C0,#4A6399)",
+            color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: '"Manrope",sans-serif', fontWeight: 800, fontSize: 26,
+            boxShadow: "0 10px 24px rgba(108,134,192,.28)",
+          }}>K</div>
+          <div style={{ flex: 1 }}>
+            <h2 style={{
+              fontFamily: '"Manrope",sans-serif', fontWeight: 700, fontSize: 24,
+              letterSpacing: "-.015em", margin: "0 0 4px",
+            }}>Kevin's agent</h2>
+            <p style={{ color: "#6B7280", fontSize: 13, margin: 0 }}>
+              Engineering · 248 memories · 7 skills installed
+            </p>
+          </div>
+          <Btn variant="secondary" icon="edit" style={{ minHeight: 36, padding: "8px 14px", fontSize: 13 }}>Edit</Btn>
+        </div>
+
+        <div style={{
+          display: "flex", gap: 4, padding: 4, marginBottom: 20,
+          background: "rgba(255,255,255,.5)", border: "1px solid rgba(255,255,255,.55)",
+          borderRadius: 12, width: "fit-content",
+        }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              border: 0, borderRadius: 8, padding: "8px 16px", cursor: "pointer",
+              fontFamily: '"Inter",sans-serif', fontWeight: 600, fontSize: 13,
+              color: tab === t.id ? "#6C86C0" : "#6B7280",
+              background: tab === t.id ? "#fff" : "transparent",
+              boxShadow: tab === t.id ? "0 2px 8px rgba(108,134,192,.15)" : "none",
+              transition: "all 180ms",
+            }}>{t.label}</button>
+          ))}
+        </div>
+
+        {tab === "profile" && (
+          <Glass style={{ padding: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 6 }}>System prompt</div>
+            <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginBottom: 16 }}>
+              You are Kevin's engineering agent. Be concise, favor concrete examples, and surface Acme precedents when scoping integrations. Default to shipping over polish.
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 6 }}>Tone</div>
+            <div style={{ fontSize: 13, color: "#334155" }}>Direct, warm, slightly dry.</div>
+          </Glass>
+        )}
+        {tab === "skills" && (
+          <Glass style={{ padding: 8 }}>
+            {[
+              { name: "Meeting Summarizer", desc: "Extracts action items from transcripts" },
+              { name: "Research Analyst", desc: "Cross-references multiple sources" },
+              { name: "Code Reviewer", desc: "Style + correctness suggestions" },
+            ].map((s, i) => (
+              <div key={s.name} style={{
+                padding: "12px 14px", borderBottom: i < 2 ? "1px solid rgba(255,255,255,.35)" : "none",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{s.name}</div>
+                  <div style={{ fontSize: 12, color: "#6B7280" }}>{s.desc}</div>
+                </div>
+                <div style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>● Installed</div>
+              </div>
+            ))}
+          </Glass>
+        )}
+        {tab === "files" && (
+          <Glass style={{ padding: 8 }}>
+            {[
+              { name: "Acme_SOW_Q2.pdf", size: "2.4 MB" },
+              { name: "integration-patterns.md", size: "48 KB" },
+              { name: "q2-budget.xlsx", size: "120 KB" },
+            ].map((f, i) => (
+              <div key={f.name} style={{
+                padding: "12px 14px", borderBottom: i < 2 ? "1px solid rgba(255,255,255,.35)" : "none",
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <Icon name="file" size={18} color="#6C86C0" />
+                <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{f.name}</div>
+                <div style={{ fontSize: 12, color: "#6B7280" }}>{f.size}</div>
+              </div>
+            ))}
+          </Glass>
+        )}
+        {tab === "memory" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {MEMORIES.map((m, i) => <MemoryBullet key={i} mem={m} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DashboardView() {
+  const stats = [
+    { label: "Conversations", value: "124", delta: "+12 this week" },
+    { label: "Messages",      value: "2,840", delta: "+316 this week" },
+    { label: "Memories",      value: "248",  delta: "+18 this week" },
+    { label: "Avg. response", value: "1.4s", delta: "−0.2s vs last" },
+  ];
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "32px 32px" }}>
+      <div style={{ maxWidth: 820, margin: "0 auto" }}>
+        <h2 style={{
+          fontFamily: '"Manrope",sans-serif', fontWeight: 700, fontSize: 24,
+          letterSpacing: "-.015em", margin: "0 0 4px",
+        }}>Dashboard</h2>
+        <p style={{ color: "#6B7280", fontSize: 13, margin: "0 0 20px" }}>
+          Activity across your agent and conversations.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+          {stats.map(s => (
+            <Glass key={s.label} style={{ padding: 18 }}>
+              <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 600 }}>{s.label}</div>
+              <div style={{ fontFamily: '"Manrope",sans-serif', fontSize: 28, fontWeight: 800, letterSpacing: "-.02em", margin: "6px 0 4px", color: "#1C1E2E" }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: "#6B7280" }}>{s.delta}</div>
+            </Glass>
+          ))}
+        </div>
+        <Glass style={{ padding: 20 }}>
+          <div style={{ fontFamily: '"Manrope",sans-serif', fontWeight: 700, fontSize: 16, marginBottom: 14 }}>Messages this week</div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 140 }}>
+            {[42, 58, 73, 61, 89, 94, 78].map((v, i) => (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <div style={{
+                  width: "100%", height: v + "%",
+                  background: "linear-gradient(180deg,#8BA3D6,#6C86C0)",
+                  borderRadius: "6px 6px 0 0",
+                }} />
+                <div style={{ fontSize: 11, color: "#6B7280" }}>{["M","T","W","T","F","S","S"][i]}</div>
+              </div>
+            ))}
+          </div>
+        </Glass>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:24px;background:var(--mm-aurora);font-family:var(--mm-font-body);display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .btn{min-height:44px;border:0;padding:12px 22px;font-weight:600;font-size:14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-family:inherit;transition:all 180ms cubic-bezier(.4,0,.2,1);}
+  .primary{background:#6C86C0;color:#fff;box-shadow:0 10px 24px rgba(108,134,192,.28);}
+  .ghost{background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.7);color:#0f172a;backdrop-filter:blur(14px);}
+  .secondary{background:#fff;border:1px solid #E5E7EB;color:#1C1E2E;}
+  .icon{background:transparent;color:#6B7280;width:40px;height:40px;padding:0;border-radius:9999px;justify-content:center;}
+  .label{font-family:var(--mm-font-mono);font-size:10px;color:#64748b;display:block;margin-top:6px;}
+  .col{display:flex;flex-direction:column;align-items:center;}
+  svg{stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;}
+</style></head>
+<body>
+<div class="col"><button class="btn primary">Start for free <svg width="14" height="14" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button><span class="label">primary</span></div>
+<div class="col"><button class="btn ghost">Sign in</button><span class="label">ghost glass</span></div>
+<div class="col"><button class="btn secondary">Cancel</button><span class="label">secondary</span></div>
+<div class="col"><button class="btn icon"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></button><span class="label">icon</span></div>
+</body></html>

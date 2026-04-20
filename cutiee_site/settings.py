@@ -56,11 +56,18 @@ if CUTIEE_ENV == "production" and SECRET_KEY.startswith("cutiee-insecure"):
         "Render's `generateValue: true` produces a suitable secret automatically."
     )
 
-DEBUG = env.bool("DJANGO_DEBUG", default = CUTIEE_ENV == "local")
-# Defaults are scoped to the localhost dev box. Production deployments must
-# enumerate their own host(s) via DJANGO_ALLOWED_HOSTS / DJANGO_CSRF_TRUSTED_ORIGINS
-# (set in render.yaml). This avoids trusting every *.onrender.com tenant by
-# default, which would let any sibling subdomain pass the CSRF origin check.
+# Render injects RENDER_EXTERNAL_HOSTNAME (for example "cutiee-1kqk.onrender.com")
+# on every web service. Treat its presence as the production signal so the deploy
+# survives a misconfigured CUTIEE_ENV: DEBUG defaults to False, the assigned
+# hostname is appended to ALLOWED_HOSTS, and the matching https origin is added
+# to CSRF_TRUSTED_ORIGINS. Explicit env vars still win when set.
+RENDER_EXTERNAL_HOSTNAME = env("RENDER_EXTERNAL_HOSTNAME", default = "")
+IS_ON_RENDER = bool(RENDER_EXTERNAL_HOSTNAME)
+
+DEBUG = env.bool(
+    "DJANGO_DEBUG",
+    default = CUTIEE_ENV == "local" and not IS_ON_RENDER,
+)
 ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
     default = ["localhost", "127.0.0.1"],
@@ -69,6 +76,11 @@ CSRF_TRUSTED_ORIGINS = env.list(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
     default = [],
 )
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    renderOrigin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+    if renderOrigin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(renderOrigin)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
