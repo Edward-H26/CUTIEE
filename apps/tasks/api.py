@@ -42,10 +42,33 @@ def run_task_view(request: HttpRequest, task_id: str) -> JsonResponse:
     if task is None:
         return JsonResponse({"error": "task not found"}, status = 404)
 
+    # Reject duplicate clicks: if the latest execution is still running,
+    # short-circuit instead of spawning a parallel thread that would race
+    # against the same procedural-graph write.
+    existing = tasksRepo.listExecutionsForTask(str(request.user.pk), str(task_id))
+    if existing and existing[0].get("status") == "running":
+        return JsonResponse({
+            "status": "already_running",
+            "task_id": task["id"],
+            "execution_id": existing[0]["id"],
+        }, status = 409)
+
     useMockRaw = request.POST.get("use_mock") or request.GET.get("use_mock")
     useMock = None
     if useMockRaw is not None:
         useMock = str(useMockRaw).lower() in {"1", "true", "yes"}
+
+    # Create the execution row synchronously BEFORE spawning the thread so
+    # the detail page sees an in-flight execution on the next render. The
+    # row starts with status='running' and step_count=0; the agent loop
+    # writes each step into Neo4j live via _publishProgress hooks.
+    import uuid as _uuid
+    executionId = str(_uuid.uuid4())
+    tasksRepo.createExecution(
+        userId = str(request.user.pk),
+        taskId = task["id"],
+        executionId = executionId,
+    )
 
     threading.Thread(
         target = _runInBackground,
@@ -55,10 +78,11 @@ def run_task_view(request: HttpRequest, task_id: str) -> JsonResponse:
             "description": task["description"],
             "initialUrl": task.get("initial_url") or "",
             "useMockAgent": useMock,
+            "executionId": executionId,
         },
         daemon = True,
     ).start()
-    return JsonResponse({"status": "started", "task_id": task["id"]})
+    return JsonResponse({"status": "started", "task_id": task["id"], "execution_id": executionId})
 
 
 def _runInBackground(**kwargs: object) -> None:

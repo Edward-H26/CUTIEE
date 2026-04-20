@@ -5,6 +5,12 @@
 # A lazy sweep on every publish drops snapshots older than 5 minutes
 # and the post-finish purge drops them on the next HTMX poll, so the
 # graph stays bounded for 2-5 concurrent demo users.
+#
+# Django framework bookkeeping (contenttypes, auth_permission, allauth_*,
+# sites, sessions) lives in a shared-cache in-memory SQLite hard-coded
+# in cutiee_site/settings.py. Zero application data lives there: every
+# domain entity round-trips through Neo4j via Cypher in apps/*/repo.py.
+# Therefore no DJANGO_INTERNAL_DB_URL env var is needed or honoured.
 
 services:
   - type: web
@@ -17,17 +23,19 @@ services:
     buildCommand: |
       uv sync &&
       uv run playwright install chromium &&
-      uv run python manage.py migrate --no-input &&
-      uv run python manage.py collectstatic --no-input &&
-      uv run python -m agent.persistence.bootstrap
+      uv run python -m agent.persistence.bootstrap &&
+      uv run python manage.py collectstatic --no-input
     # Single worker keeps Chromium memory bounded. Threads still fan out
     # for HTMX polls and other non-CU requests.
     startCommand: |
       uv run gunicorn cutiee_site.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     autoDeploy: true
     envVars:
+      # Python 3.12 is the current Render default; matches the local
+      # dev venv (3.13) closely enough for build artifacts to be
+      # interchangeable. Bump to 3.13 once Render makes it GA.
       - key: PYTHON_VERSION
-        value: "3.11.9"
+        value: "3.12.7"
       - key: CUTIEE_ENV
         value: production
       - key: DJANGO_SECRET_KEY
@@ -38,18 +46,9 @@ services:
         value: "cutiee-web.onrender.com,cutiee.onrender.com"
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         value: "https://cutiee-web.onrender.com,https://cutiee.onrender.com"
-      # DJANGO_INTERNAL_DB_URL is intentionally not exported. CUTIEE
-      # hard-codes a shared-cache in-memory SQLite for Django framework
-      # bookkeeping (contenttypes, auth_permission, allauth_*, sites,
-      # sessions). Zero application data lives in SQLite — every domain
-      # entity round-trips through Neo4j via Cypher in apps/*/repo.py.
+      # === Required secrets (paste in Render dashboard) ===
       - key: GEMINI_API_KEY
         sync: false
-      # Computer Use model. Defaults to gemini-flash-latest (auto-tracks
-      # Google's current Flash). Pin to gemini-3-flash-preview for
-      # deterministic replay across Google model swaps.
-      - key: CUTIEE_CU_MODEL
-        value: "gemini-flash-latest"
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -60,28 +59,37 @@ services:
         sync: false
       - key: NEO4J_PASSWORD
         sync: false
+      # === Computer Use tunables ===
+      # Defaults to gemini-flash-latest (auto-tracks Google's current
+      # Flash). Pin to gemini-3-flash-preview for deterministic replay
+      # across Google model swaps.
+      - key: CUTIEE_CU_MODEL
+        value: "gemini-flash-latest"
       - key: NEO4J_DATABASE
         value: "neo4j"
+      # Render dynos have no display server, so the browser must be
+      # headless. The controller defaults to headed for the dev demo.
+      - key: CUTIEE_BROWSER_HEADLESS
+        value: "true"
+      # Real Chromium drives the page directly. Set to "true" to fall
+      # back to the no-op stub (useful for cost-only demos without
+      # burning Chromium memory).
+      - key: CUTIEE_USE_STUB_BROWSER
+        value: "false"
+      # Aura-backed progress cache: 30 ms / publish, no Redis dyno needed.
+      - key: CUTIEE_PROGRESS_BACKEND
+        value: "neo4j"
+      # === ACE / planner tunables (defaults are sane; override per env) ===
       - key: CUTIEE_RECENCY_WINDOW
         value: "3"
       - key: CUTIEE_TEMPLATE_MATCH_THRESHOLD
         value: "0.85"
       - key: CUTIEE_REQUIRE_APPROVAL_HIGH_RISK
         value: "true"
-      # Aura-backed progress: 30 ms / publish, no Redis dyno needed.
-      # Demo-sized: lazy sweep + post-finish purge keep the graph bounded.
-      - key: CUTIEE_PROGRESS_BACKEND
-        value: "neo4j"
-      # Real-browser posture: buildCommand installs chromium via
-      # `playwright install chromium`, so the agent drives the page directly.
-      # Set CUTIEE_USE_STUB_BROWSER=true to fall back to the no-op stub
-      # (useful for cost-only demos without burning Chromium memory).
-      - key: CUTIEE_USE_STUB_BROWSER
-        value: "false"
-      # Render dynos have no display server, so the browser must be
-      # headless. The controller defaults to headed for the dev demo;
-      # this env var flips it to headless in production.
-      - key: CUTIEE_BROWSER_HEADLESS
-        value: "true"
-      - key: CUTIEE_CREDENTIAL_KEY
-        sync: false
+      # === Optional ===
+      # CUTIEE_CREDENTIAL_KEY (Fernet) is only needed if you persist
+      # user secrets via SemanticCredentialStore. Omit unless you've
+      # explicitly wired that store; the rest of the agent works fine
+      # without it. To enable: generate via
+      #   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+      # then add the key to the Render dashboard as a secret.

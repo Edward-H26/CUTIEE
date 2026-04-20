@@ -18,6 +18,8 @@
                 hx-post="{% url 'tasks:run' task_id=task.id %}"
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                 hx-swap="none"
+                hx-disabled-elt="this"
+                hx-on::after-request="this.textContent = 'Starting…'; setTimeout(() => window.location.reload(), 1500);"
                 title="Computer Use via gemini-flash-latest (screenshot + pixel coordinates)">Run task now</button>
         <span class="cutiee-text-sm cutiee-muted">CUTIEE checks procedural memory first; otherwise it runs the screenshot-based Computer Use pipeline.</span>
     </div>
@@ -41,7 +43,11 @@
             </div>
         </div>
 
-        <div class="cutiee-card cutiee-table-wrap">
+        <div class="cutiee-card cutiee-table-wrap"
+             hx-get="{% url 'tasks:detail' task_id=task.id %}"
+             hx-trigger="every 2s"
+             hx-select=".cutiee-table-wrap"
+             hx-swap="outerHTML">
             <table class="cutiee-table">
                 <thead>
                     <tr>
@@ -66,13 +72,19 @@
                         <td>{% if step.model != "replay" %}<a href="{% url 'tasks:step_screenshot' execution_id=executions.0.id step_index=step.index %}" target="_blank" rel="noreferrer" class="cutiee-text-sm">screenshot</a>{% else %}<span class="cutiee-text-sm cutiee-muted">-</span>{% endif %}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="7" class="cutiee-text-sm cutiee-muted">No steps recorded yet.</td></tr>
+                    <tr><td colspan="7" class="cutiee-text-sm cutiee-muted">Agent is starting; first step appears in a moment.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     {% else %}
-        <div class="cutiee-card"><p class="cutiee-text-sm cutiee-muted cutiee-m-0">This task has not been run yet. Click "Run task now" to start.</p></div>
+        <div class="cutiee-card"
+             hx-get="{% url 'tasks:detail' task_id=task.id %}"
+             hx-trigger="every 2s"
+             hx-select=".cutiee-card"
+             hx-swap="outerHTML">
+            <p class="cutiee-text-sm cutiee-muted cutiee-m-0">This task has not been run yet. Click "Run task now" to start.</p>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

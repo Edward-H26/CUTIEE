@@ -318,14 +318,22 @@ def listExecutionsForTask(userId: str, taskId: str) -> list[dict[str, Any]]:
 
 
 def persistAgentState(userId: str, taskId: str, state: AgentState) -> None:
-    """Bulk-write all steps + finalize execution. Used by the services layer."""
-    createExecution(
-        userId = userId,
-        taskId = taskId,
-        executionId = state.executionId,
-        replayed = state.replayed,
-        templateId = state.templateId,
-    )
+    """Finalize execution: idempotently ensure the execution row exists,
+    flush all steps (idempotent MERGE), then mark complete and update the
+    task summary.
+
+    The Execution row is normally pre-created by the run view so the UI
+    can poll progress live; if missing (direct-shell invocation, tests),
+    this method back-fills it.
+    """
+    if getExecution(userId, state.executionId) is None:
+        createExecution(
+            userId = userId,
+            taskId = taskId,
+            executionId = state.executionId,
+            replayed = state.replayed,
+            templateId = state.templateId,
+        )
     for step in state.history:
         appendStep(userId = userId, executionId = state.executionId, step = step)
     finalizeExecution(

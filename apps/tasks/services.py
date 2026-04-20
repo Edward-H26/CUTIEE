@@ -86,6 +86,7 @@ def runTaskForUser(
     description: str,
     initialUrl: str = "",
     useMockAgent: bool | None = None,
+    executionId: str | None = None,
 ) -> TaskRunSummary:
     """Drive one task to completion through the Computer Use runner.
 
@@ -111,6 +112,7 @@ def runTaskForUser(
             description = description,
             initialUrl = initialUrl,
             useMockAgent = useMockAgent,
+            executionId = executionId,
         )
     )
 
@@ -254,11 +256,25 @@ async def _runTaskAsync(
     description: str,
     initialUrl: str,
     useMockAgent: bool | None,
+    executionId: str | None = None,
 ) -> AgentState:
     cutieeEnv = os.environ.get("CUTIEE_ENV", "")
-    forceMock = useMockAgent if useMockAgent is not None else cutieeEnv != "production"
+    # Allow local-mode operators to opt into the live Gemini ComputerUse
+    # client via `CUTIEE_LOCAL_USE_GEMINI=true`. Useful for testing the
+    # real CU pipeline against a Neo4j-backed local stack without flipping
+    # the entire CUTIEE_ENV to production. Requires GEMINI_API_KEY.
+    localUsesGemini = (
+        cutieeEnv == "local"
+        and os.environ.get("CUTIEE_LOCAL_USE_GEMINI", "false").lower() in {"1", "true", "yes"}
+    )
+    if useMockAgent is not None:
+        forceMock = useMockAgent
+    elif cutieeEnv == "production" or localUsesGemini:
+        forceMock = False
+    else:
+        forceMock = True
 
-    executionId = str(uuid.uuid4())
+    executionId = executionId or str(uuid.uuid4())
 
     if forceMock:
         runner = buildMockCuRunner(initialUrl = initialUrl)
@@ -515,7 +531,21 @@ def _computeReward(state: AgentState) -> float:
 
 
 def _progressCallback(state: AgentState, step: ObservationStep) -> None:
+    """Per-step hook: publish to the in-process progress cache AND
+    persist the step to Neo4j so the detail page's steps table updates
+    in real time. Best-effort — Neo4j hiccups never abort the run."""
     _publishProgress(state.executionId, _summarize(state, latestStep = step), finished = False)
+    try:
+        tasksRepo.appendStep(
+            userId = state.userId,
+            executionId = state.executionId,
+            step = step,
+        )
+    except Exception:  # noqa: BLE001 - never block the agent on a write hiccup
+        _logger.debug(
+            "Live appendStep failed for execution=%s step=%s",
+            state.executionId, step.index, exc_info = True,
+        )
 
 
 def _publishProgress(executionId: str, summary: TaskRunSummary, *, finished: bool) -> None:

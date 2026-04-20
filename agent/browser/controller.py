@@ -137,8 +137,12 @@ class BrowserController:
                 keys = action.keys or ([action.value] if action.value else [])
                 if not keys:
                     return StepResult(success = False, detail = "key_combo requires keys")
-                # Playwright accepts "Control+A" style combos in keyboard.press.
-                await self._page.keyboard.press("+".join(keys))
+                # Playwright requires its own canonical key names (ArrowUp,
+                # PageDown, etc.). Gemini emits informal aliases like "up"
+                # or "page_down"; normalize them here so the press succeeds
+                # instead of throwing `Unknown key` and burning a retry.
+                normalized = [_normalizePlaywrightKey(k) for k in keys]
+                await self._page.keyboard.press("+".join(normalized))
             elif action.type == ActionType.SCROLL_AT:
                 if action.coordinate is not None:
                     await self._page.mouse.move(*action.coordinate)
@@ -290,3 +294,42 @@ def _resolveStorageStatePath(domain: str, userId: str = "") -> str | None:
     if fallback and Path(fallback).exists():
         return fallback
     return None
+
+
+# Gemini ComputerUse emits informal key names ("up", "page_down", "ctrl");
+# Playwright requires its canonical names. Map the common aliases so the
+# `keyboard.press` call succeeds instead of raising `Unknown key`.
+_PLAYWRIGHT_KEY_ALIASES = {
+    "up": "ArrowUp",
+    "down": "ArrowDown",
+    "left": "ArrowLeft",
+    "right": "ArrowRight",
+    "esc": "Escape",
+    "del": "Delete",
+    "ins": "Insert",
+    "page_up": "PageUp",
+    "page_down": "PageDown",
+    "pageup": "PageUp",
+    "pagedown": "PageDown",
+    "ctrl": "Control",
+    "cmd": "Meta",
+    "command": "Meta",
+    "win": "Meta",
+    "return": "Enter",
+    "space": " ",
+}
+
+
+def _normalizePlaywrightKey(key: str) -> str:
+    """Normalize a Gemini-emitted key name to Playwright's canonical form.
+
+    Already-canonical keys (`Enter`, `Tab`, `ArrowUp`, single chars, F1)
+    pass through untouched. Unknown keys also pass through so Playwright's
+    own error message surfaces if Gemini hallucinates something exotic.
+    """
+    if not key:
+        return key
+    lower = key.strip().lower()
+    if lower in _PLAYWRIGHT_KEY_ALIASES:
+        return _PLAYWRIGHT_KEY_ALIASES[lower]
+    return key
