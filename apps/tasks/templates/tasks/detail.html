@@ -78,10 +78,11 @@
             </table>
         </div>
     {% else %}
-        <div class="cutiee-card"
+        <div id="empty-exec"
+             class="cutiee-card"
              hx-get="{% url 'tasks:detail' task_id=task.id %}"
              hx-trigger="every 2s"
-             hx-select=".cutiee-card"
+             hx-select="#empty-exec"
              hx-swap="outerHTML">
             <p class="cutiee-text-sm cutiee-muted cutiee-m-0">This task has not been run yet. Click "Run task now" to start.</p>
         </div>

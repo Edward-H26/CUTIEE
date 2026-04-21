@@ -1,9 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" role="img" aria-label="CUTIEE">
-  <defs>
-    <linearGradient id="cutiee-g" x1="0" x2="1" y1="0" y2="0">
-      <stop offset="0%" stop-color="#6C86C0"></stop>
-      <stop offset="100%" stop-color="#8B6CC0"></stop>
-    </linearGradient>
-  </defs>
-  <text x="0" y="36" font-family="Manrope, Inter, sans-serif" font-weight="800" font-size="32" letter-spacing="-1.2" fill="url(#cutiee-g)">CUTIEE</text>
+<svg width="43" height="40" viewBox="0 0 43 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="10" cy="30" r="10" fill="#4D58F0"></circle>
+  <circle cx="21.5" cy="10" r="10" fill="#4D58F0"></circle>
+  <circle cx="33" cy="30" r="10" fill="#4D58F0"></circle>
 </svg>

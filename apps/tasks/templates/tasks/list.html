@@ -1,64 +1,99 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Tasks · CUTIEE{% endblock %}
 {% block content %}
-<section class="cutiee-stack">
-    <div class="cutiee-row-between">
+<section class="page-head">
+    <div>
+        <div class="crumb">Workspace &middot; Tasks</div>
+        <h1>Run a task</h1>
+        <div class="page-head__stats">{{ tasks|length }} task(s) &middot; ${{ cost.total_cost|floatformat:4 }} spent &middot; {{ cost.replay_step_count }} replayed step(s)</div>
+    </div>
+    <div class="page-head__actions">
+        <a href="{% url 'tasks:dashboard' %}" class="btn-secondary">View cost dashboard</a>
+        <a href="{% url 'audit:list' %}" class="btn-secondary">Audit log</a>
+    </div>
+</section>
+
+<form method="post" action="{% url 'tasks:create' %}" class="submit-card" data-testid="task-form">
+    {% csrf_token %}
+    <label class="submit-card__label" for="id_description">What should CUTIEE do?</label>
+    <div class="submit-card__row">
+        <div class="submit-card__fields">
+            <textarea name="description" id="id_description" placeholder="Sort the spreadsheet rows by column B and email me the result." required>{{ form.description.value|default_if_none:'' }}</textarea>
+            <input type="url" name="initial_url" placeholder="Optional: https://docs.google.com/spreadsheets/..." value="{{ form.initial_url.value|default_if_none:'' }}">
+            <input type="text" name="domain_hint" placeholder="Optional: domain hint (e.g. docs.google.com)" value="{{ form.domain_hint.value|default_if_none:'' }}">
+        </div>
+        <div class="submit-card__actions">
+            <button type="submit" class="btn-primary" data-testid="submit-task">Submit task
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>
+            </button>
+            <a href="{% url 'memory_app:list' %}" class="btn-secondary submit-card__templates">View templates</a>
+        </div>
+    </div>
+    <div class="submit-card__tips">
+        <span class="ex-chip">Tip: paste a Google Sheets URL</span>
+        <span class="ex-chip">Tip: sort / sum / rename a column</span>
+        <span class="ex-chip">Tip: extract and email top rows</span>
+    </div>
+</form>
+
+<div data-testid="vlm-banner">
+    <div id="vlm-status-banner"
+         class="vlm-banner vlm-banner--loading"
+         hx-get="/api/vlm-health/"
+         hx-trigger="load, every 4s"
+         hx-swap="outerHTML"
+         hx-target="this">
+        <span class="dot"></span> Checking model status&hellip;
+    </div>
+</div>
+
+<section class="metric-grid" data-testid="cost-cards">
+    <div class="metric">
+        <div class="metric__label">Total spend</div>
+        <div class="metric__value metric__value--grad">${{ cost.total_cost|floatformat:4 }}</div>
+        <div class="metric__delta">vs $0.30 frontier baseline</div>
+    </div>
+    <div class="metric">
+        <div class="metric__label">Tasks</div>
+        <div class="metric__value">{{ cost.task_count|default:0 }}</div>
+        <div class="metric__delta">{{ tasks|length }} in this view</div>
+    </div>
+    <div class="metric">
+        <div class="metric__label">Steps</div>
+        <div class="metric__value">{{ cost.step_count|default:0 }}</div>
+        <div class="metric__delta">{{ cost.replay_step_count|default:0 }} replayed</div>
+    </div>
+    <div class="metric">
+        <div class="metric__label">Model tier</div>
+        <div class="metric__value metric__value--sm">Computer Use</div>
+        <div class="metric__delta">screenshot + pixel coordinates</div>
+    </div>
+</section>
+
+<section class="panel" data-testid="your-tasks-panel">
+    <div class="panel__head">
         <div>
-            <h1>My tasks</h1>
-            <p class="cutiee-text-sm cutiee-muted cutiee-mt-1">
-                {{ tasks|length }} task(s) · ${{ cost.total_cost|floatformat:4 }} spent · {{ cost.replay_step_count }} replayed step(s)
-            </p>
-        </div>
-        <a href="{% url 'tasks:dashboard' %}" class="cta-ghost">View cost dashboard</a>
-    </div>
-
-    <div class="cutiee-card" data-testid="task-form">
-        <h2 class="cutiee-mb-3">Submit a new task</h2>
-        <form method="post" action="{% url 'tasks:create' %}" class="cutiee-stack-tight">
-            {% csrf_token %}
-            {% for field in form %}
-                <label class="cutiee-label">
-                    {{ field.label }}
-                    {{ field }}
-                    {% if field.errors %}<span class="cutiee-error">{{ field.errors|join:', ' }}</span>{% endif %}
-                </label>
-            {% endfor %}
-            <div class="cutiee-row-between">
-                <p class="cutiee-text-sm cutiee-muted cutiee-m-0">Tip: paste a Google Sheets URL and ask CUTIEE to sort, sum, or rename a column.</p>
-                <button type="submit" class="cta" data-testid="submit-task">Submit task</button>
-            </div>
-        </form>
-    </div>
-
-    <div data-testid="vlm-banner">
-        <div id="vlm-status-banner"
-             class="vlm-banner vlm-banner--loading"
-             hx-get="/api/vlm-health/"
-             hx-trigger="load, every 4s"
-             hx-swap="outerHTML"
-             hx-target="this">
-            <span class="dot"></span> Checking model status…
+            <h2>Your tasks</h2>
+            <div class="panel__sub">{{ tasks|length }} total &middot; click a row to drill into its steps</div>
         </div>
     </div>
-
     {% if tasks %}
-        <div class="cutiee-stack-tight">
+        <div class="task-rows">
             {% for task in tasks %}
-                <a href="{% url 'tasks:detail' task_id=task.id %}" class="cutiee-card cutiee-card-tight cutiee-task-row" data-testid="task-row">
-                    <div class="cutiee-task-row__main">
-                        <div class="cutiee-task-row__title">{{ task.description|truncatechars:90 }}</div>
-                        <div class="cutiee-mono">{{ task.initial_url|default:"no starting url" }}</div>
+                <a href="{% url 'tasks:detail' task_id=task.id %}" data-testid="task-row" class="task-row">
+                    <div class="task-row__main">
+                        <div class="task-row__title">{{ task.description|truncatechars:90 }}</div>
+                        <div class="task-row__url">{{ task.initial_url|default:"no starting url" }}</div>
                     </div>
-                    <span class="cutiee-pill">{{ task.status }}</span>
-                    <span class="cutiee-mono">${{ task.total_cost_usd|floatformat:4 }}</span>
-                    <span class="cutiee-mono">{{ task.run_count }} runs</span>
+                    <span class="tier {% if task.status == 'completed' %}tier--ok{% elif task.status == 'pending' %}tier--t1{% else %}tier--t2{% endif %}">{{ task.status }}</span>
+                    <span class="task-row__cost">${{ task.total_cost_usd|floatformat:4 }}</span>
+                    <span class="task-row__runs">{{ task.run_count }} runs</span>
                 </a>
             {% endfor %}
         </div>
     {% else %}
-        <div class="cutiee-card">
-            <p class="cutiee-text-sm cutiee-muted cutiee-m-0">No tasks yet. Submit your first task above to see CUTIEE in action.</p>
-        </div>
+        <p class="panel__empty">No tasks yet. Submit your first task above to see CUTIEE in action.</p>
     {% endif %}
 </section>
 {% endblock %}

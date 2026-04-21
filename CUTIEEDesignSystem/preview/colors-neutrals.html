@@ -1,21 +1,25 @@
-<!doctype html><html><head><meta charset="utf-8">
+<!doctype html>
+<html><head><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Sans:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=block">
-<link rel="stylesheet" href="../colors_and_type.css"><style>
-body{margin:0;padding:20px;background:#fff}
-.row{display:flex;gap:12px}
-.sw{flex:1;border-radius:12px;padding:14px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid #E5E5E5}
-.sw .n{font-family:var(--cutiee-font-display);font-weight:700;font-size:14px}
-.sw .h{font-family:var(--cutiee-font-mono);font-size:11px}
-</style><style>html{visibility:hidden}html.fonts-ready{visibility:visible}</style><script>document.fonts.ready.then(()=>document.documentElement.classList.add('fonts-ready'));setTimeout(()=>document.documentElement.classList.add('fonts-ready'),1500);</script></head><body>
-<!-- True neutral grays — no warm/cool cast (pure achromatic scale) -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:20px;background:#fafafa;font-family:var(--mm-font-body);}
+  .row{display:flex;gap:10px;}
+  .sw{flex:1;border-radius:var(--mm-radius-lg);padding:14px 12px 12px;min-height:90px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid #0000000f;}
+  .name{font-weight:600;font-size:12px;line-height:1.1;}
+  .hex{font-family:var(--mm-font-mono);font-size:10px;opacity:.8;}
+</style></head>
+<body>
 <div class="row">
-  <div class="sw" style="background:#1F1F1F"><div class="n" style="color:#fff">Text</div><div class="h" style="color:#D4D4D4">#1F1F1F</div></div>
-  <div class="sw" style="background:#6B6B6B"><div class="n" style="color:#fff">Text Muted</div><div class="h" style="color:#E5E5E5">#6B6B6B</div></div>
-  <div class="sw" style="background:#9A9A9A"><div class="n" style="color:#fff">Text Soft</div><div class="h" style="color:#F5F5F5">#9A9A9A</div></div>
-  <div class="sw" style="background:#F7F7F7"><div class="n" style="color:#1F1F1F">Page BG</div><div class="h" style="color:#6B6B6B">#F7F7F7</div></div>
-  <div class="sw" style="background:#ffffff"><div class="n" style="color:#1F1F1F">Content</div><div class="h" style="color:#6B6B6B">#FFFFFF</div></div>
-  <div class="sw" style="background:#E5E5E5"><div class="n" style="color:#1F1F1F">Hair</div><div class="h" style="color:#6B6B6B">#E5E5E5</div></div>
+  <div class="sw" style="background:#1C1E2E;color:#fff;"><div><div class="name">fg-1</div><div class="hex">Primary text</div></div><div class="hex">#1C1E2E</div></div>
+  <div class="sw" style="background:#0f172a;color:#fff;"><div><div class="name">fg-2</div><div class="hex">Landing body</div></div><div class="hex">#0f172a</div></div>
+  <div class="sw" style="background:#6B7280;color:#fff;"><div><div class="name">muted</div><div class="hex">Secondary</div></div><div class="hex">#6B7280</div></div>
+  <div class="sw" style="background:#94a3b8;color:#fff;"><div><div class="name">light</div><div class="hex">Eyebrow</div></div><div class="hex">#94a3b8</div></div>
+  <div class="sw" style="background:#E5E7EB;color:#1C1E2E;"><div><div class="name">border</div><div class="hex">Solid</div></div><div class="hex">#E5E7EB</div></div>
+  <div class="sw" style="background:#F5F6FA;color:#1C1E2E;"><div><div class="name">hover-bg</div><div class="hex">Rest hover</div></div><div class="hex">#F5F6FA</div></div>
+  <div class="sw" style="background:#fdfdfd;color:#1C1E2E;border:1px solid #E5E7EB;"><div><div class="name">bg-subtle</div><div class="hex">Warm white</div></div><div class="hex">#fdfdfd</div></div>
 </div>
 </body></html>

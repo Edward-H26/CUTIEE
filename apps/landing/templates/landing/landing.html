@@ -1,56 +1,1023 @@
-{% extends "base.html" %}
-{% block title %}CUTIEE — Computer Use agentIc-framework with Token-efficient harnEss Engineering{% endblock %}
-{% block content %}
-<section class="cutiee-hero">
-    <span class="cutiee-pill cutiee-pill--success cutiee-hero__badge">
-        <span class="cutiee-hero__dot"></span>
-        Computer use agent · live demo on Render
-    </span>
-    <h1 class="cutiee-hero__heading">
-        <span class="cutiee-gradient-text">Your computer use agent,</span><br>
-        at $0 per recurring task.
-    </h1>
-    <p class="cutiee-hero__subtitle">
-        CUTIEE replays learned workflows, prunes stale context, and routes each action to the cheapest viable model, so your agent gets smarter and cheaper over time.
-    </p>
-    <div class="cutiee-hero__cta">
-        <a href="{% url 'account_login' %}" class="cta" data-testid="hero-signin">Sign in with Google</a>
-        <a href="#features" class="cta-ghost">See how it works</a>
-    </div>
-</section>
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CUTIEE — Token-efficient computer use agents</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="{% static 'css/cutiee.css' %}?v=2026-04-20i">
+<style>html{visibility:hidden}html.fr{visibility:visible}</style>
+<script>document.fonts.ready.then(()=>document.documentElement.classList.add('fr'));setTimeout(()=>document.documentElement.classList.add('fr'),1500);</script>
 
-<section id="features" class="cutiee-feature-grid">
-    <div class="cutiee-feature">
-        <div class="cutiee-feature-icon">P</div>
-        <h3>Procedural Memory Replay</h3>
-        <p>Every completed task becomes a zero-cost template. Recurring work drops to $0.</p>
-    </div>
-    <div class="cutiee-feature">
-        <div class="cutiee-feature-icon">T</div>
-        <h3>Temporal Recency Pruning</h3>
-        <p>Keeps context bounded as tasks grow longer. 70%+ token savings on long workflows.</p>
-    </div>
-    <div class="cutiee-feature">
-        <div class="cutiee-feature-icon">S</div>
-        <h3>Self-Evolving Templates</h3>
-        <p>When a site's UI changes, templates patch themselves automatically. No manual updates.</p>
-    </div>
-    <div class="cutiee-feature">
-        <div class="cutiee-feature-icon">M</div>
-        <h3>Multi-Model Routing</h3>
-        <p>Each action goes to the cheapest viable model tier. Pay pro-tier rates only for the hard 5%.</p>
-    </div>
-</section>
+<!-- GSAP + ScrollTrigger + Lenis (MIRA motion stack) -->
+<script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://unpkg.com/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
 
-<section class="cutiee-cost-strip">
-    <span>Gemini-only baseline: <strong>~$0.30/task</strong></span>
-    <span class="cutiee-cost-strip__sep">·</span>
-    <span>CUTIEE hybrid: <strong>~$0.004/task</strong></span>
-    <span class="cutiee-cost-strip__sep">·</span>
-    <span><strong>98.7% reduction</strong></span>
-</section>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;scroll-behavior:auto /* Lenis handles smooth */}
+  body{
+    font-family:var(--cutiee-font-body);color:var(--cutiee-text);
+    background:
+      radial-gradient(ellipse 55% 50% at 85% 12%, rgba(235,170,195,.55) 0%, transparent 70%),
+      radial-gradient(ellipse 70% 60% at 15% 40%, rgba(150,190,245,.55) 0%, transparent 70%),
+      radial-gradient(ellipse 55% 55% at 82% 85%, rgba(165,150,215,.5) 0%, transparent 65%),
+      linear-gradient(135deg,#e9f0fc 0%,#ecf0fb 25%,#efedf9 55%,#ebe5f4 85%,#e6dff0 100%);
+    background-attachment:fixed;min-height:100vh;overflow-x:hidden;
+  }
 
-<footer class="cutiee-footer">
-    &copy; 2026 CUTIEE · INFO490 Final Project · University of Illinois
+  /* NAV */
+  .nav{position:fixed;top:0;left:0;right:0;z-index:50;border-bottom:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.55);backdrop-filter:blur(20px);transition:background .35s ease,box-shadow .35s ease,padding .35s ease;padding:6px 0}
+  .nav.scrolled{background:rgba(255,255,255,.82);box-shadow:0 2px 16px rgba(15,23,42,.08);padding:0}
+  .nav-inner{max-width:1200px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  .brand-lockup{display:flex;align-items:center;gap:10px;text-decoration:none}
+  .brand-tile{width:40px;height:40px;display:grid;place-items:center;background:transparent;border:none;box-shadow:none}
+  .brand-tile img{width:100%;height:100%;display:block;object-fit:contain}
+  .brand-word{font-family:var(--cutiee-font-display);font-weight:700;font-size:22px;letter-spacing:-1px;background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .nav-links{display:flex;gap:4px;align-items:center}
+  .lnk{text-decoration:none;color:var(--cutiee-text-muted);font-size:14px;font-weight:500;padding:8px 14px;border-radius:10px;transition:all .18s}
+  .lnk:hover{color:var(--cutiee-text);background:rgba(255,255,255,.6)}
+  .cta-gradient{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:999px;color:#fff;font-weight:600;font-size:14px;text-decoration:none;background:linear-gradient(135deg,#6C86C0,#8B6CC0);box-shadow:0 10px 24px rgba(108,134,192,.28);transition:transform .18s;border:0;cursor:pointer;font-family:var(--cutiee-font-body)}
+  .cta-gradient:hover{transform:translateY(-1px)}
+  .cta-ghost{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.7);color:var(--cutiee-text);font-weight:600;font-size:14px;text-decoration:none;backdrop-filter:blur(14px);font-family:var(--cutiee-font-body);cursor:pointer}
+
+  section{max-width:1100px;margin:0 auto;padding:80px 24px}
+  .section-head{text-align:center;max-width:780px;margin:0 auto 48px}
+  .kicker{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--cutiee-primary);font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;padding:5px 12px;border-radius:999px;background:rgba(108,134,192,.1);border:1px solid rgba(108,134,192,.18)}
+  h2.section-title{font-family:var(--cutiee-font-display);font-weight:700;font-size:clamp(32px,4.5vw,52px);line-height:1.05;letter-spacing:-1.5px;margin:0 0 18px}
+  h2 .grad{background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .section-sub{font-size:17px;line-height:1.55;color:var(--cutiee-text-muted);max-width:620px;margin:0 auto}
+  .reveal{opacity:0;transform:translateY(18px);transition:opacity .45s cubic-bezier(.22,1,.36,1),transform .45s cubic-bezier(.22,1,.36,1)}
+  .reveal.in{opacity:1;transform:translateY(0)}
+
+  /* HERO */
+  .hero{text-align:center;padding:120px 24px 60px;min-height:100svh;display:flex;flex-direction:column;justify-content:center}
+  .hero-tag{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.6);backdrop-filter:blur(14px);font-size:12.5px;color:var(--cutiee-text-muted);margin:0 auto 24px;max-width:92%}
+  .hero-tag::before{content:"";width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.2);animation:pulse 1.4s ease-in-out infinite;flex-shrink:0}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.6}}
+  .full-name{font-family:"JetBrains Mono",monospace;font-size:clamp(10.5px,1.2vw,12px);color:var(--cutiee-text-muted);margin-bottom:22px;max-width:640px;margin-inline:auto;line-height:1.5;padding:0 12px;overflow-wrap:anywhere}
+  .full-name b{color:var(--cutiee-primary);font-weight:700}
+  h1.headline{font-family:var(--cutiee-font-display);font-weight:700;font-size:clamp(44px,13vw,160px);line-height:1;letter-spacing:clamp(-5px,-0.5vw,-1.5px);margin:0;background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;word-break:break-word}
+  /* Hero elements should never be hidden on first paint — override .reveal baseline. */
+  .hero .reveal{opacity:1;transform:none;transition:none}
+  .sub{margin:26px auto 0;max-width:680px;font-size:19px;line-height:1.55;color:var(--cutiee-text);font-weight:500}
+  .sub .sub-em{color:var(--cutiee-text-muted);font-weight:400;font-size:16px}
+  .hero-cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap;justify-content:center}
+
+  /* PROBLEM + STEP CARDS */
+  .stat-grid,.step-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .stat,.step-card{padding:26px;border-radius:18px;background:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.5);backdrop-filter:blur(22px)}
+  .stat{text-align:center;padding:28px 20px}
+  .stat .n{font-family:var(--cutiee-font-display);font-weight:700;font-size:56px;letter-spacing:-2px;line-height:1;background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .stat .copy{margin-top:12px;font-size:14.5px;line-height:1.5}
+  .stat .src{margin-top:10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--cutiee-text-soft);text-transform:uppercase;letter-spacing:.6px}
+  .step-badge{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#6C86C0,#8B6CC0);color:#fff;font-family:var(--cutiee-font-display);font-weight:700;font-size:13px;margin-bottom:16px}
+  .step-card h3{font-family:var(--cutiee-font-display);font-weight:600;font-size:18px;margin:0 0 8px;letter-spacing:-.3px}
+  .step-card p{font-size:14px;line-height:1.55;color:var(--cutiee-text-muted);margin:0}
+  @media (max-width:780px){.stat-grid,.step-grid{grid-template-columns:1fr}}
+
+  /* ────────────────────────────────────────────────
+     DEMOS — horizontal pinned scroll.
+     The 4 demo sections live inside .hpin, which gets
+     pinned for 4× viewport-worth of scroll. During that
+     scroll .htrack translates -75% horizontally, cycling
+     the 4 panels past the viewport. Vertical scroll
+     outside .hpin stays normal (Lenis-smoothed).
+     ──────────────────────────────────────────────── */
+  .hpin{
+    position:relative;
+    height:100vh;
+    width:100%;
+    overflow:hidden;
+    margin:40px 0 60px;
+  }
+  .htrack{
+    display:flex;
+    flex-wrap:nowrap;
+    height:100%;
+    width:400vw;            /* 4 panels × 100vw */
+    will-change:transform;
+  }
+  .hpanel{
+    flex:0 0 100vw;
+    height:100%;
+    max-width:none !important;
+    padding:0 24px !important;
+    margin:0 !important;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    box-sizing:border-box;
+  }
+  .hpanel .panel-inner{
+    width:100%;
+    max-width:1100px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns: 340px 1fr;
+    gap:40px;
+    align-items:center;
+  }
+  .hpanel .section-head{
+    text-align:left;
+    margin:0;
+    opacity:1 !important;   /* pinned panels: show immediately, no reveal delay */
+    transform:none !important;
+  }
+  .hpanel .section-head .kicker{margin-bottom:16px}
+  .hpanel h2.section-title{font-size:clamp(28px,3.2vw,44px);margin-bottom:14px}
+  .hpanel .section-sub{font-size:15px;margin:0;max-width:none}
+  .hpanel .browser{margin:0;max-width:none}
+
+  /* Progress pips above the pinned section */
+  .hpin-progress{
+    position:absolute;top:24px;left:50%;transform:translateX(-50%);
+    z-index:5;display:flex;gap:8px;align-items:center;
+    padding:8px 14px;border-radius:999px;
+    background:rgba(255,255,255,.7);backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.6);
+    font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--cutiee-text-muted);
+    box-shadow:0 8px 20px rgba(15,23,42,.06);
+  }
+  .hpin-progress .pp{width:7px;height:7px;border-radius:50%;background:rgba(108,134,192,.25);transition:all .4s ease}
+  .hpin-progress .pp.on{background:#6C86C0;width:22px;border-radius:4px}
+  .hpin-hint{
+    position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+    z-index:5;font-family:"JetBrains Mono",monospace;font-size:10.5px;
+    color:var(--cutiee-text-muted);letter-spacing:1px;text-transform:uppercase;
+    opacity:.7;
+  }
+  .hpin-hint::before{content:"↓ ";color:var(--cutiee-primary)}
+
+  @media (max-width:880px){
+    .hpin{height:auto;margin:40px 0}
+    .htrack{display:block;width:100%;height:auto}
+    .hpanel{height:auto;padding:40px 20px}
+    .hpanel .panel-inner{grid-template-columns:1fr;gap:24px}
+    .hpin-progress,.hpin-hint{display:none}
+  }
+
+  /* Demo sections: tall so the browser mockup can stick in view long enough
+     for its animation to finish before the user scrolls past. */
+  .demo-section{padding-top:48px;padding-bottom:48px;min-height:150vh}
+  .demo-section .section-head{margin-bottom:28px}
+  .browser{position:sticky;top:12vh;width:100%;max-width:920px;margin:0 auto;border-radius:18px;overflow:hidden;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.5);backdrop-filter:blur(28px) saturate(170%);box-shadow:0 1px 0 rgba(255,255,255,.6) inset,0 30px 60px -20px rgba(108,134,192,.35)}
+  @media (max-width:880px){.demo-section{min-height:auto}.browser{position:relative;top:0}}
+  .browser-chrome{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.35)}
+  .dot3{display:flex;gap:6px}
+  .dot3 i{width:11px;height:11px;border-radius:50%;display:block}
+  .dot3 i:nth-child(1){background:#ff5f57}.dot3 i:nth-child(2){background:#ffbd2e}.dot3 i:nth-child(3){background:#28c940}
+  .addr{flex:1;height:26px;border-radius:7px;background:rgba(255,255,255,.55);display:flex;align-items:center;justify-content:center;gap:6px;color:var(--cutiee-text-muted);font-family:"JetBrains Mono",monospace;font-size:11px}
+  .browser-main{padding:24px 28px;min-height:380px}
+
+  /* Progress rail above each demo showing stage */
+  .stage-rail{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--cutiee-text-muted);padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.5);border:1px solid rgba(108,134,192,.15);width:fit-content}
+  .stage-rail .dotr{width:6px;height:6px;border-radius:50%;background:rgba(108,134,192,.25);transition:all .3s ease}
+  .stage-rail .dotr.on{background:#6C86C0;box-shadow:0 0 0 3px rgba(108,134,192,.2)}
+  .stage-rail .dotr.done{background:#22c55e}
+  .stage-rail b{color:var(--cutiee-primary);font-weight:700}
+  .replay-btn{margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:rgba(108,134,192,.1);border:1px solid rgba(108,134,192,.25);color:var(--cutiee-primary);font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s}
+  .replay-btn:hover{background:rgba(108,134,192,.2)}
+
+  /* ────────── DEMO 1 — Memory search ────────── */
+  .submit-box{padding:14px;border-radius:12px;background:rgba(255,255,255,.55);border:1px solid rgba(108,134,192,.18)}
+  .submit-box label{font-size:10.5px;font-family:"JetBrains Mono",monospace;color:var(--cutiee-text-muted);text-transform:uppercase;letter-spacing:.5px}
+  .submit-input{margin-top:6px;height:44px;border-radius:10px;background:rgba(255,255,255,.7);border:1px solid rgba(108,134,192,.25);padding:0 14px;display:flex;align-items:center;font-size:14px;position:relative;transition:border-color .3s,box-shadow .3s}
+  [data-demo="submit"][data-stage="1"] .submit-input,
+  [data-demo="submit"][data-stage="2"] .submit-input{border-color:rgba(108,134,192,.55);box-shadow:0 0 0 3px rgba(108,134,192,.12)}
+  .typed{position:relative;color:var(--cutiee-text)}
+  .typed::after{content:"│";color:var(--cutiee-primary);margin-left:1px;animation:blink 1s step-end infinite}
+  [data-demo="submit"]:not([data-stage="1"]) .typed::after{display:none}
+  @keyframes blink{50%{opacity:0}}
+  .submit-opts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .chip-opt{padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.55);border:1px solid rgba(108,134,192,.22);font-size:11.5px;color:var(--cutiee-text-muted);transition:all .3s}
+  .chip-opt.on{background:rgba(108,134,192,.15);color:var(--cutiee-primary);border-color:rgba(108,134,192,.4);font-weight:600}
+
+  .mem-cands{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(108,134,192,.06);border:1px dashed rgba(108,134,192,.22);font-family:"JetBrains Mono",monospace;font-size:11px;min-height:130px;position:relative;overflow:hidden}
+  .mem-cands .mc-hdr{display:flex;justify-content:space-between;color:var(--cutiee-text-muted);margin-bottom:6px}
+  .mem-cands .mc-hdr .spin::after{content:"⚙";display:inline-block;animation:spin 1.2s linear infinite}
+  [data-demo="submit"][data-stage="3"] .mem-cands .mc-hdr .spin::after,
+  [data-demo="submit"][data-stage="4"] .mem-cands .mc-hdr .spin::after,
+  [data-demo="submit"][data-stage="5"] .mem-cands .mc-hdr .spin::after{display:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .mc-row{display:grid;grid-template-columns:1fr 52px;gap:8px;padding:4px 6px;border-radius:5px;opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease,background .3s}
+  .mc-row .sim{text-align:right;font-weight:700}
+  .mc-row.v{opacity:1;transform:translateY(0)}
+  .mc-row.best{background:rgba(34,197,94,.12);color:#166534}
+  .mc-row.reject{opacity:.35}
+
+  .memory-hit{margin-top:12px;padding:12px 14px;border-radius:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.28);display:flex;align-items:center;gap:12px;font-size:13px;opacity:0;transform:translateY(6px);transition:opacity .5s,transform .5s}
+  [data-demo="submit"][data-stage="5"] .memory-hit{opacity:1;transform:translateY(0)}
+  .mh-icon{width:26px;height:26px;border-radius:7px;background:#22c55e;display:grid;place-items:center;flex-shrink:0}
+  .memory-hit b{color:#166534}
+
+  /* ────────── DEMO 2 — Replay ────────── */
+  .replay-wrap{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+  @media (max-width:780px){.replay-wrap{grid-template-columns:1fr}}
+  .step-list{display:flex;flex-direction:column;gap:6px;position:relative}
+  .d-step{display:grid;grid-template-columns:22px 1fr auto;gap:10px;padding:9px 12px;border-radius:9px;background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.45);align-items:center;font-size:12.5px;opacity:.35;transition:opacity .4s,transform .4s,background .3s,border-color .3s}
+  .d-step.shown{opacity:1}
+  .d-step.active{background:rgba(255,255,255,.85);border-color:rgba(108,134,192,.45);box-shadow:0 6px 16px -8px rgba(108,134,192,.3);transform:translateX(3px)}
+  .d-step .idx{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--cutiee-text-muted)}
+  .d-step .meta-pill{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",monospace;font-size:10.5px;padding:3px 8px;border-radius:6px;font-weight:600}
+  .d-step.replay .meta-pill{background:rgba(34,197,94,.15);color:#166534}
+  .d-step.t1 .meta-pill{background:rgba(14,165,233,.14);color:#0369a1}
+  .d-step.t2 .meta-pill{background:rgba(108,134,192,.2);color:#4a6399}
+  .d-step .tdot{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .d-step.active .tdot{animation:tdotPulse 1s ease-in-out infinite}
+  @keyframes tdotPulse{0%,100%{box-shadow:0 0 0 0 currentColor;opacity:1}50%{box-shadow:0 0 0 5px transparent;opacity:.6}}
+
+  .cursor-ghost{position:absolute;left:0;top:0;width:16px;height:16px;opacity:0;transition:opacity .3s,transform .55s cubic-bezier(.3,.9,.4,1);pointer-events:none;z-index:5}
+  [data-demo="replay"].running .cursor-ghost{opacity:1}
+  .cursor-ghost svg{width:100%;height:100%;filter:drop-shadow(0 2px 4px rgba(108,134,192,.5))}
+  .click-ring{position:absolute;width:24px;height:24px;border-radius:50%;border:2px solid #6C86C0;left:0;top:0;opacity:0;transform:translate(-4px,-4px) scale(.4);pointer-events:none;z-index:4}
+  [data-demo="replay"].clicking .click-ring{animation:clickRing .5s ease-out}
+  @keyframes clickRing{0%{opacity:.8;transform:translate(-4px,-4px) scale(.4)}100%{opacity:0;transform:translate(-12px,-12px) scale(2)}}
+
+  .cost-panel{padding:14px;border-radius:12px;background:rgba(255,255,255,.55);border:1px solid rgba(108,134,192,.18);display:flex;flex-direction:column;gap:10px;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--cutiee-text-muted);min-width:0;overflow:hidden}
+  .cost-panel h4{margin:0;font-family:var(--cutiee-font-display);font-weight:600;font-size:13px;color:var(--cutiee-text)}
+  .cost-big{font-family:var(--cutiee-font-display);font-weight:700;font-size:clamp(18px,1.8vw,24px);letter-spacing:-.6px;line-height:1;background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;transition:transform .2s;word-break:break-all;overflow-wrap:anywhere;white-space:nowrap}
+  .cost-big.bump{transform:scale(1.1)}
+  .cost-row{display:flex;justify-content:space-between}
+  .cost-row b{color:var(--cutiee-text)}
+  .cost-bar-wrap{height:8px;border-radius:4px;background:rgba(108,134,192,.1);overflow:hidden;position:relative}
+  .cost-bar-replay{position:absolute;top:0;bottom:0;left:0;background:linear-gradient(90deg,#22c55e,#16a34a);width:calc(var(--pct-replay,0) * 1%);transition:width .4s ease}
+  .cost-bar-paid{position:absolute;top:0;bottom:0;left:calc(var(--pct-replay,0) * 1%);background:linear-gradient(90deg,#6C86C0,#8B6CC0);width:calc(var(--pct-paid,0) * 1%);transition:width .4s ease,left .4s ease}
+  .save-splash{padding:7px 10px;border-radius:8px;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:#15803d;font-weight:600;opacity:0;transform:translateY(4px);transition:opacity .4s,transform .4s}
+  [data-demo="replay"][data-stage="6"] .save-splash{opacity:1;transform:translateY(0)}
+
+  /* ────────── DEMO 3 — Routing + pruning ────────── */
+  .route-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:780px){.route-wrap{grid-template-columns:1fr}}
+  .route-panel{padding:14px;border-radius:12px;background:rgba(255,255,255,.55);border:1px solid rgba(108,134,192,.18)}
+  .route-panel h4{margin:0 0 10px;font-family:var(--cutiee-font-display);font-weight:600;font-size:13px}
+
+  .tier-row{display:grid;grid-template-columns:50px 1fr 68px 22px;gap:10px;align-items:center;padding:8px 10px;border-radius:8px;margin-bottom:5px;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--cutiee-text-muted);background:rgba(255,255,255,.45);position:relative;transition:all .35s ease}
+  .tier-row.eval{background:linear-gradient(90deg,rgba(14,165,233,.1),rgba(14,165,233,.04));color:var(--cutiee-text)}
+  .tier-row.eval .verdict{color:#0369a1}
+  .tier-row.reject{opacity:.4}
+  .tier-row.reject .verdict{color:#b91c1c}
+  .tier-row.hot{background:linear-gradient(90deg,rgba(108,134,192,.3),rgba(139,108,192,.22));color:var(--cutiee-text);transform:translateX(3px);box-shadow:0 8px 18px -8px rgba(108,134,192,.4)}
+  .tier-row.hot .tag{background:#fff;color:var(--cutiee-primary)}
+  .tier-row .tag{font-weight:700;font-size:10px;padding:3px 6px;border-radius:4px;background:rgba(108,134,192,.15);color:var(--cutiee-primary);text-align:center;transition:all .3s}
+  .tier-row .price{text-align:right;font-weight:700}
+  .tier-row .verdict{font-size:11px;text-align:center}
+  .eval-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--cutiee-text-muted)}
+  .eval-head .query{color:var(--cutiee-text);font-weight:600}
+
+  .prune-strip{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:6px 0 10px}
+  .thumb{aspect-ratio:1.3/1;border-radius:6px;background:linear-gradient(135deg,#c6d2ec,#d4c8e8);display:grid;place-items:center;font-family:"JetBrains Mono",monospace;font-size:8.5px;color:#fff;font-weight:700;position:relative;transition:all .45s ease}
+  .thumb.stale{opacity:.2;filter:grayscale(1);transform:scale(.82) rotate(-3deg)}
+  .thumb.kept{border:1.5px solid #22c55e;box-shadow:0 4px 10px rgba(34,197,94,.3)}
+  .thumb.kept::after{content:"✓";position:absolute;top:-5px;right:-5px;width:13px;height:13px;border-radius:50%;background:#22c55e;color:#fff;font-size:9px;display:grid;place-items:center;font-weight:900}
+
+  .token-box{padding:12px;border-radius:10px;background:rgba(255,255,255,.55);border:1px solid rgba(108,134,192,.15)}
+  .tok-hdr{display:flex;justify-content:space-between;font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--cutiee-text-muted);margin-bottom:8px}
+  .tok-hdr b{color:var(--cutiee-text)}
+  .tok-bar{height:8px;border-radius:4px;background:rgba(108,134,192,.12);overflow:hidden;position:relative}
+  .tok-bar .fill{position:absolute;inset:0;background:linear-gradient(90deg,#6C86C0,#8B6CC0);transform-origin:left;transform:scaleX(var(--fill,.3));transition:transform .5s ease}
+  .tok-bar .fill-saved{position:absolute;top:0;bottom:0;left:0;background:repeating-linear-gradient(45deg,rgba(34,197,94,.18) 0 4px,transparent 4px 8px);width:calc((1 - var(--fill,.3)) * 100%);right:0;left:auto;transition:width .5s ease}
+  .tok-label{margin-top:10px;font-size:11.5px;font-family:var(--cutiee-font-body)}
+  .tok-label b{color:#166534}
+
+  /* ────────── DEMO 4 — Audit ────────── */
+  .audit-row{display:grid;grid-template-columns:72px 1fr 60px 76px;gap:10px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.45);border:1px solid rgba(108,134,192,.15);margin-bottom:5px;font-family:"JetBrains Mono",monospace;font-size:11px;align-items:center;opacity:0;transform:translateX(-10px);transition:opacity .4s,transform .4s}
+  .audit-row.in{opacity:1;transform:translateX(0)}
+  .audit-row .t{color:var(--cutiee-text-muted)}
+  .audit-row .r{text-align:center;padding:2px 6px;border-radius:4px;font-size:9.5px;font-weight:700}
+  .audit-row .r.low{background:rgba(34,197,94,.15);color:#166534}
+  .audit-row .r.med{background:rgba(245,158,11,.18);color:#92400e}
+  .audit-row .r.high{background:rgba(207,108,192,.2);color:#831f6e}
+  .audit-row .ok{color:#166534;text-align:right}
+  .done-stamp{margin-top:14px;padding:14px 18px;border-radius:12px;background:linear-gradient(90deg,rgba(34,197,94,.12),rgba(108,134,192,.1));border:1px solid rgba(34,197,94,.3);display:flex;align-items:center;gap:12px;font-size:13px;opacity:0;transform:translateY(6px);transition:opacity .5s,transform .5s}
+  [data-demo="audit"][data-stage="7"] .done-stamp{opacity:1;transform:translateY(0)}
+  .done-stamp .big{font-family:var(--cutiee-font-display);font-weight:700;font-size:22px;background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+  /* COMPARE + NUMBERS + CTA + FOOTER */
+  .compare{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:32px}
+  .cmp-card{padding:26px;border-radius:18px;background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.5);backdrop-filter:blur(22px)}
+  .cmp-card.win{background:rgba(255,255,255,.65);border:1px solid rgba(108,134,192,.4);box-shadow:0 18px 40px -18px rgba(108,134,192,.35)}
+  .cmp-card .kick{font-family:"JetBrains Mono",monospace;font-size:10.5px;color:var(--cutiee-text-soft);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+  .cmp-card.win .kick{color:var(--cutiee-primary)}
+  .cmp-card h3{font-family:var(--cutiee-font-display);font-weight:600;font-size:17px;margin:0 0 8px;letter-spacing:-.3px}
+  .cmp-card p{font-size:13.5px;line-height:1.55;color:var(--cutiee-text-muted);margin:0 0 14px}
+  .cmp-limit,.cmp-win{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",monospace;font-size:11px;padding:5px 10px;border-radius:999px;font-weight:600}
+  .cmp-limit{background:rgba(148,163,184,.18);color:#64748b}
+  .cmp-win{background:rgba(34,197,94,.15);color:#166534}
+  @media (max-width:780px){.compare{grid-template-columns:1fr}}
+  .numbers-inner{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:20px;padding:28px 32px;border-radius:20px;background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.45);backdrop-filter:blur(22px) saturate(170%);text-align:center}
+  .num .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--cutiee-text-muted);font-weight:600}
+  .num .val{font-family:var(--cutiee-font-display);font-weight:700;font-size:32px;letter-spacing:-1px;margin-top:6px;background:linear-gradient(90deg,#6C86C0,#8B6CC0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .num .sub{font-size:11.5px;color:var(--cutiee-text-soft);margin-top:4px;font-family:"JetBrains Mono",monospace}
+  .final-card{padding:56px 40px;border-radius:24px;text-align:center;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.6);backdrop-filter:blur(22px) saturate(170%);box-shadow:0 30px 60px -24px rgba(108,134,192,.3)}
+  .final-card h2{font-family:var(--cutiee-font-display);font-weight:700;font-size:clamp(28px,4vw,40px);letter-spacing:-1.2px;margin:0 0 12px}
+  .final-card p{color:var(--cutiee-text-muted);font-size:15.5px;margin:0 auto 28px;max-width:400px}
+  footer{max-width:1200px;margin:0 auto;padding:32px 24px 48px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;color:var(--cutiee-text-muted);font-size:13px;border-top:1px solid rgba(255,255,255,.3)}
+  footer a{color:var(--cutiee-text-muted);text-decoration:none;margin-left:16px}
+
+  /* Medium tablets + small laptops (641-1024 px): tighten spacing. */
+  @media (max-width: 1024px){
+    section{padding:64px 24px}
+    .hero{padding:110px 24px 56px;min-height:auto}
+    .compare{grid-template-columns:1fr 1fr}
+    .compare .cmp-card:last-child{grid-column:1 / -1}
+    .stat-grid,.step-grid{grid-template-columns:repeat(2,1fr)}
+  }
+  /* Small tablets and large phones (641-880 px) */
+  @media (max-width: 880px){
+    .compare{grid-template-columns:1fr}
+    h1.headline{font-size:clamp(44px,13vw,96px);letter-spacing:-3px}
+    .demo-section{min-height:auto;padding-top:40px;padding-bottom:40px}
+    .browser{top:0;position:relative}
+    .sub{font-size:17px}
+    .hpanel{padding:32px 16px !important}
+    .hpanel h2.section-title{font-size:clamp(24px,4vw,36px)}
+  }
+  /* Narrow phones: keep just the brand on the left and the "Open app" CTA on
+   * the right. The middle anchor links (Memory / Replay / Routing / Audit)
+   * were visible on the desktop reference but there is no room for them on a
+   * 390px viewport, so we drop them rather than let them clip. */
+  @media (max-width: 640px){
+    .nav-inner{padding:10px 16px}
+    .nav-links .lnk{display:none}
+    .brand-word{font-size:18px}
+    .hero{padding:100px 16px 40px}
+    section{padding:48px 16px}
+    h1.headline{font-size:clamp(40px,14vw,72px);letter-spacing:-2px}
+    .full-name{font-size:11px}
+    .sub{font-size:16px;line-height:1.5}
+    .hero-cta{flex-direction:column;width:100%;align-items:stretch;gap:10px}
+    .hero-cta a{justify-content:center}
+    .numbers-inner{padding:22px 16px;grid-template-columns:repeat(2,1fr)}
+    .final-card{padding:40px 20px}
+    .stat-grid,.step-grid,.compare{grid-template-columns:1fr}
+    .stat .n{font-size:44px}
+    footer{flex-direction:column;align-items:flex-start}
+  }
+  /* Narrow phones ≤ 480 px */
+  @media (max-width: 480px){
+    section{padding:40px 14px}
+    .hero{padding:90px 14px 32px}
+    h1.headline{font-size:clamp(36px,14vw,60px);letter-spacing:-1.5px}
+    .sub{font-size:15px}
+    .full-name{font-size:10.5px;padding:0 8px}
+    .hero-tag{font-size:11.5px}
+    .kicker{font-size:10px}
+    h2.section-title{font-size:clamp(26px,7vw,36px) !important}
+    .numbers-inner{grid-template-columns:1fr;padding:22px 14px}
+    .num .val{font-size:28px}
+  }
+  /* Ultra-narrow phones ≤ 360 px (e.g. Galaxy Fold folded) */
+  @media (max-width: 360px){
+    h1.headline{font-size:clamp(32px,14vw,48px);letter-spacing:-1px}
+    .hero{padding:80px 12px 24px}
+    section{padding:36px 12px}
+    .sub{font-size:14px}
+    .full-name{font-size:10px}
+    .brand-word{font-size:16px}
+    .cta-gradient,.cta-ghost{padding:10px 14px;font-size:13px}
+  }
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01s !important;transition-duration:.01s !important}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="mmg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#6C86C0"/><stop offset="100%" stop-color="#8B6CC0"/></linearGradient></defs></svg>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand-lockup" href="/">
+      <span class="brand-tile" aria-hidden="true"><img src="{% static 'images/brand-mark.png' %}" alt=""></span>
+      <span class="brand-word">CUTIEE</span>
+    </a>
+    <nav class="nav-links">
+      <a class="lnk" href="#memory">Memory</a>
+      <a class="lnk" href="#replay">Replay</a>
+      <a class="lnk" href="#route">Routing</a>
+      <a class="lnk" href="#audit">Audit</a>
+      <a class="cta-gradient" href="{% url 'account_login' %}">Open app →</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-tag reveal">Computer-use agents · live pilot</div>
+    <div class="full-name reveal">Computer Use agent<b>I</b>c-framework with Token-efficient harn<b>E</b>ss <b>E</b>ngineering</div>
+    <h1 class="headline reveal">CUTIEE</h1>
+    <p class="sub reveal">Transparent, token-efficient computer-use agents<br><span class="sub-em">Unifying personal task automation and compliance audit automation.</span></p>
+    <div class="hero-cta reveal">
+      <a class="cta-gradient" href="{% url 'account_login' %}">Open the app
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+      <a class="cta-ghost" href="#problem">See how it works</a>
+    </div>
+  </section>
+
+  <!-- PROBLEM -->
+  <section id="problem">
+    <div class="section-head reveal">
+      <span class="kicker">The problem</span>
+      <h2 class="section-title">LLM agents are <span class="grad">burning money</span> on work they already know how to do.</h2>
+      <p class="section-sub">Every time your agent repeats the same task, it pays full price — again and again. For recurring workflows, that cost compounds into thousands per user per year.</p>
+    </div>
+    <div class="stat-grid">
+      <div class="stat reveal"><div class="n">$0.30</div><p class="copy">Typical cost per task with a frontier model doing it start-to-finish, every time.</p><div class="src">Gemini 2.5 Pro · baseline</div></div>
+      <div class="stat reveal"><div class="n">54%</div><p class="copy">Of agent actions in real workflows are pure repetition — already seen, already solved.</p><div class="src">CUTIEE eval · 1.4k tasks</div></div>
+      <div class="stat reveal"><div class="n">3×</div><p class="copy">Context windows grow every turn. Most of it is noise nobody ever reads again.</p><div class="src">LongMemEval, 2024</div></div>
+    </div>
+  </section>
+
+  <!-- SOLUTION -->
+  <section id="solution">
+    <div class="section-head reveal">
+      <span class="kicker">The fix</span>
+      <h2 class="section-title">Stop reasoning. <span class="grad">Start replaying.</span></h2>
+      <p class="section-sub">CUTIEE turns every completed task into a zero-cost procedural template, routes live decisions to the cheapest viable model, and prunes context to what still matters.</p>
+    </div>
+    <div class="step-grid">
+      <article class="step-card reveal"><span class="step-badge">01</span><h3>Learn once</h3><p>The first run through a task pays full rate. Steps, selectors, and decisions are captured into a procedural template.</p></article>
+      <article class="step-card reveal"><span class="step-badge">02</span><h3>Replay forever</h3><p>Every run after drops to $0 for any step the template covers. Only genuinely new decisions hit the model.</p></article>
+      <article class="step-card reveal"><span class="step-badge">03</span><h3>Route what's left</h3><p>The remaining decisions route to the cheapest tier that can handle them — with every action logged and signed.</p></article>
+    </div>
+  </section>
+
+  <!-- FEATURE 1 — MEMORY (auto-playing timeline on view) -->
+  <section id="memory" class="demo-section">
+    <div class="section-head reveal">
+      <span class="kicker">01 · Memory</span>
+      <h2 class="section-title">Submit a task. <span class="grad">Match a memory.</span></h2>
+      <p class="section-sub">Before any model wakes up: embed the task, run vector search, rank candidates, lock in the best template.</p>
+    </div>
+    <div class="browser" data-demo="submit" data-stage="0" data-autoplay>
+      <div class="browser-chrome"><div class="dot3"><i></i><i></i><i></i></div><div class="addr">cutiee.ai/tasks/new</div></div>
+      <div class="browser-main">
+        <div class="stage-rail"><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span>stage <b data-stage-num>0/5</b> · <span data-stage-lbl>idle</span></span><button class="replay-btn" data-replay>↻ replay</button></div>
+        <div class="submit-box">
+          <label>Task description</label>
+          <div class="submit-input"><span class="typed" data-typed></span></div>
+          <div class="submit-opts">
+            <span class="chip-opt on">Recurring</span>
+            <span class="chip-opt on">Template match</span>
+            <span class="chip-opt">Approval: auto</span>
+          </div>
+          <div class="mem-cands">
+            <div class="mc-hdr"><span class="spin">vector search · embeddings-v3</span><span data-cand-count>0 / 0</span></div>
+            <div class="mc-row" data-cand="0"><span>tpl_expense_weekly · 12 runs</span><span class="sim">0.98</span></div>
+            <div class="mc-row" data-cand="1"><span>tpl_receipt_batch · 4 runs</span><span class="sim">0.82</span></div>
+            <div class="mc-row" data-cand="2"><span>tpl_timesheet · 7 runs</span><span class="sim">0.71</span></div>
+            <div class="mc-row" data-cand="3"><span>tpl_travel_report · 2 runs</span><span class="sim">0.66</span></div>
+            <div class="mc-row" data-cand="4"><span>tpl_invoice_review · 9 runs</span><span class="sim">0.54</span></div>
+          </div>
+          <div class="memory-hit">
+            <div class="mh-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div><b>Matched</b> · <span style="font-family:'JetBrains Mono',monospace">tpl_expense_weekly</span> · 98% sim · avg $0.0041</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURE 2 — REPLAY -->
+  <section id="replay" class="demo-section">
+    <div class="section-head reveal">
+      <span class="kicker">02 · Replay</span>
+      <h2 class="section-title">Procedural steps fire at <span class="grad">zero cost.</span></h2>
+      <p class="section-sub">A ghost cursor walks the timeline; the cost counter ticks only when a model tier fires. Six steps, $0.0025 total.</p>
+    </div>
+    <div class="browser" data-demo="replay" data-stage="0" data-autoplay>
+      <div class="browser-chrome"><div class="dot3"><i></i><i></i><i></i></div><div class="addr">cutiee.ai/tasks/47/run</div></div>
+      <div class="browser-main">
+        <div class="stage-rail"><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span>step <b data-stage-num>0/6</b></span><button class="replay-btn" data-replay>↻ replay</button></div>
+        <div class="replay-wrap">
+          <div class="step-list" data-step-list>
+            <div class="cursor-ghost" data-cursor><svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-6 1-3 7-5-17z" fill="#6C86C0" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+            <div class="click-ring" data-ring></div>
+            <div class="d-step replay" data-step="0"><span class="idx">01</span><span>open concur.com/reports</span><span class="meta-pill"><span class="tdot"></span>replay · $0.0000</span></div>
+            <div class="d-step replay" data-step="1"><span class="idx">02</span><span>click "new report"</span><span class="meta-pill"><span class="tdot"></span>replay · $0.0000</span></div>
+            <div class="d-step t1" data-step="2"><span class="idx">03</span><span>extract receipts from inbox</span><span class="meta-pill"><span class="tdot"></span>T1 · $0.0004</span></div>
+            <div class="d-step replay" data-step="3"><span class="idx">04</span><span>upload 8 receipts</span><span class="meta-pill"><span class="tdot"></span>replay · $0.0000</span></div>
+            <div class="d-step t2" data-step="4"><span class="idx">05</span><span>categorize "Uber — client"</span><span class="meta-pill"><span class="tdot"></span>T2 · $0.0021</span></div>
+            <div class="d-step replay" data-step="5"><span class="idx">06</span><span>submit for approval</span><span class="meta-pill"><span class="tdot"></span>replay · $0.0000</span></div>
+          </div>
+          <div class="cost-panel">
+            <h4>Live cost</h4>
+            <div class="cost-big" data-cost-big>$0.0000</div>
+            <div class="cost-bar-wrap" style="--pct-replay:0;--pct-paid:0"><div class="cost-bar-replay"></div><div class="cost-bar-paid"></div></div>
+            <div class="cost-row"><span>replayed steps</span><b data-replayed>0/4</b></div>
+            <div class="cost-row"><span>paid steps</span><b data-paid>0/2</b></div>
+            <div class="cost-row"><span>elapsed</span><b data-elapsed>00:00</b></div>
+            <div class="save-splash">▲ saved <b data-saved>$0.2975</b> vs frontier baseline</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURE 3 — ROUTING -->
+  <section id="route" class="demo-section">
+    <div class="section-head reveal">
+      <span class="kicker">03 · Routing</span>
+      <h2 class="section-title">Cheapest viable model. <span class="grad">Pruned context.</span></h2>
+      <p class="section-sub">Router evaluates tiers bottom-up and locks the cheapest viable one. Meanwhile context gets pruned — tokens cut by 70%.</p>
+    </div>
+    <div class="browser" data-demo="route" data-stage="0" data-autoplay>
+      <div class="browser-chrome"><div class="dot3"><i></i><i></i><i></i></div><div class="addr">cutiee.ai/tasks/47/router</div></div>
+      <div class="browser-main">
+        <div class="stage-rail"><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span>phase <b data-stage-num>0/5</b> · <span data-stage-lbl>idle</span></span><button class="replay-btn" data-replay>↻ replay</button></div>
+        <div class="route-wrap">
+          <div class="route-panel">
+            <div class="eval-head"><span>Routing decision</span><span class="query">"categorize Uber ride"</span></div>
+            <div class="tier-row" data-tier="1"><span class="tag">T1</span><span>qwen3.5 0.8B</span><span class="price">$0.0004</span><span class="verdict"></span></div>
+            <div class="tier-row" data-tier="2"><span class="tag">T2</span><span>gemini-flash-lite</span><span class="price">$0.0021</span><span class="verdict"></span></div>
+            <div class="tier-row" data-tier="3"><span class="tag">T3</span><span>gemini-flash</span><span class="price">$0.0048</span><span class="verdict"></span></div>
+            <div class="tier-row" data-tier="4"><span class="tag">T4</span><span>gemini-pro</span><span class="price">$0.0180</span><span class="verdict"></span></div>
+            <div style="margin-top:10px;font-size:11px;color:var(--cutiee-text-muted);font-family:'JetBrains Mono',monospace" data-route-verdict>→ evaluating…</div>
+          </div>
+          <div class="route-panel">
+            <h4>Context window</h4>
+            <div class="prune-strip" data-prune>
+              <div class="thumb" data-ti="0">t−7</div><div class="thumb" data-ti="1">t−6</div><div class="thumb" data-ti="2">t−5</div><div class="thumb" data-ti="3">t−4</div>
+              <div class="thumb" data-ti="4">t−3</div><div class="thumb" data-ti="5">t−2</div><div class="thumb" data-ti="6">t−1</div><div class="thumb" data-ti="7">t</div>
+            </div>
+            <div class="token-box">
+              <div class="tok-hdr"><span>tokens sent</span><span><b data-tok-count>12,400</b> / 12,400</span></div>
+              <div class="tok-bar" style="--fill:1"><div class="fill"></div><div class="fill-saved"></div></div>
+              <div class="tok-label"><b data-tok-saved>0% saved</b> · <span data-tok-detail>full context</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURE 4 — AUDIT -->
+  <section id="audit" class="demo-section">
+    <div class="section-head reveal">
+      <span class="kicker">04 · Audit</span>
+      <h2 class="section-title">Every action <span class="grad">logged and signed.</span></h2>
+      <p class="section-sub">Ledger fills in real time. Each row is timestamped, risk-tiered, and signed by its approver.</p>
+    </div>
+    <div class="browser" data-demo="audit" data-stage="0" data-autoplay>
+      <div class="browser-chrome"><div class="dot3"><i></i><i></i><i></i></div><div class="addr">cutiee.ai/tasks/47/audit</div></div>
+      <div class="browser-main">
+        <div class="stage-rail"><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span>row <b data-stage-num>0/6</b></span><button class="replay-btn" data-replay>↻ replay</button></div>
+        <div>
+          <div class="audit-row" data-a="0"><span class="t">00:02.1</span><span>open concur.com/reports</span><span class="r low">LOW</span><span class="ok">✓ auto</span></div>
+          <div class="audit-row" data-a="1"><span class="t">00:03.4</span><span>click "new report"</span><span class="r low">LOW</span><span class="ok">✓ auto</span></div>
+          <div class="audit-row" data-a="2"><span class="t">00:06.8</span><span>extract receipts · 8 items</span><span class="r low">LOW</span><span class="ok">✓ auto</span></div>
+          <div class="audit-row" data-a="3"><span class="t">00:12.2</span><span>upload receipts</span><span class="r med">MED</span><span class="ok">✓ auto</span></div>
+          <div class="audit-row" data-a="4"><span class="t">00:18.5</span><span>categorize "Uber — client"</span><span class="r low">LOW</span><span class="ok">✓ auto</span></div>
+          <div class="audit-row" data-a="5"><span class="t">00:23.0</span><span>submit for approval</span><span class="r high">HIGH</span><span class="ok">✓ user</span></div>
+        </div>
+        <div class="done-stamp">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <div>Task complete — <span class="big">$0.0025</span> spent · template strengthened · replay rate ↑</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section id="compare">
+    <div class="section-head reveal">
+      <span class="kicker">Vs. the alternatives</span>
+      <h2 class="section-title">Where every other approach <span class="grad">falls short.</span></h2>
+      <p class="section-sub">Others either burn tokens on every run, skip transparency, or can't handle computer-use at all. CUTIEE combines procedural memory, tiered routing, and full audit in one harness.</p>
+    </div>
+    <div class="compare">
+      <article class="cmp-card reveal"><div class="kick">Frontier-only agents</div><h3>Smart. Expensive.</h3><p>They can do anything — and they'll charge you frontier rates to redo it every single time.</p><span class="cmp-limit">✕ No procedural memory</span></article>
+      <article class="cmp-card reveal"><div class="kick">Workflow automation</div><h3>Cheap. Rigid.</h3><p>Record-and-replay tools break the moment a button moves. No recovery, no intelligence.</p><span class="cmp-limit">✕ No model in the loop</span></article>
+      <article class="cmp-card win reveal"><div class="kick">CUTIEE</div><h3>Replay first, route last.</h3><p>Procedural templates + tiered routing + compliance audit. Learn once, run forever at near-zero cost.</p><span class="cmp-win">✓ All three, combined</span></article>
+    </div>
+  </section>
+
+  <!-- NUMBERS -->
+  <section id="numbers">
+    <div class="section-head reveal">
+      <span class="kicker">The numbers</span>
+      <h2 class="section-title">Real workloads. <span class="grad">Real savings.</span></h2>
+    </div>
+    <div class="numbers-inner">
+      <div class="num"><div class="lbl">Cost / task</div><div class="val">$0.004</div><div class="sub">was $0.30</div></div>
+      <div class="num"><div class="lbl">Reduction</div><div class="val">98.7%</div><div class="sub">vs Gemini baseline</div></div>
+      <div class="num"><div class="lbl">Replay rate</div><div class="val">54.3%</div><div class="sub">zero-cost steps</div></div>
+      <div class="num"><div class="lbl">Context savings</div><div class="val">70%</div><div class="sub">via pruning</div></div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section>
+    <div class="final-card reveal">
+      <h2>Try it on <span class="grad">your</span> workflow.</h2>
+      <p>First run pays full rate. Every replay after drops to near zero.</p>
+      <a class="cta-gradient" href="{% url 'account_login' %}">Open the app
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div>© 2026 CUTIEE · INFO490 Final Project · University of Illinois</div>
+  <div><a href="#">Privacy</a><a href="#">Terms</a><a href="{% url 'account_login' %}">Open app</a></div>
 </footer>
-{% endblock %}
+
+<script>
+(function(){
+  'use strict';
+  const prefersReduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ────────── Lenis smooth inertial scroll ──────────
+     Tuned to coexist with the GSAP ScrollTrigger horizontal pin: lerp
+     kept low for quick response, duration short so pins settle before
+     the next frame. Without Lenis, the native wheel on desktop feels
+     stepped and the user reported "jerky" scrolling. */
+  if (window.Lenis && !prefersReduced){
+    const lenis = new Lenis({
+      duration: 0.95,
+      easing: (t)=>Math.min(1, 1.001 - Math.pow(2, -10*t)),
+      smoothWheel: true,
+      wheelMultiplier: 1.1,
+      touchMultiplier: 1.4,
+      lerp: 0.13,
+    });
+    if (window.gsap && window.ScrollTrigger){
+      gsap.registerPlugin(ScrollTrigger);
+      lenis.on('scroll', ScrollTrigger.update);
+      gsap.ticker.add((time)=>lenis.raf(time*1000));
+      gsap.ticker.lagSmoothing(0);
+    } else {
+      function raf(time){ lenis.raf(time); requestAnimationFrame(raf); }
+      requestAnimationFrame(raf);
+    }
+    window.__lenis = lenis;
+  }
+
+  if (window.gsap && window.ScrollTrigger){
+    gsap.registerPlugin(ScrollTrigger);
+  }
+
+  /* Let Lenis own the scroll; only use native smooth as a safety net when
+     Lenis failed to load or reduced-motion is requested. */
+  if (!window.__lenis){
+    document.documentElement.style.scrollBehavior = prefersReduced ? 'auto' : 'smooth';
+  }
+
+  /* ────────── Reveal fades via IntersectionObserver ──────────
+     Fire early so the animation completes before the user scrolls past:
+     rootMargin bottom +200px pre-triggers the reveal while the element
+     is still below the viewport, so by the time the user reaches it the
+     fade-in has already settled. threshold 0 = any intersection fires. */
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+      } else if (e.boundingClientRect.top > window.innerHeight) {
+        e.target.classList.remove('in');
+      }
+    });
+  }, { threshold: 0, rootMargin: '0px 0px 200px 0px' });
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+
+  /* ────────── Nav background morph on scroll ────────── */
+  const nav = document.querySelector('.nav');
+  const onScrollNav = () => nav.classList.toggle('scrolled', window.scrollY > 60);
+  window.addEventListener('scroll', onScrollNav, { passive: true });
+  onScrollNav();
+
+  /* ──────────────────────────────────────────────
+     DEMO TIMELINES
+     Each demo advances stages on a timer. Timeline
+     starts when the demo enters viewport (ScrollTrigger
+     if available, else IntersectionObserver). Finite —
+     plays once then stops. Replay button restarts it.
+     ────────────────────────────────────────────── */
+
+  const SUB_TARGET = "File my weekly expense report";
+  const SUB_LABELS = ['idle','typing','embedding','searching','ranking','matched'];
+  const STEP_COSTS = [0, 0, 0.0004, 0, 0.0021, 0];
+  const ROUTE_LABELS = ['idle','eval T1','reject T1','eval T2','lock T2','pruning'];
+
+  /* Stage appliers (same logic as the scrub version, invoked
+     per stage without sub-progress — timelines drive intra-stage updates). */
+  function setStageRail(el, stage){
+    const dots = el.querySelectorAll('.stage-rail .dotr');
+    dots.forEach((d,i)=>{
+      d.classList.toggle('on', i === stage);
+      d.classList.toggle('done', i < stage);
+    });
+    const num = el.querySelector('[data-stage-num]');
+    if (num) num.textContent = `${stage}/${dots.length - 1}`;
+  }
+
+  /* DEMO 1: Submit */
+  function buildSubmitTimeline(el){
+    const typed = el.querySelector('[data-typed]');
+    const countEl = el.querySelector('[data-cand-count]');
+    const cands = el.querySelectorAll('.mc-row');
+    const lblEl = el.querySelector('[data-stage-lbl]');
+    const tl = gsap.timeline({ paused: true });
+
+    function goStage(stage){
+      el.dataset.stage = stage;
+      setStageRail(el, stage);
+      if (lblEl) lblEl.textContent = SUB_LABELS[stage];
+      if (stage === 0){ typed.textContent = ''; cands.forEach(c=>c.classList.remove('v','best','reject')); if(countEl)countEl.textContent='0 / 5'; }
+    }
+
+    // Stage 0 → Stage 1: type the query (600ms)
+    tl.call(()=>goStage(1));
+    tl.to({n:0}, {
+      n: SUB_TARGET.length, duration: 0.9, ease: 'none',
+      onUpdate: function(){ typed.textContent = SUB_TARGET.slice(0, Math.floor(this.targets()[0].n)); }
+    });
+    // Stage 2: embedding (brief pause)
+    tl.call(()=>goStage(2));
+    tl.to({}, { duration: 0.35 });
+    // Stage 3: searching — candidates stream in
+    tl.call(()=>goStage(3));
+    tl.call(()=>cands.forEach(c=>c.classList.remove('v','best','reject')));
+    cands.forEach((c,i)=>{
+      tl.call(()=>{ c.classList.add('v'); if (countEl) countEl.textContent = `${i+1} / 5`; });
+      tl.to({}, { duration: 0.14 });
+    });
+    // Stage 4: ranking
+    tl.call(()=>{
+      goStage(4);
+      cands[0].classList.add('best');
+      [2,3,4].forEach(i=>cands[i].classList.add('reject'));
+    });
+    tl.to({}, { duration: 0.55 });
+    // Stage 5: matched
+    tl.call(()=>goStage(5));
+
+    return { tl, reset: ()=>{ goStage(0); } };
+  }
+
+  /* DEMO 2: Replay — cursor walks, cost ticks */
+  function buildReplayTimeline(el){
+    const steps = el.querySelectorAll('.d-step');
+    const cursor = el.querySelector('[data-cursor]');
+    const list = el.querySelector('[data-step-list]');
+    const big = el.querySelector('[data-cost-big]');
+    const wrap = el.querySelector('.cost-bar-wrap');
+    const tl = gsap.timeline({ paused: true });
+    let paidTotal = 0, replayCount = 0, paidCount = 0;
+
+    function moveCursorTo(i){
+      const target = steps[i]; if (!target) return;
+      const listBox = list.getBoundingClientRect();
+      const tb = target.getBoundingClientRect();
+      const x = tb.right - listBox.left - 60;
+      const y = tb.top - listBox.top + tb.height/2 - 8;
+      cursor.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    function clickFlash(){
+      el.classList.remove('clicking'); void el.offsetWidth; el.classList.add('clicking');
+    }
+    function setStep(i){
+      steps.forEach((s, idx) => {
+        s.classList.toggle('shown', idx <= i);
+        s.classList.toggle('active', idx === i);
+      });
+      el.dataset.stage = String(i + 1);
+      setStageRail(el, i + 1);
+      if (STEP_COSTS[i] > 0){ paidTotal += STEP_COSTS[i]; paidCount++; } else { replayCount++; }
+      big.textContent = '$' + paidTotal.toFixed(4);
+      big.classList.remove('bump'); void big.offsetWidth; big.classList.add('bump');
+      el.querySelector('[data-replayed]').textContent = `${replayCount}/4`;
+      el.querySelector('[data-paid]').textContent = `${paidCount}/2`;
+      el.querySelector('[data-elapsed]').textContent = `00:${String(Math.round((i+1)/6 * 23)).padStart(2,'0')}`;
+      el.querySelector('[data-saved]').textContent = '$' + (0.30 - paidTotal).toFixed(4);
+      wrap.style.setProperty('--pct-replay', (replayCount / 6) * 100);
+      wrap.style.setProperty('--pct-paid', Math.max(paidCount > 0 ? 4 : 0, (paidCount / 6) * 100));
+    }
+
+    tl.call(()=>{ el.classList.add('running'); moveCursorTo(0); });
+    tl.to({}, { duration: 0.3 });
+    for (let i = 0; i < 6; i++){
+      tl.call(()=>{ moveCursorTo(i); clickFlash(); });
+      tl.to({}, { duration: 0.25 });
+      tl.call(()=>setStep(i));
+      tl.to({}, { duration: 0.30 });
+    }
+    tl.call(()=>{ el.dataset.stage = '6'; }); // triggers save-splash reveal
+
+    return { tl, reset: ()=>{
+      paidTotal = 0; replayCount = 0; paidCount = 0;
+      steps.forEach(s=>s.classList.remove('shown','active'));
+      big.textContent = '$0.0000';
+      el.querySelector('[data-replayed]').textContent = '0/4';
+      el.querySelector('[data-paid]').textContent = '0/2';
+      el.querySelector('[data-elapsed]').textContent = '00:00';
+      el.querySelector('[data-saved]').textContent = '$0.2975';
+      wrap.style.setProperty('--pct-replay', 0);
+      wrap.style.setProperty('--pct-paid', 0);
+      el.classList.remove('running','clicking');
+      el.dataset.stage = '0';
+      setStageRail(el, 0);
+    }};
+  }
+
+  /* DEMO 3: Route + prune */
+  function buildRouteTimeline(el){
+    const rows = el.querySelectorAll('.tier-row');
+    const lbl = el.querySelector('[data-stage-lbl]');
+    const vLine = el.querySelector('[data-route-verdict]');
+    const thumbs = el.querySelectorAll('.thumb');
+    const tokCount = el.querySelector('[data-tok-count]');
+    const tokSaved = el.querySelector('[data-tok-saved]');
+    const tokDetail = el.querySelector('[data-tok-detail]');
+    const tokBar = el.querySelector('.tok-bar');
+    const tl = gsap.timeline({ paused: true });
+
+    function goStage(stage){
+      el.dataset.stage = stage;
+      setStageRail(el, stage);
+      if (lbl) lbl.textContent = ROUTE_LABELS[stage];
+    }
+    function clearRows(){ rows.forEach(r=>{ r.classList.remove('eval','reject','hot'); r.querySelector('.verdict').textContent=''; }); }
+
+    // Stage 1: eval T1
+    tl.call(()=>{
+      goStage(1); clearRows();
+      rows[0].classList.add('eval');
+      rows[0].querySelector('.verdict').textContent = '…';
+      vLine.textContent = '→ T1 evaluating capability…';
+    });
+    tl.to({}, { duration: 0.5 });
+    // Stage 2: reject T1
+    tl.call(()=>{
+      goStage(2);
+      rows[0].classList.remove('eval'); rows[0].classList.add('reject');
+      rows[0].querySelector('.verdict').textContent = '✕';
+      vLine.textContent = '→ T1 insufficient (confidence 0.42) — escalate';
+    });
+    tl.to({}, { duration: 0.45 });
+    // Stage 3: eval T2
+    tl.call(()=>{
+      goStage(3);
+      rows[1].classList.add('eval');
+      rows[1].querySelector('.verdict').textContent = '…';
+      vLine.textContent = '→ T2 evaluating capability…';
+    });
+    tl.to({}, { duration: 0.5 });
+    // Stage 4: lock T2
+    tl.call(()=>{
+      goStage(4);
+      rows[1].classList.remove('eval'); rows[1].classList.add('hot');
+      rows[1].querySelector('.verdict').textContent = '✓';
+      vLine.textContent = '→ T2 locked · cheapest viable tier';
+      thumbs.forEach(t=>{ t.classList.remove('stale'); t.classList.add('kept'); });
+    });
+    tl.to({}, { duration: 0.35 });
+    // Stage 5: pruning — drop thumbs one by one
+    tl.call(()=>goStage(5));
+    for (let i = 0; i < 5; i++){
+      tl.call(()=>{
+        thumbs[i].classList.remove('kept'); thumbs[i].classList.add('stale');
+        const pct = 1 - ((i+1)/8) * 0.8;
+        tokBar.style.setProperty('--fill', pct.toFixed(3));
+        tokCount.textContent = Math.round(12400 * pct).toLocaleString();
+        tokSaved.textContent = Math.round((1 - pct) * 100) + '% saved';
+        tokDetail.textContent = 'via recency pruning';
+      });
+      tl.to({}, { duration: 0.12 });
+    }
+
+    return { tl, reset: ()=>{
+      el.dataset.stage = '0';
+      setStageRail(el, 0);
+      if (lbl) lbl.textContent = ROUTE_LABELS[0];
+      clearRows();
+      thumbs.forEach(t=>t.classList.remove('stale','kept'));
+      tokBar.style.setProperty('--fill', 1);
+      tokCount.textContent = '12,400';
+      tokSaved.textContent = '0% saved';
+      tokDetail.textContent = 'full context';
+      vLine.textContent = '→ evaluating…';
+    }};
+  }
+
+  /* DEMO 4: Audit */
+  function buildAuditTimeline(el){
+    const rows = el.querySelectorAll('.audit-row');
+    const tl = gsap.timeline({ paused: true });
+    for (let i = 0; i < rows.length; i++){
+      tl.call(()=>{
+        rows[i].classList.add('in');
+        el.dataset.stage = String(i + 1);
+        setStageRail(el, i + 1);
+      });
+      tl.to({}, { duration: 0.22 });
+    }
+    tl.call(()=>{ el.dataset.stage = '7'; setStageRail(el, 7); }); // reveal done-stamp
+
+    return { tl, reset: ()=>{
+      rows.forEach(r=>r.classList.remove('in'));
+      el.dataset.stage = '0';
+      setStageRail(el, 0);
+    }};
+  }
+
+  /* ────────── Mount demos ────────── */
+  const builders = {
+    submit: buildSubmitTimeline,
+    replay: buildReplayTimeline,
+    route: buildRouteTimeline,
+    audit: buildAuditTimeline,
+  };
+
+  const demoInstances = [];
+  document.querySelectorAll('[data-demo][data-autoplay]').forEach(el=>{
+    const kind = el.dataset.demo;
+    const builder = builders[kind]; if (!builder || !window.gsap) return;
+    const { tl, reset } = builder(el);
+    demoInstances.push({ el, tl, reset, played:false });
+
+    // Replay button stays functional
+    const btn = el.querySelector('[data-replay]');
+    if (btn){
+      btn.addEventListener('click', ()=>{
+        reset(); tl.restart();
+      });
+    }
+  });
+
+  /* ────────── Horizontal pin scroll ──────────
+     .hpin gets pinned. During pin, .htrack translates
+     from 0 to -75% (4 panels × 100vw → reveals 4 panels
+     across 3 × 100vw of movement). When each panel becomes
+     the dominant one in view, its demo timeline plays. */
+  if (window.gsap && window.ScrollTrigger && !prefersReduced){
+    const hpin = document.querySelector('#hpin');
+    const htrack = document.querySelector('[data-htrack]');
+    const panels = document.querySelectorAll('.hpanel');
+    const pips = document.querySelectorAll('.hpin-progress .pp');
+    const label = document.querySelector('[data-hpin-label]');
+    const isWide = matchMedia('(min-width: 881px)').matches;
+
+    if (hpin && htrack && panels.length && isWide){
+      const totalShift = (panels.length - 1) * 100; // in vw
+
+      gsap.to(htrack, {
+        xPercent: -(100 * (panels.length - 1) / panels.length), /* -75% of 400vw track = -300vw */
+        ease: 'none',
+        scrollTrigger: {
+          trigger: hpin,
+          start: 'top top',
+          end: () => '+=' + (panels.length * window.innerHeight * 1.4),
+          pin: true,
+          scrub: 1.2,              /* smooth catch-up */
+          anticipatePin: 1,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            // progress 0..1 maps to panel 0..3
+            const idx = Math.min(panels.length - 1, Math.floor(self.progress * panels.length * 0.999));
+            pips.forEach((p, i) => p.classList.toggle('on', i === idx));
+            const activePanel = panels[idx];
+            if (label && activePanel) label.textContent = activePanel.dataset.hkey || '';
+            // play the demo inside the active panel once
+            demoInstances.forEach(inst => {
+              if (activePanel.contains(inst.el) && !inst.played){
+                inst.played = true;
+                inst.reset();
+                inst.tl.restart();
+              }
+            });
+          },
+        },
+      });
+    } else {
+      // narrow viewport OR reduced motion: just play each demo on enter
+      demoInstances.forEach(inst => {
+        ScrollTrigger.create({
+          trigger: inst.el,
+          start: 'top 65%',
+          once: true,
+          onEnter: () => { if (!inst.played){ inst.played = true; inst.reset(); inst.tl.restart(); } },
+        });
+      });
+    }
+  } else {
+    // no GSAP: plain IntersectionObserver fallback
+    demoInstances.forEach(inst => {
+      const obs = new IntersectionObserver((entries)=>{
+        entries.forEach(e=>{ if (e.isIntersecting && !inst.played){ inst.played = true; inst.reset(); inst.tl.restart(); obs.disconnect(); } });
+      }, { threshold: 0.25 });
+      obs.observe(inst.el);
+    });
+  }
+
+  /* Hero parallax removed — keep CUTIEE title always visible. */
+})();
+</script>
+</body>
+</html>

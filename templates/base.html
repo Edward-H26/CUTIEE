@@ -9,51 +9,72 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/cutiee.css' %}">
+    <link rel="stylesheet" href="{% static 'css/cutiee.css' %}?v=2026-04-20i">
+    <link rel="icon" type="image/png" href="{% static 'images/brand-mark.png' %}">
     <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="{% if user.is_authenticated %}has-shell{% endif %}">
+{% if user.is_authenticated %}
+    {% url 'tasks:list' as nav_tasks %}
+    {% url 'tasks:dashboard' as nav_dashboard %}
+    {% url 'memory_app:list' as nav_memory %}
+    {% url 'audit:list' as nav_audit %}
+    <header class="shell-topbar">
+        <a href="/" class="shell-brand" aria-label="CUTIEE home">
+            <span class="cutiee-brand-tile"><img src="{% static 'images/brand-mark.png' %}" alt=""></span>
+            <span class="cutiee-brand">CUTIEE</span>
+        </a>
+        <div class="shell-topbar__right">
+            <span class="shell-status-pill"><span class="dot"></span>Computer Use &middot; gemini-flash-latest</span>
+            <form method="post" action="{% url 'account_logout' %}" class="cutiee-nav-form">
+                {% csrf_token %}
+                <button type="submit" class="shell-logout">Log out</button>
+            </form>
+        </div>
+    </header>
+    <div class="shell">
+        <aside class="shell-sidebar" aria-label="Primary navigation">
+            <div class="shell-sidebar__section">Workspace</div>
+            <a class="shell-nav-link {% if request.path|slice:':7' == '/tasks/' and request.path != nav_dashboard %}is-active{% endif %}" href="{{ nav_tasks }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+                <span>Tasks</span>
+            </a>
+            <a class="shell-nav-link {% if request.path == nav_dashboard %}is-active{% endif %}" href="{{ nav_dashboard }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 3 5-6"/></svg>
+                <span>Cost dashboard</span>
+            </a>
+            <a class="shell-nav-link {% if request.path|slice:':8' == '/memory/' %}is-active{% endif %}" href="{{ nav_memory }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                <span>Memory</span>
+            </a>
+            <a class="shell-nav-link {% if request.path|slice:':7' == '/audit/' %}is-active{% endif %}" href="{{ nav_audit }}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                <span>Audit log</span>
+            </a>
+            <div class="shell-spacer"></div>
+            <div class="shell-upgrade">
+                <div class="shell-upgrade__title">Cost aware by default</div>
+                <p>Recurring tasks replay procedurally and drop toward $0 per run.</p>
+            </div>
+        </aside>
+{% else %}
     <header class="cutiee-header">
-        <a href="/" class="cutiee-brand">CUTIEE</a>
+        <a href="/" class="cutiee-brand-lockup" aria-label="CUTIEE home">
+            <span class="cutiee-brand-tile"><img src="{% static 'images/brand-mark.png' %}" alt=""></span>
+            <span class="cutiee-brand">CUTIEE</span>
+        </a>
         <nav class="cutiee-nav" aria-label="Primary">
-            {% if user.is_authenticated %}
-                {% url 'tasks:list' as tasks_url %}
-                {% url 'tasks:dashboard' as dashboard_url %}
-                {% url 'memory_app:list' as memory_url %}
-                {% url 'audit:list' as audit_url %}
-                <a href="{{ tasks_url }}"
-                   class="{% if request.path|slice:':7' == '/tasks/' and request.path != dashboard_url %}is-active{% endif %}"
-                   {% if request.path|slice:':7' == '/tasks/' and request.path != dashboard_url %}aria-current="page"{% endif %}>Tasks</a>
-                <a href="{{ dashboard_url }}"
-                   class="{% if request.path == dashboard_url %}is-active{% endif %}"
-                   {% if request.path == dashboard_url %}aria-current="page"{% endif %}>Dashboard</a>
-                <a href="{{ memory_url }}"
-                   class="{% if request.path|slice:':8' == '/memory/' %}is-active{% endif %}"
-                   {% if request.path|slice:':8' == '/memory/' %}aria-current="page"{% endif %}>Memory</a>
-                <a href="{{ audit_url }}"
-                   class="{% if request.path|slice:':7' == '/audit/' %}is-active{% endif %}"
-                   {% if request.path|slice:':7' == '/audit/' %}aria-current="page"{% endif %}>Audit</a>
-                <details class="cutiee-nav-more">
-                    <summary aria-label="More navigation">More ▾</summary>
-                    <div class="cutiee-nav-more__menu">
-                        <a href="{{ dashboard_url }}">Dashboard</a>
-                        <a href="{{ memory_url }}">Memory</a>
-                        <a href="{{ audit_url }}">Audit</a>
-                    </div>
-                </details>
-                <form method="post" action="{% url 'account_logout' %}" class="cutiee-nav-form">
-                    {% csrf_token %}
-                    <button type="submit" class="cutiee-btn-ghost cutiee-btn-sm">Log out</button>
-                </form>
-            {% else %}
-                <a href="{% url 'account_login' %}" class="cta">Sign in</a>
-            {% endif %}
+            <a href="{% url 'account_login' %}" class="cta">Sign in</a>
         </nav>
     </header>
-    <main class="cutiee-main">
-        {% block content %}{% endblock %}
-    </main>
-    {% block extra_js %}{% endblock %}
+{% endif %}
+        <main class="{% if user.is_authenticated %}shell-main{% else %}cutiee-main{% endif %}">
+            {% block content %}{% endblock %}
+        </main>
+{% if user.is_authenticated %}
+    </div>
+{% endif %}
+{% block extra_js %}{% endblock %}
 </body>
 </html>
