@@ -31,6 +31,12 @@
              hx-swap="outerHTML"
              hx-target="this"></div>
 
+        <div id="preview-slot"
+             hx-get="{% url 'tasks:preview_pending' execution_id=executions.0.id %}"
+             hx-trigger="load, every 1s"
+             hx-swap="outerHTML"
+             hx-target="this"></div>
+
         {% if NOVNC_URL and executions.0.status == 'running' %}
         <div class="cutiee-card cutiee-live-panel" data-testid="live-browser">
             <div class="cutiee-live-panel__header">

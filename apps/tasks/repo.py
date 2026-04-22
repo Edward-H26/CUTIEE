@@ -149,6 +149,18 @@ def deleteTask(userId: str, taskId: str) -> None:
             """,
             exec_ids = execIds,
         )
+        # :PreviewApproval nodes are keyed on execution_id and do not
+        # carry a relationship to :Execution, so the DETACH DELETE above
+        # does not reach them. Clean them up explicitly to avoid leaving
+        # orphans after task deletion.
+        run_query(
+            """
+            MATCH (p:PreviewApproval)
+            WHERE p.execution_id IN $exec_ids
+            DETACH DELETE p
+            """,
+            exec_ids = execIds,
+        )
 
 
 def createExecution(
@@ -340,6 +352,27 @@ def listExecutionsForTask(userId: str, taskId: str) -> list[dict[str, Any]]:
         task_id = str(taskId),
     )
     return [row["execution"] for row in rows]
+
+
+def findActiveExecutionForUser(userId: str) -> dict[str, Any] | None:
+    """Return the most recent running execution for this user, with its task_id.
+
+    Surfaces the "live" task on the main list page so users can watch
+    the agent without drilling in. Returns None when no execution is
+    currently running. The task_id is included so the caller can link
+    to the detail view.
+    """
+    row = run_single(
+        """
+        MATCH (:User {id: $user_id})-[:OWNS]->(t:Task)-[:EXECUTED_AS]->(e:Execution)
+        WHERE e.status = 'running'
+        RETURN e {.*, task_id: t.id} AS execution
+        ORDER BY e.started_at DESC
+        LIMIT 1
+        """,
+        user_id = str(userId),
+    )
+    return row["execution"] if row else None
 
 
 def persistAgentState(userId: str, taskId: str, state: AgentState) -> None:

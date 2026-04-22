@@ -35,7 +35,9 @@ CONSTRAINTS: list[str] = [
     # identifier so the MERGE-based writes at their call sites are
     # idempotent.
     "CREATE CONSTRAINT cost_ledger_key   IF NOT EXISTS FOR (l:CostLedger)         REQUIRE (l.user_id, l.hour_key) IS UNIQUE",
-    "CREATE CONSTRAINT action_approval_id IF NOT EXISTS FOR (a:ActionApproval)    REQUIRE a.id           IS UNIQUE",
+    # The action-approval flow is in-process (apps/tasks/approval_queue.py)
+    # and never writes to Neo4j, so no :ActionApproval constraint is
+    # declared here. Add one back only if the queue moves into Neo4j.
     "CREATE CONSTRAINT preview_approval_id IF NOT EXISTS FOR (p:PreviewApproval)  REQUIRE p.execution_id IS UNIQUE",
     # Screenshot store writes MERGE (:Screenshot {execution_id, step_index}).
     # Without this composite constraint Neo4j scans every :Screenshot node on
@@ -55,7 +57,8 @@ INDEXES: list[str] = [
     # Phase 4, 7, 16 support indexes so polling is cheap.
     "CREATE INDEX cost_ledger_user      IF NOT EXISTS FOR (l:CostLedger)         ON (l.user_id, l.hour_key)",
     "CREATE INDEX cost_ledger_day       IF NOT EXISTS FOR (l:CostLedger)         ON (l.user_id, l.day_key)",
-    "CREATE INDEX action_approval_exec  IF NOT EXISTS FOR (a:ActionApproval)     ON (a.execution_id, a.status)",
+    # action_approval_exec index omitted for the same reason as the
+    # constraint: the queue is in-process and writes nothing to Neo4j.
     "CREATE INDEX preview_approval_stat IF NOT EXISTS FOR (p:PreviewApproval)    ON (p.status)",
 ]
 

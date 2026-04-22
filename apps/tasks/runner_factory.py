@@ -13,6 +13,7 @@ from typing import Any
 from agent.browser.controller import StubBrowserController, browserFromEnv
 from agent.harness.computer_use_loop import ComputerUseRunner, buildComputerUseRunner
 from agent.harness.config import Config
+from agent.harness.preview import runPreviewAndWait
 from agent.harness.state import Action, ActionType, AgentState, ObservationStep
 from agent.harness.url_utils import hostFromUrl
 from agent.memory.ace_memory import ACEMemory
@@ -112,7 +113,44 @@ def buildLiveCuRunnerForUser(
         return redactScreenshot(screenshotBytes, regions)
 
     runner.redactor = _composedRedactor
+
+    async def _previewHook(state: AgentState, fragmentPlan: Any) -> Any:
+        """Write the :PreviewApproval node, poll until the user decides.
+
+        The summary is deterministic and built from the task state plus
+        the fragment plan so the user sees exactly what will replay for
+        free versus what the model will drive. Cancellation propagates
+        through the runner as a `user_cancelled_preview` completion
+        reason, which the runner handles before any browser action fires.
+        """
+        return await runPreviewAndWait(
+            executionId = state.executionId,
+            userId = state.userId,
+            summary = _buildPreviewSummary(state, fragmentPlan),
+        )
+
+    runner.previewHook = _previewHook
     return runner
+
+
+def _buildPreviewSummary(state: AgentState, fragmentPlan: Any) -> str:
+    """Compose the natural-language plan shown in the preview modal."""
+    fragmentCount = 0
+    if fragmentPlan is not None:
+        fragmentCount = len(getattr(fragmentPlan, "fragments", []) or [])
+    lines: list[str] = [f"Goal: {state.taskDescription or '(no description)'}"]
+    if fragmentCount > 0:
+        lines.append(
+            f"{fragmentCount} step(s) will replay from procedural memory at $0."
+        )
+    else:
+        lines.append(
+            "No procedural replay available; every step will use the model."
+        )
+    lines.append(
+        "Approve to begin, or Cancel to stop before any browser action fires."
+    )
+    return "\n".join(lines)
 
 
 def _buildCuClientFromEnv(*, cdpUrl: str | None, maxSteps: int) -> CuClient:

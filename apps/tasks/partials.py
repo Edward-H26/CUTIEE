@@ -108,3 +108,47 @@ def renderApprovalModal(executionId: str, pending: dict[str, Any] | None) -> Htt
         approve = approveUrl,
         reject = rejectUrl,
     ))
+
+
+def renderPreviewModal(executionId: str, preview: dict[str, Any] | None) -> HttpResponse:
+    """Render the pre-run preview modal.
+
+    The preview asks the user to confirm the plan before any browser
+    action fires. While the :PreviewApproval node status is 'pending'
+    this renders an approve/cancel card; any other status collapses to
+    an empty polling slot so the poll ends when the run is underway.
+    Polling continues at 1s while pending so the view flips within a
+    tick of the agent creating the node.
+    """
+    pollUrl = f"/tasks/api/preview/{executionId}/"
+    emptySlot = format_html(
+        "<div id='preview-slot' "
+        "hx-get='{}' hx-trigger='every 1s' hx-swap='outerHTML' hx-target='this'></div>",
+        pollUrl,
+    )
+    if preview is None or preview.get("status") != "pending":
+        return HttpResponse(emptySlot)
+
+    approveUrl = f"/tasks/api/preview/{executionId}/approve/"
+    cancelUrl = f"/tasks/api/preview/{executionId}/cancel/"
+    summary = str(preview.get("summary") or "")
+    return HttpResponse(format_html(
+        "<div id='preview-slot' class='cutiee-card cutiee-preview' "
+        "hx-get='{poll}' hx-trigger='every 1s' hx-swap='outerHTML' hx-target='this'>"
+        "<div class='cutiee-stack-tight'>"
+        "<div class='cutiee-row cutiee-row--gap-2'>"
+        "<span class='cutiee-pill cutiee-pill--accent'>preview</span>"
+        "<strong>Approve before CUTIEE starts</strong>"
+        "</div>"
+        "<pre class='cutiee-preview-summary'>{summary}</pre>"
+        "<div class='cutiee-row cutiee-row--gap-2'>"
+        "<button class='cta' hx-post='{approve}' hx-swap='none'>Approve &amp; run</button>"
+        "<button class='cutiee-btn-ghost' hx-post='{cancel}' hx-swap='none'>Cancel</button>"
+        "</div>"
+        "</div>"
+        "</div>",
+        poll = pollUrl,
+        summary = summary,
+        approve = approveUrl,
+        cancel = cancelUrl,
+    ))

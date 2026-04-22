@@ -48,6 +48,47 @@
     </div>
 </div>
 
+{% if active_execution %}
+    <div id="approval-slot"
+         hx-get="{% url 'tasks:approval_pending' execution_id=active_execution.id %}"
+         hx-trigger="load, every 1s"
+         hx-swap="outerHTML"
+         hx-target="this"></div>
+
+    <div id="preview-slot"
+         hx-get="{% url 'tasks:preview_pending' execution_id=active_execution.id %}"
+         hx-trigger="load, every 1s"
+         hx-swap="outerHTML"
+         hx-target="this"></div>
+
+    <section class="panel cutiee-live-panel" data-testid="live-browser-main">
+        <div class="panel__head">
+            <div>
+                <h2>Live browser</h2>
+                <div class="panel__sub">
+                    Execution in progress &middot;
+                    <a href="{% url 'tasks:detail' task_id=active_execution.task_id %}">open this task</a>
+                </div>
+            </div>
+        </div>
+        {% if NOVNC_URL %}
+            <iframe class="cutiee-live-panel__frame"
+                    src="{{ NOVNC_URL }}?autoconnect=1&resize=scale&execution_id={{ active_execution.id }}"
+                    title="Live browser for execution {{ active_execution.id }}"
+                    sandbox="allow-same-origin allow-scripts allow-forms"
+                    allow="clipboard-read; clipboard-write"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"></iframe>
+        {% else %}
+            <p class="cutiee-text-sm cutiee-muted">
+                The live noVNC iframe is configured but the worker URL is not set.
+                Paste the deployed worker's public URL (the one ending in <code>/vnc.html</code>)
+                into the <code>CUTIEE_NOVNC_URL</code> env var in the Render dashboard and redeploy.
+            </p>
+        {% endif %}
+    </section>
+{% endif %}
+
 <section class="metric-grid" data-testid="cost-cards">
     <div class="metric">
         <div class="metric__label">Total spend</div>

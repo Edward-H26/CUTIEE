@@ -14,7 +14,8 @@
     <script src="https://unpkg.com/htmx.org@1.9.10" defer></script>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="{% if user.is_authenticated %}has-shell{% endif %}">
+<body class="{% if user.is_authenticated %}has-shell{% endif %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 {% if user.is_authenticated %}
     {% url 'tasks:list' as nav_tasks %}
     {% url 'tasks:dashboard' as nav_dashboard %}

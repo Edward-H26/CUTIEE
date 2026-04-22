@@ -28,6 +28,16 @@ urlpatterns = [
         api.approval_decide,
         name = "approval_decide",
     ),
+    path(
+        "api/preview/<str:execution_id>/",
+        api.preview_pending,
+        name = "preview_pending",
+    ),
+    path(
+        "api/preview/<str:execution_id>/<str:decision>/",
+        api.preview_decide,
+        name = "preview_decide",
+    ),
     path("api/cost-summary/", api.cost_summary, name = "cost_summary"),
     path("api/cost-timeseries/", api.cost_timeseries, name = "cost_timeseries"),
     path("api/tier-distribution/", api.tier_distribution, name = "tier_distribution"),

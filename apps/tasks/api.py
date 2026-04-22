@@ -30,7 +30,8 @@ from apps.tasks.approval_queue import (
     pendingApprovalFor,
     submitDecision,
 )
-from apps.tasks.partials import renderApprovalModal, renderStatusPartial
+from apps.tasks.partials import renderApprovalModal, renderPreviewModal, renderStatusPartial
+from apps.tasks.preview_queue import fetchPreviewApproval, setPreviewStatus
 from apps.tasks.services import _screenshotStore, fetchProgress, runTaskForUser
 
 logger = logging.getLogger("cutiee")
@@ -284,6 +285,41 @@ def approval_decide(request: HttpRequest, execution_id: str, decision: str) -> J
     approved = decision.lower() in {"approve", "approved", "yes", "ok"}
     delivered = submitDecision(str(execution_id), approved)
     return JsonResponse({"delivered": delivered, "approved": approved})
+
+
+@require_GET
+@login_required
+def preview_pending(request: HttpRequest, execution_id: str) -> HttpResponse:
+    """HTMX poll endpoint for the pre-run preview modal.
+
+    Auth: must own the execution. Returns the approve/cancel modal when
+    the :PreviewApproval node is in 'pending' state, otherwise an empty
+    slot that keeps polling so the UI reacts to a late-arriving preview.
+    """
+    userId = str(request.user.pk)
+    if tasksRepo.getExecution(userId, str(execution_id)) is None:
+        return HttpResponse(status = 404)
+    preview = fetchPreviewApproval(str(execution_id))
+    return renderPreviewModal(str(execution_id), preview)
+
+
+@require_POST
+@login_required
+def preview_decide(request: HttpRequest, execution_id: str, decision: str) -> JsonResponse:
+    """Flip the preview's status to approved or cancelled.
+
+    The agent's `runPreviewAndWait` is polling the same :PreviewApproval
+    node in Neo4j and sees the flip on its next poll tick, which
+    releases the runner to start (approved) or exit cleanly (cancelled)
+    without touching the browser.
+    """
+    userId = str(request.user.pk)
+    if tasksRepo.getExecution(userId, str(execution_id)) is None:
+        return JsonResponse({"error": "execution not found"}, status = 404)
+    approved = decision.lower() in {"approve", "approved", "yes", "ok"}
+    status = "approved" if approved else "cancelled"
+    delivered = setPreviewStatus(str(execution_id), status = status)
+    return JsonResponse({"delivered": delivered, "status": status})
 
 
 @require_GET

@@ -89,3 +89,52 @@ def test_deleteTaskRejectsRequestsWithoutCsrfToken():
     client.force_login(user)
     resp = client.post("/tasks/any-task-id/delete/")
     assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+def test_previewPendingUrlResolves():
+    # Regression guard: detail.html references tasks:preview_pending via
+    # {% url %}. A NoReverseMatch here was the 500 on every detail page.
+    from django.urls import reverse
+    url = reverse("tasks:preview_pending", kwargs = {"execution_id": "abc-123"})
+    assert url.endswith("/tasks/api/preview/abc-123/")
+
+
+@pytest.mark.django_db
+def test_previewDecideUrlResolves():
+    from django.urls import reverse
+    url = reverse(
+        "tasks:preview_decide",
+        kwargs = {"execution_id": "abc-123", "decision": "approve"},
+    )
+    assert url.endswith("/tasks/api/preview/abc-123/approve/")
+
+
+@pytest.mark.django_db
+def test_baseTemplateInjectsHtmxCsrfHeader():
+    # HTMX POSTs from dynamically-rendered modals (approval, preview)
+    # must include X-CSRFToken. The body-level hx-headers is the single
+    # source of truth; losing it would silently 403 approve/cancel clicks
+    # in production.
+    from django.contrib.auth import get_user_model
+    user = get_user_model().objects.create_user(username = "bob", password = "pw")
+    client = Client()
+    client.force_login(user)
+    resp = client.get("/tasks/dashboard/")
+    assert resp.status_code == 200
+    body = resp.content.decode("utf-8")
+    assert "X-CSRFToken" in body
+    assert "hx-headers" in body
+
+
+@pytest.mark.django_db
+def test_previewDecideRejectsUnknownExecution():
+    # Authorization boundary: if the execution does not exist under
+    # the caller's User node, the endpoint must return 404 without
+    # writing to Neo4j. Guards against execution-id enumeration.
+    from django.contrib.auth import get_user_model
+    user = get_user_model().objects.create_user(username = "carol", password = "pw")
+    client = Client()
+    client.force_login(user)
+    resp = client.post("/tasks/api/preview/missing-exec-id/approve/")
+    assert resp.status_code == 404

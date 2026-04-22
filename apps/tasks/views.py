@@ -37,10 +37,21 @@ def _safeListAndCost(userId: str) -> tuple[list, dict, str]:
 def task_list(request: HttpRequest) -> HttpResponse:
     userId = str(request.user.pk)
     tasks, cost, dbError = _safeListAndCost(userId)
+    activeExecution = None
+    try:
+        activeExecution = tasksRepo.findActiveExecutionForUser(userId)
+    except Exception:  # noqa: BLE001 - optional panel, fail soft for UI
+        _logger.debug("findActiveExecutionForUser failed; hiding live panel", exc_info = True)
     return render(
         request,
         "tasks/list.html",
-        {"tasks": tasks, "cost": cost, "form": TaskSubmissionForm(), "db_error": dbError},
+        {
+            "tasks": tasks,
+            "cost": cost,
+            "form": TaskSubmissionForm(),
+            "db_error": dbError,
+            "active_execution": activeExecution,
+        },
     )
 
 
