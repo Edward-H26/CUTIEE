@@ -43,11 +43,14 @@ RUN pip install --no-cache-dir uv \
  && uv pip compile pyproject.toml -o /tmp/requirements.txt \
  && uv pip install --system --no-cache -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
-# Install browser-use unconditionally so the worker can flip
-# CUTIEE_CU_BACKEND between "gemini" and "browser_use" at runtime without
-# a rebuild. A failure here must break the build loudly: a silent fallback
-# would only surface as a ModuleNotFoundError on the first real task.
-RUN pip install --no-cache-dir "browser-use>=0.7"
+# browser-use is intentionally NOT installed here. This image's runtime
+# (start-worker.sh) only launches Xvfb, fluxbox, x11vnc, websockify, and
+# Chromium; no Python process starts, so browser-use would be dead weight.
+# Additionally browser-use requires Python >=3.11 and this Playwright
+# base image ships Python 3.10 from Ubuntu jammy, so the install cannot
+# succeed on jammy anyway. If a future sidecar lands that runs Python in
+# this container AND selects CUTIEE_CU_BACKEND=browser_use, bump the base
+# image to a noble variant (Python 3.12) and install browser-use then.
 
 COPY agent/ ./agent/
 COPY apps/ ./apps/
@@ -55,6 +58,21 @@ COPY cutiee_site/ ./cutiee_site/
 COPY scripts/ ./scripts/
 
 RUN mkdir -p /var/log/cutiee /opt/cutiee
+
+# Playwright's base image ships Chromium at
+# /ms-playwright/chromium-<rev>/chrome-linux/chrome (binary is named
+# `chrome`, not `chromium`) and does NOT put it on PATH. start-worker.sh
+# invokes `chromium --no-sandbox ...`, so symlink the Playwright binary
+# into /usr/local/bin/chromium. The `--version` probe fails the build if
+# the find does not return a runnable binary, so a silent
+# command-not-found at runtime becomes a loud build failure here.
+RUN if ! command -v chromium >/dev/null 2>&1; then \
+        CHROMIUM_BIN="$(find /ms-playwright -type f -name chrome -path '*chromium*' 2>/dev/null | head -1)"; \
+        if [ -n "$CHROMIUM_BIN" ]; then \
+            ln -s "$CHROMIUM_BIN" /usr/local/bin/chromium; \
+        fi; \
+    fi \
+ && chromium --version
 
 # start-worker.sh runs five long-lived processes:
 #   1. Xvfb          virtual X display on :99
