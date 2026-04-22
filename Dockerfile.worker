@@ -35,7 +35,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir uv && uv pip install --system --no-cache -r <(uv pip compile pyproject.toml)
+# Install core deps. Docker's RUN defaults to `/bin/sh -c`, and on
+# Ubuntu `/bin/sh` is `dash`, which does NOT support bash's `<(...)`
+# process substitution. Compile to a temp file instead so the command
+# stays POSIX-compliant and works on every Docker host.
+RUN pip install --no-cache-dir uv \
+ && uv pip compile pyproject.toml -o /tmp/requirements.txt \
+ && uv pip install --system --no-cache -r /tmp/requirements.txt \
+ && rm -f /tmp/requirements.txt
 # Install browser-use unconditionally so the worker can flip
 # CUTIEE_CU_BACKEND between "gemini" and "browser_use" at runtime without
 # a rebuild. A failure here must break the build loudly: a silent fallback
