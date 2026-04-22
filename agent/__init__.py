@@ -1,15 +1,19 @@
-"""CUTIEE agent package — public surface (Computer Use only).
+"""CUTIEE agent package, the public surface for Computer Use workflows.
 
-Importable as a standalone library; nothing in `agent/` depends on
-Django, allauth, Neo4j, or any specific persistence layer. Implementations
-of `BulletStore`, the audit sink, and the progress callback are injected
-by the consumer (Django for the bundled web app, but anything else
-can inject its own).
+Importable as a standalone library. Nothing in `agent/` depends on
+Django, allauth, or any specific persistence layer; implementations
+of `BulletStore`, the audit sink, and the progress callback are
+injected by the consumer (Django for the bundled web app, any other
+host for a custom integration).
 
-The legacy DOM-router stack (AdaptiveRouter / GeminiCloudClient / DOMState
-extraction / RecencyPruner / Orchestrator) was removed once Gemini Flash
-gained the ComputerUse tool at flash pricing. Every task now runs through
-`ComputerUseRunner` with screenshot+pixel input.
+Every task runs through a single agent loop, `ComputerUseRunner`,
+which drives a screenshot to pixel-action cycle against a pluggable
+`CuClient`. Two client implementations ship today: the default
+`GeminiComputerUseClient` (flash-tier Gemini CU) and
+`BrowserUseClient` (browser-use wrapping Gemini 3 Flash). Optional
+safety and memory-hygiene collaborators (injection guard, CAPTCHA
+detector, heartbeat, preview, fragment replay) plug in through
+fields on the runner and are no-ops when absent.
 
 Quick start:
 
@@ -59,10 +63,9 @@ from .memory.pipeline import ACEPipeline, PipelineResult
 from .memory.quality_gate import QualityGate, QualityGateDiagnostics
 from .memory.reflector import HeuristicReflector, LessonCandidate
 from .memory.replay import ReplayPlan, ReplayPlanner
-from .memory.semantic import SemanticCredentialStore
 from .memory.store import BulletStore, InMemoryBulletStore
+from .routing.cu_client import ComputerUseStep, CuClient
 from .routing.models.gemini_cu import (
-    ComputerUseStep,
     GeminiComputerUseClient,
     MockComputerUseClient,
 )
@@ -76,14 +79,13 @@ __all__ = [
     "Config",
     "envBool", "envFloat", "envInt", "envStr",
     "ComputerUseRunner", "buildComputerUseRunner",
-    "ComputerUseStep", "GeminiComputerUseClient", "MockComputerUseClient",
+    "ComputerUseStep", "CuClient", "GeminiComputerUseClient", "MockComputerUseClient",
     "Bullet", "DeltaUpdate", "MEMORY_TYPES", "TYPE_PRIORITY", "hashContent",
     "ACEMemory", "ACEPipeline", "PipelineResult",
     "BulletStore", "InMemoryBulletStore",
     "Curator", "QualityGate", "QualityGateDiagnostics",
     "HeuristicReflector", "LessonCandidate",
     "ReplayPlan", "ReplayPlanner",
-    "SemanticCredentialStore",
     "EPISODIC_DECAY_RATE", "PROCEDURAL_DECAY_RATE", "SEMANTIC_DECAY_RATE",
     "decayedStrength", "totalDecayedStrength",
     "ApprovalGate", "ApprovalRequest",

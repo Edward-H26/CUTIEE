@@ -123,7 +123,7 @@ model and writes lessons back at end of run.
 | `CUTIEE_BROWSER_HEADLESS` | Optional | `false` (visible window) |
 | `CUTIEE_BROWSER_CDP_URL` | Optional | unset (launches fresh chromium) |
 | `CUTIEE_STORAGE_STATE_PATH` | Optional | unset (cold cookie jar) |
-| `CUTIEE_CREDENTIAL_KEY` | Only if using `SemanticCredentialStore` | — (Fernet key) |
+| `CUTIEE_CU_BACKEND` | Optional | `gemini` (default) or `browser_use` |
 
 ## Optional dependencies
 
@@ -131,7 +131,7 @@ The library is single-package but the deps it pulls in are scoped:
 
 - `google-genai` — required for `GeminiComputerUseClient`
 - `playwright` — required for `BrowserController` (real browser)
-- `cryptography` — required only for `SemanticCredentialStore`
+- `browser-use` — required only when `CUTIEE_CU_BACKEND=browser_use`
 - `numpy` + `fastembed` — required only for `ACEMemory` (semantic embeddings)
 
 If you only use `MockComputerUseClient` + `StubBrowserController`, you

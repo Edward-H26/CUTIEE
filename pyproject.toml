@@ -34,6 +34,14 @@ dev = [
     "mypy>=1.11",
     "respx>=0.21",
 ]
+browser_use = [
+    "browser-use>=0.7",
+]
+
+[project.optional-dependencies]
+browser_use = [
+    "browser-use>=0.7",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -42,9 +50,9 @@ python_files = ["tests.py", "test_*.py", "*_tests.py"]
 markers = [
     "slow: tests that take >5s",
     "local: tests requiring CUTIEE_ENV=local and a reachable Neo4j bolt endpoint (uses MockComputerUseClient)",
-    "production: tests requiring CUTIEE_ENV=production, GEMINI_API_KEY, and a real Chromium binary",
+    "production: tests requiring CUTIEE_ENV=production, GEMINI_API_KEY, and the optional playwright extra installed",
     "integration: E2E tests against demo Flask sites",
-    "showcase: real-world demos requiring a logged-in Playwright storage_state",
+    "showcase: real-world demos requiring the playwright extra plus a logged-in storage_state",
 ]
 
 [tool.ruff]

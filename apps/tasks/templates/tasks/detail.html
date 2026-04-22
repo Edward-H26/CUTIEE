@@ -31,6 +31,28 @@
              hx-swap="outerHTML"
              hx-target="this"></div>
 
+        <div id="preview-slot"
+             hx-get="{% url 'tasks:preview_pending' execution_id=executions.0.id %}"
+             hx-trigger="load, every 1s"
+             hx-swap="outerHTML"
+             hx-target="this"></div>
+
+        {% if NOVNC_URL and executions.0.status == 'running' %}
+        <div class="cutiee-card cutiee-live-panel" data-testid="live-browser">
+            <div class="cutiee-live-panel__header">
+                <h2>Live browser</h2>
+                <span class="cutiee-text-sm cutiee-muted">You can click inside the view to take over if the agent stalls.</span>
+            </div>
+            <iframe class="cutiee-live-panel__frame"
+                    src="{{ NOVNC_URL }}?autoconnect=1&resize=scale&execution_id={{ executions.0.id }}"
+                    title="Live browser for execution {{ executions.0.id }}"
+                    sandbox="allow-same-origin allow-scripts allow-forms"
+                    allow="clipboard-read; clipboard-write"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"></iframe>
+        </div>
+        {% endif %}
+
         <div class="cutiee-card" data-testid="latest-execution">
             <h2>Latest execution · run #{{ executions.0.run_index }}</h2>
             <div id="exec-progress"

@@ -182,30 +182,4 @@ def _emptyGraph(userId: str, taskDescription: str) -> ProcedureGraph:
     )
 
 
-_JSON_OBJECT_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
-
-
-def _parseJsonLoose(text: str) -> Any:
-    if not text:
-        return None
-    if text.startswith("```"):
-        parts = text.split("\n")
-        if len(parts) > 2:
-            text = "\n".join(parts[1:-1]).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = _JSON_OBJECT_PATTERN.search(text)
-        if match is None:
-            return None
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            return None
-
-
-def _slugify(text: str) -> str:
-    if not text:
-        return "task"
-    normalized = re.sub(r"[^a-zA-Z0-9]+", "-", text.strip().lower())
-    return normalized.strip("-")[:48] or "task"
+from .text_utils import parseJsonLoose as _parseJsonLoose, slugify as _slugify  # noqa: E402

@@ -23,8 +23,9 @@ services:
     buildCommand: |
       uv sync &&
       uv run playwright install chromium &&
-      uv run python -m agent.persistence.bootstrap &&
-      uv run python manage.py collectstatic --no-input
+      uv run python manage.py migrate --no-input &&
+      uv run python manage.py collectstatic --no-input &&
+      uv run python -m agent.persistence.bootstrap
     # Single worker keeps Chromium memory bounded. Threads still fan out
     # for HTMX polls and other non-CU requests.
     startCommand: |
@@ -71,9 +72,9 @@ services:
       # headless. The controller defaults to headed for the dev demo.
       - key: CUTIEE_BROWSER_HEADLESS
         value: "true"
-      # Real Chromium drives the page directly. Set to "true" to fall
-      # back to the no-op stub (useful for cost-only demos without
-      # burning Chromium memory).
+      # Real Chromium drives the page via Playwright. The Standard
+      # plan (2 GB) has the headroom; flip to "true" only for cost-only
+      # demos that do not need a real browser.
       - key: CUTIEE_USE_STUB_BROWSER
         value: "false"
       # Aura-backed progress cache: 30 ms / publish, no Redis dyno needed.

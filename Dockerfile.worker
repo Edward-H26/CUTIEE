@@ -1,0 +1,109 @@
+# CUTIEE agent worker: Xvfb + Chromium + noVNC.
+#
+# The worker hosts a single headed Chromium inside a virtual X
+# display. The web dyno drives that Chromium over the Chrome DevTools
+# Protocol (via Playwright's `connect_over_cdp`), and classmates watch
+# the same browser through a noVNC iframe embedded in the dashboard.
+#
+# Ports:
+#   6080  noVNC HTTP (served by websockify; exposed publicly)
+#   9222  Chrome DevTools (exposed on the private Render network only,
+#         reachable from the web service as http://cutiee-worker:9222)
+#   5901  VNC (internal; not exposed)
+#
+# Build: docker build -f Dockerfile.worker -t cutiee-worker .
+# Run:   docker run -p 6080:6080 -p 9222:9222 --env-file .env cutiee-worker
+
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    DISPLAY=:99 \
+    VNC_PORT=5901 \
+    NOVNC_PORT=6080 \
+    CDP_PORT=9222 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        xvfb \
+        x11vnc \
+        fluxbox \
+        novnc \
+        websockify \
+        tini \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir uv && uv pip install --system --no-cache -r <(uv pip compile pyproject.toml)
+RUN pip install --no-cache-dir "browser-use>=0.7" || echo "browser-use optional extra not installed at build time"
+
+COPY agent/ ./agent/
+COPY apps/ ./apps/
+COPY cutiee_site/ ./cutiee_site/
+COPY scripts/ ./scripts/
+
+RUN mkdir -p /var/log/cutiee /opt/cutiee
+
+# start-worker.sh runs five long-lived processes:
+#   1. Xvfb          virtual X display on :99
+#   2. fluxbox       window manager so Chromium has focus + close-buttons
+#   3. x11vnc        serve :99 over raw VNC on ${VNC_PORT}
+#   4. websockify    wrap VNC in WebSocket + serve /usr/share/novnc at ${NOVNC_PORT}
+#   5. chromium      headed on :99, CDP on 0.0.0.0:${CDP_PORT}
+#
+# The web dyno connects via CDP over Render's private network and drives
+# this Chromium through Playwright. The foreground process (`wait`) keeps
+# tini alive; if any child dies, the shell exits and Render restarts us.
+COPY <<'EOF' /opt/cutiee/start-worker.sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+Xvfb :99 -screen 0 1280x800x24 +extension RANDR >/var/log/cutiee/xvfb.log 2>&1 &
+XVFB_PID=$!
+sleep 1
+
+fluxbox >/var/log/cutiee/fluxbox.log 2>&1 &
+FLUXBOX_PID=$!
+
+x11vnc -display :99 -forever -nopw -quiet -rfbport ${VNC_PORT} -shared \
+    >/var/log/cutiee/x11vnc.log 2>&1 &
+X11VNC_PID=$!
+
+websockify --web=/usr/share/novnc --heartbeat=30 ${NOVNC_PORT} localhost:${VNC_PORT} \
+    >/var/log/cutiee/websockify.log 2>&1 &
+WEBSOCKIFY_PID=$!
+
+# Chromium binds CDP to 0.0.0.0 so Render's private network routes
+# http://cutiee-worker:${CDP_PORT} to this process. --no-sandbox is
+# safe here because Render containers already run in a sandboxed env.
+# --disable-dev-shm-usage prevents OOM-like failures when /dev/shm is
+# the default tiny 64 MB mount (Render default).
+chromium \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --remote-debugging-port=${CDP_PORT} \
+    --remote-debugging-address=0.0.0.0 \
+    --user-data-dir=/tmp/chromium-profile \
+    --window-size=1280,800 \
+    about:blank \
+    >/var/log/cutiee/chromium.log 2>&1 &
+CHROMIUM_PID=$!
+
+cleanup() {
+    kill ${CHROMIUM_PID} ${WEBSOCKIFY_PID} ${X11VNC_PID} ${FLUXBOX_PID} ${XVFB_PID} 2>/dev/null || true
+}
+trap cleanup EXIT
+
+# Block on Chromium so Render's health check sees a live process.
+# If Chromium crashes, the container exits and Render restarts it.
+wait ${CHROMIUM_PID}
+EOF
+RUN chmod +x /opt/cutiee/start-worker.sh
+
+EXPOSE 6080
+EXPOSE 9222
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/opt/cutiee/start-worker.sh"]

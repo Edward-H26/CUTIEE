@@ -9,6 +9,12 @@ Default posture is **headed** (`headless=False`). Computer Use is a
 spectator feature; if the user can't see the agent operating, the demo
 loses its value and silent action failures look indistinguishable from
 success. Override with `CUTIEE_BROWSER_HEADLESS=1` for CI / smoke tests.
+
+`BrowserControllerProtocol` formalizes the contract both `BrowserController`
+(Playwright-backed, real browser) and `StubBrowserController` (no-op, for
+tests and tiers without Chromium) satisfy. The runner accepts anything
+satisfying the Protocol, which eliminates the prior Pyright complaints
+about passing `StubBrowserController` where `BrowserController` was typed.
 """
 from __future__ import annotations
 
@@ -16,7 +22,7 @@ import asyncio
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from ..harness.state import Action, ActionType
 
@@ -28,6 +34,26 @@ class StepResult:
     durationMs: int = 0
 
 
+@runtime_checkable
+class BrowserControllerProtocol(Protocol):
+    """Contract that every browser controller in CUTIEE must honor.
+
+    Satisfied by `BrowserController` (Playwright real browser) and
+    `StubBrowserController` (no-op for tests). The runner accepts
+    anything that matches this shape, which keeps `StubBrowserController`
+    usable where `BrowserController` was previously typed.
+    """
+
+    cdpUrl: str | None
+
+    async def start(self) -> None: ...
+    async def stop(self) -> None: ...
+    async def execute(self, action: Action) -> StepResult: ...
+    async def captureScreenshot(self) -> bytes: ...
+    async def currentUrl(self) -> str: ...
+    async def saveStorageState(self, path: str) -> None: ...
+
+
 @dataclass
 class BrowserController:
     headless: bool = False
@@ -37,6 +63,12 @@ class BrowserController:
     viewportWidth: int = 1280
     viewportHeight: int = 800
     cdpUrl: str | None = None
+    # Phase 14 screenshot compression: downscale-and-reencode knobs.
+    # quality (1-100) maps to PNG/JPEG quality; maxWidth downscales the
+    # longer edge before encoding. Both default to no-op values that
+    # keep the pre-phase behavior (PNG at native viewport).
+    screenshotQuality: int = 90
+    screenshotMaxWidth: int = 1280
     _playwright: Any = field(default = None, init = False, repr = False)
     _browser: Any = field(default = None, init = False, repr = False)
     _context: Any = field(default = None, init = False, repr = False)
@@ -56,11 +88,16 @@ class BrowserController:
         # storage_state because it survives 2FA challenges and lives next
         # to the user's actual browsing.
         if self.cdpUrl:
+            # Phase 9 CDP tab fencing: attach to the user's running Chrome
+            # for its auth state, but always open a fresh page for the
+            # agent. Previously we inherited `contexts[0].pages[0]`, which
+            # meant the agent could read and act on whichever unrelated
+            # tab the user had focused. A fresh page isolates the agent's
+            # work from the user's other browsing.
             self._browser = await self._playwright.chromium.connect_over_cdp(self.cdpUrl)
             existing = self._browser.contexts
             self._context = existing[0] if existing else await self._browser.new_context()
-            pages = self._context.pages
-            self._page = pages[0] if pages else await self._context.new_page()
+            self._page = await self._context.new_page()
             self._attachedToExisting = True
             self._page.set_default_timeout(self.defaultTimeoutMs)
             return
@@ -162,7 +199,8 @@ class BrowserController:
         return StepResult(success = True, durationMs = elapsed)
 
     async def captureScreenshot(self) -> bytes:
-        return await self._page.screenshot(type = "png", full_page = False)
+        raw = await self._page.screenshot(type = "png", full_page = False)
+        return _compressScreenshot(raw, self.screenshotQuality, self.screenshotMaxWidth)
 
     async def currentUrl(self) -> str:
         return self._page.url
@@ -173,15 +211,19 @@ class BrowserController:
 
 @dataclass
 class StubBrowserController:
-    """No-op browser stand-in for tests + Render's web tier (no chromium binary).
+    """No-op browser stand-in that satisfies `BrowserControllerProtocol`.
 
-    Implements the same start/stop/execute/captureScreenshot/currentUrl surface
-    that ComputerUseRunner expects, but never actually launches anything.
-    Returns a 1×1 transparent PNG for screenshots so the runner's screenshot
-    sink path stays exercised end-to-end without a real browser.
+    Used for unit tests and tiers without Chromium installed. Implements
+    the full start/stop/execute/captureScreenshot/currentUrl surface but
+    never actually launches anything. Returns a 1x1 transparent PNG for
+    screenshots so the runner's screenshot sink path stays exercised
+    end-to-end without a real browser.
     """
     log: list[Action] = field(default_factory = list)
     fakeUrl: str = "stub://blank"
+    # Protocol-shaped field so `isinstance(stub, BrowserControllerProtocol)`
+    # passes without callers needing to care about the underlying impl.
+    cdpUrl: str | None = None
 
     async def start(self) -> None:
         return None
@@ -207,6 +249,39 @@ class StubBrowserController:
     async def saveStorageState(self, path: str) -> None:
         del path
         return None
+
+
+def _compressScreenshot(pngBytes: bytes, quality: int, maxWidth: int) -> bytes:
+    """Optionally downscale and re-encode a screenshot.
+
+    Phase 14 trades a small quality loss for meaningful token savings:
+    models charge per pixel of the decoded image, so shrinking from
+    1920 down to 1280 cuts ~40 percent of input image tokens. Behavior
+    stays a no-op when Pillow is not installed or when the source is
+    already within the limits; we never raise a runtime error here.
+    """
+    if quality >= 100 and maxWidth <= 0:
+        return pngBytes
+    try:
+        import io
+
+        from PIL import Image
+    except ImportError:
+        return pngBytes
+
+    try:
+        with Image.open(io.BytesIO(pngBytes)) as img:
+            width, height = img.size
+            if maxWidth > 0 and width > maxWidth:
+                scale = maxWidth / float(width)
+                newSize = (maxWidth, max(1, int(height * scale)))
+                resample = getattr(Image, "Resampling", Image).LANCZOS  # type: ignore[attr-defined]
+                img = img.resize(newSize, resample = resample)
+            buffer = io.BytesIO()
+            img.save(buffer, format = "PNG", optimize = True, compress_level = 9)
+            return buffer.getvalue()
+    except Exception:
+        return pngBytes
 
 
 import re as _re

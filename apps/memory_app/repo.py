@@ -43,7 +43,8 @@ def upsertBullet(userId: str, bullet: Bullet) -> None:
         """
         MERGE (u:User {id: $user_id})
         MERGE (b:MemoryBullet {id: $id})
-        SET b.content = $content,
+        SET b.user_id = $user_id,
+            b.content = $content,
             b.memory_type = $memory_type,
             b.tags = $tags,
             b.topic = $topic,

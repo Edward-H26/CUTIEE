@@ -21,9 +21,20 @@ CONSTRAINTS: list[str] = [
     "CREATE CONSTRAINT step_id           IF NOT EXISTS FOR (s:Step)               REQUIRE s.id           IS UNIQUE",
     "CREATE CONSTRAINT template_id       IF NOT EXISTS FOR (t:ProceduralTemplate) REQUIRE t.id           IS UNIQUE",
     "CREATE CONSTRAINT bullet_id         IF NOT EXISTS FOR (b:MemoryBullet)       REQUIRE b.id           IS UNIQUE",
+    # Phase 9 CDP tab fencing: require user_id on every bullet so a
+    # mis-issued query without a user filter fails at the database
+    # instead of silently cross-reading.
+    "CREATE CONSTRAINT bullet_user_scope IF NOT EXISTS FOR (b:MemoryBullet)       REQUIRE b.user_id      IS NOT NULL",
     "CREATE CONSTRAINT fact_id           IF NOT EXISTS FOR (f:SemanticFact)       REQUIRE f.id           IS UNIQUE",
     "CREATE CONSTRAINT audit_id          IF NOT EXISTS FOR (a:AuditEntry)         REQUIRE a.id           IS UNIQUE",
     "CREATE CONSTRAINT progress_exec_id  IF NOT EXISTS FOR (p:ProgressSnapshot)   REQUIRE p.execution_id IS UNIQUE",
+    # Phase 4 budget cap ledger; Phase 7 heartbeat plus approval queue;
+    # Phase 16 pre-run preview. Each structure is keyed on a natural
+    # identifier so the MERGE-based writes at their call sites are
+    # idempotent.
+    "CREATE CONSTRAINT cost_ledger_key   IF NOT EXISTS FOR (l:CostLedger)         REQUIRE (l.user_id, l.hour_key) IS UNIQUE",
+    "CREATE CONSTRAINT action_approval_id IF NOT EXISTS FOR (a:ActionApproval)    REQUIRE a.id           IS UNIQUE",
+    "CREATE CONSTRAINT preview_approval_id IF NOT EXISTS FOR (p:PreviewApproval)  REQUIRE p.execution_id IS UNIQUE",
 ]
 
 INDEXES: list[str] = [
@@ -31,8 +42,14 @@ INDEXES: list[str] = [
     "CREATE INDEX template_stale        IF NOT EXISTS FOR (t:ProceduralTemplate) ON (t.stale)",
     "CREATE INDEX bullet_type           IF NOT EXISTS FOR (b:MemoryBullet)       ON (b.memory_type)",
     "CREATE INDEX bullet_content_hash   IF NOT EXISTS FOR (b:MemoryBullet)       ON (b.content_hash)",
+    "CREATE INDEX bullet_user           IF NOT EXISTS FOR (b:MemoryBullet)       ON (b.user_id)",
     "CREATE INDEX audit_user_time       IF NOT EXISTS FOR (a:AuditEntry)         ON (a.user_id, a.timestamp)",
     "CREATE INDEX progress_updated_at   IF NOT EXISTS FOR (p:ProgressSnapshot)   ON (p.updated_at)",
+    # Phase 4, 7, 16 support indexes so polling is cheap.
+    "CREATE INDEX cost_ledger_user      IF NOT EXISTS FOR (l:CostLedger)         ON (l.user_id, l.hour_key)",
+    "CREATE INDEX cost_ledger_day       IF NOT EXISTS FOR (l:CostLedger)         ON (l.user_id, l.day_key)",
+    "CREATE INDEX action_approval_exec  IF NOT EXISTS FOR (a:ActionApproval)     ON (a.execution_id, a.status)",
+    "CREATE INDEX preview_approval_stat IF NOT EXISTS FOR (p:PreviewApproval)    ON (p.status)",
 ]
 
 

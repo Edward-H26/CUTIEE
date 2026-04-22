@@ -68,54 +68,29 @@ class ReplayPlanner:
         return ReplayPlan(topic = bestTopic, bullets = bullets, actions = actions, score = bestScore)
 
 
+from .text_utils import stepIndexFromContent as _stepIndexBase  # noqa: E402
+
+
 def _stepIndexFromContent(bullet: Bullet) -> int:
-    match = re.search(r"step_index=(\d+)", bullet.content)
-    if match is None:
-        return 0
-    return int(match.group(1))
+    return _stepIndexBase(bullet.content)
 
 
 def _actionFromBullet(bullet: Bullet) -> Action | None:
-    actionMatch = re.search(r"action=(\w+)", bullet.content)
-    targetMatch = re.search(r"target='([^']*)'", bullet.content) or re.search(r'target="([^"]*)"', bullet.content)
-    valueMatch = re.search(r"value='([^']*)'", bullet.content) or re.search(r'value="([^"]*)"', bullet.content)
-    coordMatch = re.search(r"coordinate=\((-?\d+),(-?\d+)\)", bullet.content)
-    keysMatch = re.search(r"keys=([\w+,\-]+)", bullet.content)
-    scrollMatch = re.search(r"scroll=\((-?\d+),(-?\d+)\)", bullet.content)
-    if actionMatch is None:
-        return None
-    try:
-        actionType = ActionType(actionMatch.group(1))
-    except ValueError:
-        return None
-    target = targetMatch.group(1) if targetMatch else ""
-    value = valueMatch.group(1) if valueMatch else None
-    coordinate = (int(coordMatch.group(1)), int(coordMatch.group(2))) if coordMatch else None
-    keys = keysMatch.group(1).split(",") if keysMatch else None
-    scrollDx = int(scrollMatch.group(1)) if scrollMatch else 0
-    scrollDy = int(scrollMatch.group(2)) if scrollMatch else 0
-    requiresApproval = "risk:high" in bullet.tags
-    risk = RiskLevel.HIGH if requiresApproval else RiskLevel.LOW
-    # All replay steps are tier 0 — no model call, no cost. The model
-    # column distinguishes "replay" (procedural memory hit) from "harness"
-    # (initial navigation). The CU/DOM origin of the bullet doesn't
-    # matter at replay time since we just execute the recorded action.
-    return Action(
-        type = actionType,
-        target = target,
-        value = value,
-        coordinate = coordinate,
-        keys = keys,
-        scrollDx = scrollDx,
-        scrollDy = scrollDy,
-        reasoning = f"replay:{bullet.id[:8]}",
-        model_used = "replay",
-        tier = 0,
-        confidence = 1.0,
-        risk = risk,
-        cost_usd = 0.0,
-        requires_approval = requiresApproval,
+    """Whole-plan replay reconstruction. Keeps stored values verbatim.
+
+    Thin wrapper over `bullet_reconstruct.actionFromBullet`; exists so
+    existing call sites (`_executeReplay` in the runner) keep their
+    single-value return type. Fragment replay calls the canonical
+    function directly with `modelVariantOnNonEmptyValue=True`.
+    """
+    from .bullet_reconstruct import actionFromBullet
+    action, _ = actionFromBullet(
+        bullet,
+        modelVariantOnNonEmptyValue = False,
+        reasoningPrefix = "replay",
+        modelUsed = "replay",
     )
+    return action
 
 
 def replacementBulletFor(failedBullet: Bullet, replacementContent: str) -> dict[str, Any]:

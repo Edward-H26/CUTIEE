@@ -13,7 +13,11 @@ from typing import Any
 
 SEMANTIC_DECAY_RATE = 0.01
 EPISODIC_DECAY_RATE = 0.05
-PROCEDURAL_DECAY_RATE = 0.002
+# Phase 12 memory hygiene: bumped from 0.002 to 0.01 so bad procedural
+# bullets fade before they pollute a long-lived user's retrieval. Still
+# the slowest of the three channels, matching the intent of the ACE
+# reference, but no longer effectively frozen.
+PROCEDURAL_DECAY_RATE = 0.01
 
 
 def decayedStrength(strength: float, accessDelta: int, rate: float) -> float:

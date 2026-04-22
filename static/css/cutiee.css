@@ -1525,3 +1525,56 @@ select:focus {
     .metric-grid { grid-template-columns: 1fr; }
     .submit-card { padding: 18px; }
 }
+
+/* ---------- Live VNC panel (SPEC section 3 + 9) ---------- */
+.cutiee-live-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--mm-surface, #fff);
+    border: 1px solid var(--mm-border, rgba(28, 30, 46, 0.08));
+    border-radius: 12px;
+}
+.cutiee-live-panel__header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.cutiee-live-panel__header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--mm-fg-1);
+}
+.cutiee-live-panel__frame {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    min-height: 520px;
+    border: 1px solid var(--mm-border, rgba(28, 30, 46, 0.08));
+    border-radius: 8px;
+    background: #0f172a;
+}
+@media (max-width: 780px) {
+    .cutiee-live-panel__frame { min-height: 360px; }
+}
+
+/* Preview approval card shares pill + card tokens for visual parity. */
+.cutiee-preview-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border-radius: 12px;
+    background: var(--mm-primary-tint-2, rgba(108, 134, 192, 0.06));
+    border: 1px solid var(--mm-primary-tint, rgba(108, 134, 192, 0.12));
+}
+.cutiee-preview-card__summary {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--mm-fg-1);
+    white-space: pre-wrap;
+}
+.cutiee-preview-card__actions {
+    display: flex;
+    gap: 10px;
+}

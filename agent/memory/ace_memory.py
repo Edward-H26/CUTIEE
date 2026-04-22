@@ -29,8 +29,20 @@ SEED_PENALTY = 0.25
 NEEDS_VISUAL_BONUS = 0.20
 PERSONA_BONUS = 0.10
 LEARNED_FLOOR = 2
+# Phase 12 memory hygiene: cap cumulative facet bonuses so a single
+# bullet tagged with every facet cannot overtake its relevance score.
+FACET_BONUS_CAP = 0.25
 
 NORMALIZED_STRENGTH_DENOM = 3.0  # max possible (1.0 per channel)
+
+# Phase 12 memory hygiene: reserve quota per memory_type when refining
+# so procedural dominance (slowest decay channel) does not evict episodic
+# and semantic bullets faster than intended. Shares must sum to 1.0.
+REFINE_TYPE_QUOTA: dict[str, float] = {
+    "procedural": 0.60,
+    "episodic": 0.25,
+    "semantic": 0.15,
+}
 
 
 @dataclass
@@ -128,14 +140,16 @@ class ACEMemory:
         else:
             score -= SEED_PENALTY
 
+        facetBonus = 0.0
         if facets.get("needs_visual") and "visual" in bullet.tags:
-            score += NEEDS_VISUAL_BONUS
+            facetBonus += NEEDS_VISUAL_BONUS
         if facets.get("persona_request") and "persona" in bullet.tags:
-            score += PERSONA_BONUS
+            facetBonus += PERSONA_BONUS
         if facets.get("need_procedural") and bullet.memory_type == "procedural":
-            score += 0.10
+            facetBonus += 0.10
         if facets.get("topic") and bullet.topic == facets["topic"]:
-            score += 0.15
+            facetBonus += 0.15
+        score += min(facetBonus, FACET_BONUS_CAP)
 
         return score
 
@@ -180,8 +194,31 @@ class ACEMemory:
 
         self.store.applyDelta(self.userId, delta)
 
+    def sweepDecayedBullets(self, floor: float = 0.01) -> int:
+        """Delete bullets whose totalDecayedStrength has fallen to or below
+        `floor`. Implements the SPEC decay-to-zero invariant.
+
+        Returns the number of bullets removed. Safe to run repeatedly;
+        intended for a nightly job.
+        """
+        self.ensureLoaded()
+        toRemove: list[str] = [
+            bullet.id
+            for bullet in self.bullets.values()
+            if totalDecayedStrength(bullet, self.accessClock) <= floor
+        ]
+        if toRemove:
+            self.applyDelta(DeltaUpdate(remove_bullets = toRemove))
+        return len(toRemove)
+
     def refine(self) -> int:
-        """Dedup similar bullets and prune below `maxBullets`. Returns deletions."""
+        """Dedup similar bullets and prune below `maxBullets` with per-type quotas.
+
+        Phase 12 memory hygiene: we keep at most `REFINE_TYPE_QUOTA[type] *
+        maxBullets` per memory type so a long-lived user whose procedural
+        channel dominates cannot evict every episodic bullet. Deduplication
+        still runs at 0.85 cosine similarity, but within each type slice.
+        """
         self.ensureLoaded()
         if len(self.bullets) <= self.maxBullets:
             return 0
@@ -192,11 +229,23 @@ class ACEMemory:
             reverse = True,
         )
 
+        quotas: dict[str, int] = {
+            memoryType: max(1, int(round(share * self.maxBullets)))
+            for memoryType, share in REFINE_TYPE_QUOTA.items()
+        }
+        remaining: dict[str, int] = dict(quotas)
         keepers: list[Bullet] = []
         toRemove: list[str] = []
+
         for bullet in ranked:
+            slot = remaining.get(bullet.memory_type, 0)
+            if slot <= 0:
+                toRemove.append(bullet.id)
+                continue
             duplicate = False
             for kept in keepers:
+                if kept.memory_type != bullet.memory_type:
+                    continue
                 if cosineSimilarity(bullet.embedding, kept.embedding) >= 0.85:
                     duplicate = True
                     break
@@ -204,6 +253,7 @@ class ACEMemory:
                 toRemove.append(bullet.id)
             else:
                 keepers.append(bullet)
+                remaining[bullet.memory_type] = slot - 1
             if len(keepers) >= self.maxBullets:
                 break
 

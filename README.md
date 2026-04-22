@@ -151,13 +151,16 @@ the legacy `.env.cutiee.template`). Required keys:
 | `NEO4J_BOLT_URL`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | always | Neo4j domain DB |
 | `GEMINI_API_KEY` | production | Gemini Flash with the ComputerUse tool |
 | `CUTIEE_CU_MODEL` | optional | Override default `gemini-flash-latest`; pin to `gemini-3-flash-preview` for deterministic replay |
-| `CUTIEE_CREDENTIAL_KEY` | always | Fernet key for encrypted SemanticCredentialStore |
 | `CUTIEE_BROWSER_HEADLESS` | optional | `true` for CI; default `false` (visible browser) |
 | `CUTIEE_STORAGE_STATE_PATH` | optional | Path to a Playwright storage_state.json so CU runs are pre-authenticated |
 | `CUTIEE_BROWSER_CDP_URL` | optional | Attach to your real Chrome via `--remote-debugging-port=9222` instead of launching a fresh chromium |
 | `CUTIEE_PROGRESS_BACKEND` | production multi-worker | `memory`, `redis`, or `neo4j` (default `memory`; demo deploys use `neo4j`) |
 | `REDIS_URL` | only when `CUTIEE_PROGRESS_BACKEND=redis` | Render Redis URL |
-| `CUTIEE_CREDENTIAL_KEY` | optional | Fernet key for credential bullets |
+| `CUTIEE_CU_BACKEND` | optional | `gemini` (default) or `browser_use`; both use `GEMINI_API_KEY` |
+| `CUTIEE_NOVNC_URL` | optional | Public URL of the Docker worker's noVNC viewer for the live panel |
+| `CUTIEE_MAX_COST_USD_PER_TASK` | optional | Wallet cap per task (default 0.50) |
+| `CUTIEE_MAX_COST_USD_PER_HOUR` | optional | Wallet cap per hour (default 5.00) |
+| `CUTIEE_MAX_COST_USD_PER_DAY` | optional | Wallet cap per day (default 1.00) |
 
 ## Deploy to Render
 

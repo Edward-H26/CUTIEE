@@ -33,6 +33,61 @@ PROCEDURAL_HINTS = ("step", "procedure", "workflow", "sequence", "click", "fill"
 EPISODIC_HINTS = ("user", "asked", "prefers", "wants", "today", "this run")
 SEMANTIC_HINTS = ("is at", "selector", "url", "always", "usually")
 
+# Phase 10 reflector credential scrubbing: regex patterns that match
+# values that look like credentials, account numbers, or other PII that
+# must not persist inside bullet content. Matching values are elided to
+# `<redacted:N>` where N is the original length, and the bullet is
+# flagged with is_credential=True so retrieval filters it out.
+_CREDENTIAL_LIKE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    # 13-19 digits with optional dashes or spaces: the canonical
+    # major-brand credit card range (Visa, Mastercard, Amex, Discover,
+    # JCB, Diners, Maestro). Narrower than the old `\d{9,18}` bucket
+    # which caught phone numbers, order ids, and epoch timestamps.
+    re.compile(r"\b(?:\d[ -]?){13,19}\b"),
+    # SSN: strict 3-2-4 grouping only.
+    re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
+    # CVV/CVC: a 3-4 digit group that appears next to the keyword.
+    re.compile(r"\b\d{3,4}\b(?=\s*(cvv|cvc))", re.IGNORECASE),
+    # Routing number: nine digits explicitly labelled.
+    re.compile(r"(?i)(?:routing|aba)[^\d]{0,6}\d{9}\b"),
+    # Secret-like key=value pairs. These stay broad because a real
+    # occurrence in bullet content almost always indicates a leak.
+    re.compile(r"(?i)password\s*[=:]\s*\S+"),
+    re.compile(r"(?i)secret\s*[=:]\s*\S+"),
+    re.compile(r"(?i)token\s*[=:]\s*\S+"),
+    re.compile(r"(?i)api[_-]?key\s*[=:]\s*\S+"),
+    re.compile(r"(?i)bearer\s+[a-zA-Z0-9_.\-]{16,}"),
+)
+
+_ACCOUNT_LIKE_TASK_MARKERS = (
+    "account number",
+    "ssn",
+    "social security",
+    "credit card",
+    "cvv",
+    "wire transfer",
+    "routing number",
+)
+
+
+def _looksLikeCredential(value: str) -> bool:
+    if not value:
+        return False
+    return any(pattern.search(value) for pattern in _CREDENTIAL_LIKE_PATTERNS)
+
+
+def _redactValue(value: str) -> str:
+    if not value:
+        return value
+    return f"<redacted:{len(value)}>"
+
+
+def _taskDescriptionContainsAccountMarker(taskDescription: str) -> bool:
+    if not taskDescription:
+        return False
+    lowered = taskDescription.lower()
+    return any(marker in lowered for marker in _ACCOUNT_LIKE_TASK_MARKERS)
+
 logger = logging.getLogger("cutiee.reflector")
 
 # Ported verbatim from miramemoria/app/chat/ace_runtime.py:
@@ -121,6 +176,7 @@ class HeuristicReflector:
         topic = f"task:{_slugify(state.taskDescription)}"
         successfulSteps = [step for step in state.history if step.verificationOk and step.action]
 
+        taskHasAccountMarker = _taskDescriptionContainsAccountMarker(state.taskDescription)
         for step in successfulSteps:
             if step.action is None:
                 continue
@@ -137,10 +193,16 @@ class HeuristicReflector:
                 extra += f" keys={','.join(step.action.keys)}"
             if step.action.scrollDx or step.action.scrollDy:
                 extra += f" scroll=({step.action.scrollDx},{step.action.scrollDy})"
+            # Phase 10 reflector credential scrubbing: values that look
+            # like credentials are elided and the bullet is flagged so
+            # retrieval never surfaces it back to the model.
+            rawValue = step.action.value or ""
+            isCredential = _looksLikeCredential(rawValue) or step.action.risk.value == "high"
+            safeValue = _redactValue(rawValue) if isCredential else rawValue
             content = (
                 f"step_index={step.index} action={step.action.type.value} "
                 f"target={step.action.target!r} "
-                f"value={(step.action.value or '')!r}"
+                f"value={safeValue!r}"
                 f"{extra}"
             )
             tags = [topic]
@@ -148,18 +210,23 @@ class HeuristicReflector:
                 tags.append(f"domain:{domain}")
             if step.action.risk.value == "high":
                 tags.append("risk:high")
-            lessons.append(
-                LessonCandidate(
-                    content = content,
-                    memoryType = "procedural",
-                    confidence = max(0.7, step.action.confidence or 0.7),
-                    tags = tags,
-                    topic = topic,
-                    concept = step.action.type.value,
-                )
+            if isCredential:
+                tags.append("credential")
+            candidate = LessonCandidate(
+                content = content,
+                memoryType = "procedural",
+                confidence = max(0.7, step.action.confidence or 0.7),
+                tags = tags,
+                topic = topic,
+                concept = step.action.type.value,
             )
+            candidate.metadata["is_credential"] = isCredential
+            lessons.append(candidate)
 
-        if state.isComplete:
+        if state.isComplete and not taskHasAccountMarker:
+            # Phase 10: skip the episodic summary entirely when the task
+            # description contains account-like markers so account numbers,
+            # SSNs, or wire transfer details never land in memory.
             lessons.append(
                 LessonCandidate(
                     content = (
@@ -199,11 +266,7 @@ def _domainFromUrl(url: str) -> str:
     return host.split(":")[0]
 
 
-def _slugify(text: str) -> str:
-    if not text:
-        return "task"
-    text = re.sub(r"[^a-zA-Z0-9]+", "-", text.strip().lower())
-    return text.strip("-")[:48] or "task"
+from .text_utils import slugify as _slugify  # noqa: E402 - re-export for legacy call sites
 
 
 @dataclass
@@ -335,26 +398,7 @@ class LlmReflector:
         return out
 
 
-_JSON_OBJECT_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
-
-
-def _parseJsonLoose(text: str) -> Any:
-    if not text:
-        return None
-    if text.startswith("```"):
-        parts = text.split("\n")
-        if len(parts) > 2:
-            text = "\n".join(parts[1:-1]).strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = _JSON_OBJECT_PATTERN.search(text)
-        if match is None:
-            return None
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            return None
+from .text_utils import parseJsonLoose as _parseJsonLoose  # noqa: E402
 
 
 def _isGenericLesson(content: str) -> bool:

@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ...harness.state import Action, ActionType
+from ..cu_client import ComputerUseStep
 
 # Default tracks Google's "latest flash" alias so a Google-side promotion
 # of a new flash variant flows through automatically. Pin to
@@ -50,14 +51,6 @@ FALLBACK_PRICING: tuple[float, float] = (0.15, 0.60)
 PRICING_INPUT, PRICING_OUTPUT = CU_PRICING[DEFAULT_MODEL]
 
 logger = logging.getLogger("cutiee.gemini_cu")
-
-
-@dataclass
-class ComputerUseStep:
-    action: Action
-    rawFunctionName: str
-    rawArgs: dict[str, Any]
-    costUsd: float
 
 
 # Map Gemini's function names to our ActionType enum.
