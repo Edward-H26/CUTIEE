@@ -34,6 +34,10 @@ dev = [
     "mypy>=1.11",
     "respx>=0.21",
 ]
+# Optional CU backend. Install with `uv sync --group browser_use` or
+# `pip install "cutiee[browser_use]"` when CUTIEE_CU_BACKEND=browser_use.
+# The Dockerfile.worker image installs it unconditionally so the worker
+# can switch backends at runtime without a rebuild.
 browser_use = [
     "browser-use>=0.7",
 ]

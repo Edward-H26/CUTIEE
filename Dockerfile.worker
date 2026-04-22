@@ -36,7 +36,11 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir uv && uv pip install --system --no-cache -r <(uv pip compile pyproject.toml)
-RUN pip install --no-cache-dir "browser-use>=0.7" || echo "browser-use optional extra not installed at build time"
+# Install browser-use unconditionally so the worker can flip
+# CUTIEE_CU_BACKEND between "gemini" and "browser_use" at runtime without
+# a rebuild. A failure here must break the build loudly: a silent fallback
+# would only surface as a ModuleNotFoundError on the first real task.
+RUN pip install --no-cache-dir "browser-use>=0.7"
 
 COPY agent/ ./agent/
 COPY apps/ ./apps/

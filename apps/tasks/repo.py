@@ -114,6 +114,22 @@ def updateTaskStatus(
 
 
 def deleteTask(userId: str, taskId: str) -> None:
+    # Collect the execution ids first so we can clean up their
+    # :Screenshot nodes in a separate query. Screenshots are NOT linked
+    # to executions by relationship (they are keyed on execution_id),
+    # so the DETACH DELETE below would leave them as orphans that
+    # persist for up to ttlDays.
+    execIds = [
+        row["id"] for row in run_query(
+            """
+            MATCH (u:User {id: $user_id})-[:OWNS]->(t:Task {id: $task_id})
+                -[:EXECUTED_AS]->(e:Execution)
+            RETURN e.id AS id
+            """,
+            user_id = str(userId),
+            task_id = str(taskId),
+        )
+    ]
     run_query(
         """
         MATCH (u:User {id: $user_id})-[:OWNS]->(t:Task {id: $task_id})
@@ -124,6 +140,15 @@ def deleteTask(userId: str, taskId: str) -> None:
         user_id = str(userId),
         task_id = str(taskId),
     )
+    if execIds:
+        run_query(
+            """
+            MATCH (sh:Screenshot)
+            WHERE sh.execution_id IN $exec_ids
+            DETACH DELETE sh
+            """,
+            exec_ids = execIds,
+        )
 
 
 def createExecution(

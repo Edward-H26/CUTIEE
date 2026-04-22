@@ -22,31 +22,41 @@ Seven invariants hold for every code path in every deployment.
 
 ## 3. Deployment Topology
 
-One canonical deployment.
+One canonical deployment. Two Render services, one Neo4j AuraDB, and the classmate's browser.
 
 ```
-Render Web Service (Django + HTMX)
-  │
-  │ ───── Google OAuth ────► users
-  │
-  │ ───── HTMX poll ──────► Neo4j AuraDB (bolt+s://)
-  │                           :User, :Task, :Execution, :Step,
-  │                           :MemoryBullet, :AuditEntry,
-  │                           :Screenshot, :CostLedger,
-  │                           :ActionApproval, :PreviewApproval,
-  │                           :ProgressSnapshot, :UserPrompt
-  │
-  └ ───── dispatch ───────► Render Worker (Docker container)
-                              │
-                              ├ Xvfb  (virtual display)
-                              ├ Chromium  (headful inside Xvfb)
-                              ├ ComputerUseRunner
-                              ├ BrowserController (Playwright)
-                              ├ CuClient
-                              ├ VNC server + websockify
-                              │
-                              └ ───── noVNC WebSocket ────► dashboard main panel
+                         Classmate's browser
+                             │        │
+                             │        │  noVNC WebSocket
+                      HTTPS  │        │  (iframe, public URL)
+                      HTMX   │        │
+                             ▼        ▼
+  ┌────────────────────────────────┐  ┌─────────────────────────────┐
+  │ cutiee-web   (Render Python)   │  │ cutiee-worker (Render       │
+  │                                │  │                Docker)      │
+  │   Django + HTMX                │  │   Xvfb :99                  │
+  │   allauth Google OAuth         │  │   fluxbox                   │
+  │   ComputerUseRunner            │──┼─►Chromium (headed)          │
+  │   BrowserController (Playwright│  │CDP  --remote-debugging=9222 │
+  │                  connect_over_ │  │9222                         │
+  │                  cdp)          │  │   x11vnc :5901              │
+  │   CuClient (Gemini CU or       │  │   websockify :6080          │
+  │             browser-use)       │  │        → /usr/share/novnc   │
+  │                                │  │                             │
+  │   Renders <iframe src=         │  │   (No Python runtime.       │
+  │     $CUTIEE_NOVNC_URL>         │  │    Writes nothing to Neo4j.)│
+  └────────────┬───────────────────┘  └─────────────────────────────┘
+               │
+               │  Cypher over bolt+s://
+               ▼
+       Neo4j AuraDB   (single durable store)
+         :User, :Task, :Execution, :Step,
+         :MemoryBullet, :AuditEntry, :Screenshot,
+         :CostLedger, :ActionApproval, :PreviewApproval,
+         :ProgressSnapshot, :UserPrompt
 ```
+
+`cutiee-web` is the only Python process. It runs the CU loop, the safety gate, the Cypher writes, and the template that embeds the iframe. `cutiee-worker` is a headed-browser container: Xvfb provides the display, Chromium runs inside it with CDP bound to `0.0.0.0:9222`, and websockify streams the framebuffer to any browser that connects to the public noVNC URL on port 6080. CDP reaches `cutiee-worker` from `cutiee-web` over Render's private network, never over the public internet.
 
 Each active task owns one Xvfb + Chromium + VNC trio. The dashboard's main content area embeds a noVNC iframe pointed at the worker's websockify port. Classmates see the live framebuffer in real time and can click inside it as a manual fallback if the agent stalls.
 
@@ -210,13 +220,13 @@ SETTINGS
 
 Node labels:
 
-- `:User {id, email, created_at}` — one per Google-authenticated classmate.
+- `:User {id, email, created_at}`: one per Google-authenticated classmate.
 - `:Task {id, user_id, description, initial_url, created_at}`
 - `:Execution {id, task_id, status, started_at, finished_at, completion_reason, total_cost_usd}`
 - `:Step {id, execution_id, step_index, action_type, coordinate, cost_usd, risk, verification_ok, duration_ms, created_at}`
 - `:AuditEntry {id, user_id, task_id, execution_id, step_id, timestamp, action_type, target, value_redacted, reasoning, model_used, tier, cost_usd, risk, approval_status, verification_ok, completion_reason}`
-- `:Screenshot {execution_id, step_index, data_b64, size_bytes, created_at}` — 3-day TTL via background sweeper.
-- `:MemoryBullet {id, user_id, memory_type, content, tags, topic, concept, semantic_strength, episodic_strength, procedural_strength, semantic_access_index, episodic_access_index, procedural_access_index, helpful_count, harmful_count, is_credential, is_seed, embedding, created_at}` — Phase 9 `bullet_user_scope` constraint requires `user_id IS NOT NULL`.
+- `:Screenshot {execution_id, step_index, data_b64, size_bytes, created_at}`: 3-day TTL via background sweeper.
+- `:MemoryBullet {id, user_id, memory_type, content, tags, topic, concept, semantic_strength, episodic_strength, procedural_strength, semantic_access_index, episodic_access_index, procedural_access_index, helpful_count, harmful_count, is_credential, is_seed, embedding, created_at}`: Phase 9 `bullet_user_scope` constraint requires `user_id IS NOT NULL`.
 - `:ProceduralTemplate {id, user_id, topic, domain, stale, created_at}`
 - `:CostLedger {user_id, hour_key, hourly_usd, created_at, updated_at}`
 - `:ActionApproval {id, execution_id, user_id, status, reason, action_description, created_at, resolved_at}`

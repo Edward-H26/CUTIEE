@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.harness.state import AgentState, ObservationStep
+from agent.harness.url_utils import hostFromUrl
 from apps.audit.screenshot_store import Neo4jScreenshotStore
 from apps.memory_app.repo import upsertTemplate
 from apps.tasks import progress_backend, repo as tasksRepo
@@ -121,7 +122,7 @@ def runTaskForUser(
         state.templateId = upsertTemplate(
             userId = userId,
             description = description,
-            domain = _domainFromUrl(initialUrl),
+            domain = hostFromUrl(initialUrl),
             embedding = None,
             actions = [step.action.asDict() if step.action else {} for step in state.history],
         )
@@ -587,8 +588,3 @@ def _summarize(state: AgentState, *, latestStep: ObservationStep | None = None) 
     )
 
 
-def _domainFromUrl(url: str) -> str:
-    if not url or "://" not in url:
-        return ""
-    rest = url.split("://", 1)[1]
-    return rest.split("/", 1)[0]

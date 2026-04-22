@@ -14,6 +14,7 @@ from agent.browser.controller import StubBrowserController, browserFromEnv
 from agent.harness.computer_use_loop import ComputerUseRunner, buildComputerUseRunner
 from agent.harness.config import Config
 from agent.harness.state import Action, ActionType, AgentState, ObservationStep
+from agent.harness.url_utils import hostFromUrl
 from agent.memory.ace_memory import ACEMemory
 from agent.memory.pipeline import ACEPipeline
 from agent.memory.replay import ReplayPlanner
@@ -73,7 +74,7 @@ def buildLiveCuRunnerForUser(
     pipeline = ACEPipeline(memory = memory)
     replayPlanner = ReplayPlanner(pipeline = pipeline)
 
-    domain = _domainFromUrl(initialUrl)
+    domain = hostFromUrl(initialUrl)
     browser = (
         StubBrowserController()
         if useStubBrowser
@@ -146,10 +147,3 @@ def _buildCuClientFromEnv(*, cdpUrl: str | None, maxSteps: int) -> CuClient:
 def _cdpUrlFromBrowser(browser: Any) -> str | None:
     """Surface the controller's CDP URL for CU backends that attach over CDP."""
     return getattr(browser, "cdpUrl", None)
-
-
-def _domainFromUrl(url: str) -> str:
-    if not url or "://" not in url:
-        return ""
-    rest = url.split("://", 1)[1]
-    return rest.split("/", 1)[0]

@@ -8,6 +8,7 @@ from django.shortcuts import render
 
 from agent.persistence.healthcheck import checkNeo4jReachable
 from apps.audit.repo import auditCountForUser, listAuditForUser
+from apps.common.query_utils import safeInt
 
 PAGE_SIZE = 50
 
@@ -17,10 +18,7 @@ _logger = logging.getLogger("cutiee.audit_views")
 @login_required
 def audit_list(request: HttpRequest) -> HttpResponse:
     userId = str(request.user.pk)
-    try:
-        page = max(1, int(request.GET.get("page", "1")))
-    except (TypeError, ValueError):
-        page = 1
+    page = safeInt(request.GET.get("page"), default = 1, minimum = 1)
 
     total = 0
     entries: list = []

@@ -15,12 +15,11 @@ import threading
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.utils.html import format_html
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-logger = logging.getLogger("cutiee")
-
 from apps.audit.repo import auditCountForUser, listAuditForUser
+from apps.common.query_utils import safeInt
 from apps.memory_app.repo import (
     listBulletsForUser,
     listTemplatesForUser,
@@ -33,6 +32,8 @@ from apps.tasks.approval_queue import (
 )
 from apps.tasks.partials import renderApprovalModal, renderStatusPartial
 from apps.tasks.services import _screenshotStore, fetchProgress, runTaskForUser
+
+logger = logging.getLogger("cutiee")
 
 
 @require_POST
@@ -146,7 +147,7 @@ def cost_summary(request: HttpRequest) -> JsonResponse:
 @require_GET
 @login_required
 def cost_timeseries(request: HttpRequest) -> JsonResponse:
-    days = int(request.GET.get("days", "14") or "14")
+    days = safeInt(request.GET.get("days"), default = 14, minimum = 1, maximum = 365)
     userId = str(request.user.pk)
     return _safeJson(
         lambda: {"series": tasksRepo.costTimeseriesForUser(userId, days = days)},
@@ -197,8 +198,8 @@ def memory_export(request: HttpRequest) -> HttpResponse:
 @require_GET
 @login_required
 def audit_feed(request: HttpRequest) -> JsonResponse:
-    limit = min(int(request.GET.get("limit", "50") or "50"), 200)
-    offset = int(request.GET.get("offset", "0") or "0")
+    limit = safeInt(request.GET.get("limit"), default = 50, minimum = 1, maximum = 200)
+    offset = safeInt(request.GET.get("offset"), default = 0, minimum = 0)
     userId = str(request.user.pk)
     return _safeJson(
         lambda: {
@@ -236,21 +237,26 @@ def vlm_health(request: HttpRequest) -> HttpResponse:
         return JsonResponse(payload)
 
     if payload["status"] == "ready":
-        return HttpResponse(
-            f"<div id='vlm-status-banner' data-status='ready' data-model='{payload['model']}'></div>"
-        )
-    label = "Connecting to Gemini" if payload["env"] == "production" else f"Loading {payload['model']}"
-    return HttpResponse(
-        f"""
-        <div id='vlm-status-banner' class='vlm-banner vlm-banner--{payload['status']}'
-             hx-get='{request.path}' hx-trigger='every 2s' hx-swap='outerHTML' hx-target='this'>
-          <span class='dot'></span> {label} ({payload['status']})
-        </div>
-        """
+        return HttpResponse(format_html(
+            "<div id='vlm-status-banner' data-status='ready' data-model='{model}'></div>",
+            model = payload["model"],
+        ))
+    label = (
+        "Connecting to Gemini"
+        if payload["env"] == "production"
+        else f"Loading {payload['model']}"
     )
+    return HttpResponse(format_html(
+        "<div id='vlm-status-banner' class='vlm-banner vlm-banner--{status}'"
+        " hx-get='{path}' hx-trigger='every 2s' hx-swap='outerHTML' hx-target='this'>"
+        "<span class='dot'></span> {label} ({status})"
+        "</div>",
+        status = payload["status"],
+        path = request.path,
+        label = label,
+    ))
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
 @login_required
 def delete_task(request: HttpRequest, task_id: str) -> JsonResponse:

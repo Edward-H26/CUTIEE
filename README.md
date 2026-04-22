@@ -100,10 +100,10 @@ uv run pytest
 
 The AI feature is the agent itself. It enters the application at:
 
-1. `apps/tasks/services.runTaskForUser` — the Django bridge.
-2. `apps/tasks/runner_factory.buildLiveCuRunnerForUser` — wires browser + memory + replay + screenshot sink.
-3. `agent/harness/computer_use_loop.ComputerUseRunner.run` — the screenshot ↔ function-call loop.
-4. `agent/routing/models/gemini_cu.GeminiComputerUseClient.nextAction` — the model call.
+1. `apps/tasks/services.runTaskForUser`: the Django bridge.
+2. `apps/tasks/runner_factory.buildLiveCuRunnerForUser`: wires browser, memory, replay, and the screenshot sink.
+3. `agent/harness/computer_use_loop.ComputerUseRunner.run`: the screenshot ↔ function-call loop.
+4. `agent/routing/models/gemini_cu.GeminiComputerUseClient.nextAction`: the model call.
 
 Open `/tasks/` to submit a task, click "Run task now" on a task detail
 page to trigger the agent, and watch the live HTMX progress + audit log.
@@ -118,29 +118,30 @@ CUTIEE/
 ├── cutiee_site/         Django project (settings, urls, sessions backend)
 ├── apps/
 │   ├── accounts/        allauth + Neo4j auth backend
+│   ├── common/          cross-app helpers (query_utils.safeInt, future request validators)
 │   ├── tasks/           task submission, services bridge, runner_factory, JSON API, HTMX views
 │   ├── memory_app/      ACE bullet + template dashboard, JSON export
 │   ├── audit/           paginated audit log + Neo4j screenshot store
 │   └── landing/         marketing landing page
 ├── agent/
-│   ├── harness/         state, config, env_utils, computer_use_loop (the only runner)
+│   ├── harness/         state, config, env_utils, url_utils (hostFromUrl), computer_use_loop (the only runner)
 │   ├── browser/         Playwright controller (pixel actions), env-aware factory
 │   ├── memory/          ACE memory + reflector / quality_gate / curator / pipeline / replay / semantic
-│   ├── routing/         models/gemini_cu (real + mock CU clients) — the only routing module
-│   ├── safety/          risk classifier, approval gate, audit writer
-│   └── persistence/     Neo4j driver, Cypher repos, bootstrap
+│   ├── routing/         models/gemini_cu (real + mock CU clients), the only routing module
+│   ├── safety/          risk classifier (word-boundary keywords), approval gate, audit writer
+│   └── persistence/     Neo4j driver, Cypher repos, bootstrap, health probe
 ├── demo_sites/          three Flask test targets (spreadsheet, slides, form)
 ├── scripts/             dev.sh, neo4j_up.sh, capture_storage_state.py, benchmark_costs.py
-├── docs/                Part-1 product refinement, technical report, evaluation
 ├── static/css/          unified design tokens (cutiee.css)
 ├── templates/           base.html + allauth overrides
 ├── tests/               pytest unit + integration tests
-└── render.yaml          Render deployment (single web service; progress cached in AuraDB)
+├── render.yaml         Render Blueprint: cutiee-web (Django) + cutiee-worker (Dockerized Xvfb + Chromium + noVNC)
+└── Dockerfile.worker   Worker image for the live framebuffer service
 ```
 
 ## Environment variables
 
-`.env.example` is the canonical reference (single source of truth — replaced
+`.env.example` is the canonical reference (single source of truth; replaced
 the legacy `.env.cutiee.template`). Required keys:
 
 | Key | Required when | Purpose |
@@ -164,26 +165,41 @@ the legacy `.env.cutiee.template`). Required keys:
 
 ## Deploy to Render
 
-`render.yaml` is a single-service blueprint: one Python web dyno with the
-cross-process progress cache stored on AuraDB (the database we already
-pay for) via `CUTIEE_PROGRESS_BACKEND=neo4j`. Push to GitHub, point
-Render at the repo, fill in the secrets marked `sync: false`, and the
-rest provisions automatically. To opt into a Redis-backed progress cache
-instead, set `CUTIEE_PROGRESS_BACKEND=redis`, add a managed Redis
-service block to `render.yaml`, and wire `REDIS_URL` via `fromService`.
+`render.yaml` is a two-service Blueprint:
 
-Detailed walkthrough in `docs/evaluation/production_readiness.md`.
+- `cutiee-web`: Python web dyno running Django + HTMX. Drives a remote
+  Chromium over CDP; never launches a browser in-process.
+- `cutiee-worker`: Docker image built from `Dockerfile.worker`. Runs
+  Xvfb, fluxbox, x11vnc, websockify, and a headed Chromium. Serves
+  noVNC publicly on port 6080 so the dashboard can embed it in an
+  iframe; exposes Chromium's CDP on 9222 to the private network only.
+
+Push to GitHub, point Render at the repo once via **New +** > **Blueprint**,
+and Render provisions both services in lockstep. Paste the `sync: false`
+secrets during the first sync; the only post-deploy step is copying the
+worker's public hostname into `CUTIEE_NOVNC_URL` on the web service (the
+hostname cannot be predicted before the first deploy because Render
+appends a per-workspace suffix).
+
+Cross-process progress is cached on AuraDB via `CUTIEE_PROGRESS_BACKEND=neo4j`,
+so no Redis dyno is required. The blueprint also pins every runtime
+tunable (cost caps, CU model, history window) so the two services stay
+in sync automatically; override by editing `render.yaml`, not the
+dashboard.
+
+Full walkthrough: `DEPLOY-RENDER.md` at the repo root.
 
 ## Documentation
 
-- `docs/part1_product_refinement.md` — INFO490 Part 1 deliverable
-- `docs/technical_report.md` — full architecture and design decisions
-- `docs/evaluation/test_cases.md` — Part 4.1
-- `docs/evaluation/failure_analysis.md` — Part 4.2
-- `docs/evaluation/improvement.md` — Part 4.3
-- `docs/evaluation/cost_comparison.md` — Part 4.4
-- `docs/evaluation/production_readiness.md` — Part 4.5
-- `README_AI.md` — AI workflow, model selection, design decisions
+Project-level docs live at the repo root:
+
+- `SPEC.md`: canonical runtime specification after the 17-phase integration
+- `DEPLOY-RENDER.md`: production deployment walkthrough for the two-service Render Blueprint
+- `REVIEW.md`: open refactor findings, tracked independently of commits
+- `AUDIT-DEV-BRANCH.md`: dev-branch audit output
+- `CLAUDE.md`: Claude Code briefing with coding conventions and runtime env matrix
+- `agent/README.md`: the standalone agent library's API surface
+- `CUTIEEDesignSystem/README.md`: design-system brand, colour, typography, and component guidance
 
 ## License
 

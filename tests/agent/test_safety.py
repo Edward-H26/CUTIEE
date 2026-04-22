@@ -28,6 +28,29 @@ def test_classifyRiskSafeOnFinish():
     assert classifyRisk(Action(type = ActionType.FINISH), "anything") == RiskLevel.SAFE
 
 
+def test_classifyRiskIgnoresPartialMatches():
+    # Word boundaries: "undelete", "reactivate", "unpublished", and
+    # "resubscribe" should NOT fire the HIGH path, even though they
+    # contain the high-risk root word as a substring. This prevents
+    # the approval queue from flooding with false positives.
+    safeCases = [
+        ("undelete last action", "restore prior state"),
+        ("reactivate listing", "reactivate a dormant listing"),
+        ("unpublished draft", "view the unpublished draft"),
+        ("resubscribe newsletter", "resubscribe to the newsletter"),
+    ]
+    for target, description in safeCases:
+        action = Action(type = ActionType.CLICK, target = target, reasoning = "")
+        assert classifyRisk(action, description) != RiskLevel.HIGH, target
+
+
+def test_classifyRiskMatchesWholeWordDeleteInsideSelector():
+    # Hyphens and pound signs are non-word chars so the boundary still
+    # fires inside CSS selectors the agent commonly emits.
+    action = Action(type = ActionType.CLICK, target = "button.delete-row")
+    assert classifyRisk(action, "") == RiskLevel.HIGH
+
+
 def test_approvalGateAutoApprovesBelowThreshold():
     gate = ApprovalGate(autoApproveBelow = RiskLevel.MEDIUM)
     action = Action(type = ActionType.NAVIGATE, target = "http://x", risk = RiskLevel.LOW)

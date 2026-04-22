@@ -6,11 +6,14 @@ miramemoria-style installs whose indexes shadow CUTIEE constraints.
 """
 from __future__ import annotations
 
+import logging
 import sys
 
 from neo4j.exceptions import ClientError
 
 from .neo4j_client import run_query
+
+_logger = logging.getLogger("cutiee.bootstrap")
 
 CONSTRAINTS: list[str] = [
     "CREATE CONSTRAINT user_id           IF NOT EXISTS FOR (u:User)               REQUIRE u.id           IS UNIQUE",
@@ -25,7 +28,6 @@ CONSTRAINTS: list[str] = [
     # mis-issued query without a user filter fails at the database
     # instead of silently cross-reading.
     "CREATE CONSTRAINT bullet_user_scope IF NOT EXISTS FOR (b:MemoryBullet)       REQUIRE b.user_id      IS NOT NULL",
-    "CREATE CONSTRAINT fact_id           IF NOT EXISTS FOR (f:SemanticFact)       REQUIRE f.id           IS UNIQUE",
     "CREATE CONSTRAINT audit_id          IF NOT EXISTS FOR (a:AuditEntry)         REQUIRE a.id           IS UNIQUE",
     "CREATE CONSTRAINT progress_exec_id  IF NOT EXISTS FOR (p:ProgressSnapshot)   REQUIRE p.execution_id IS UNIQUE",
     # Phase 4 budget cap ledger; Phase 7 heartbeat plus approval queue;
@@ -35,6 +37,11 @@ CONSTRAINTS: list[str] = [
     "CREATE CONSTRAINT cost_ledger_key   IF NOT EXISTS FOR (l:CostLedger)         REQUIRE (l.user_id, l.hour_key) IS UNIQUE",
     "CREATE CONSTRAINT action_approval_id IF NOT EXISTS FOR (a:ActionApproval)    REQUIRE a.id           IS UNIQUE",
     "CREATE CONSTRAINT preview_approval_id IF NOT EXISTS FOR (p:PreviewApproval)  REQUIRE p.execution_id IS UNIQUE",
+    # Screenshot store writes MERGE (:Screenshot {execution_id, step_index}).
+    # Without this composite constraint Neo4j scans every :Screenshot node on
+    # each write, which scales linearly in stored screenshots. The uniqueness
+    # constraint also blocks duplicate inserts when a retry races a retry.
+    "CREATE CONSTRAINT screenshot_exec_step IF NOT EXISTS FOR (s:Screenshot)      REQUIRE (s.execution_id, s.step_index) IS UNIQUE",
 ]
 
 INDEXES: list[str] = [
@@ -54,28 +61,29 @@ INDEXES: list[str] = [
 
 
 def bootstrap() -> None:
-    print("Installing CUTIEE Neo4j constraints and indexes...")
+    _logger.info("Installing CUTIEE Neo4j constraints and indexes...")
     for statement in CONSTRAINTS + INDEXES:
         label = statement.split("(")[1].split(":")[1].split(")")[0]
         name = statement.split()[2]
         try:
             run_query(statement)
-            print(f"  ok    {name:30s}  :{label}")
+            _logger.info("  ok    %-30s  :%s", name, label)
         except (RuntimeError, ClientError) as exc:
             # Pre-existing miramemoria-style indexes can shadow our
             # constraints; report and continue rather than aborting.
             if "IndexAlreadyExists" in str(exc) or "already exists" in str(exc).lower():
-                print(f"  skip  {name:30s}  :{label} (already present)")
+                _logger.info("  skip  %-30s  :%s (already present)", name, label)
                 continue
             raise
-    print("Done.")
+    _logger.info("Done.")
 
 
 def main() -> int:
+    logging.basicConfig(level = logging.INFO, format = "%(message)s")
     try:
         bootstrap()
     except RuntimeError as exc:
-        print(f"ERROR: {exc}", file = sys.stderr)
+        _logger.error("ERROR: %s", exc)
         return 1
     return 0
 

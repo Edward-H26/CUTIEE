@@ -14,29 +14,20 @@ from typing import Any, cast
 from neo4j import Driver, GraphDatabase, Query
 from neo4j.exceptions import ServiceUnavailable
 
+from agent.harness.env_utils import envFloat, envInt
+
 _DRIVER: Driver | None = None
 _DRIVER_LOCK = threading.Lock()
 
 
-def _safe_env_int(name: str, default: int) -> int:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        parsed = int(value)
-    except ValueError:
-        return default
+def _positiveEnvInt(name: str, default: int) -> int:
+    """envInt + sign clamp so a negative value never reaches the driver."""
+    parsed = envInt(name, default)
     return parsed if parsed >= 0 else default
 
 
-def _safe_env_float(name: str, default: float) -> float:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    try:
-        parsed = float(value)
-    except ValueError:
-        return default
+def _positiveEnvFloat(name: str, default: float) -> float:
+    parsed = envFloat(name, default)
     return parsed if parsed >= 0.0 else default
 
 
@@ -75,9 +66,9 @@ def get_driver() -> Driver:
             _DRIVER = GraphDatabase.driver(
                 uri,
                 auth = (user, password),
-                max_connection_pool_size = _safe_env_int("NEO4J_MAX_CONNECTION_POOL_SIZE", 32),
-                connection_timeout = _safe_env_float("NEO4J_CONNECTION_TIMEOUT", 30.0),
-                max_transaction_retry_time = _safe_env_float("NEO4J_MAX_TX_RETRY", 15.0),
+                max_connection_pool_size = _positiveEnvInt("NEO4J_MAX_CONNECTION_POOL_SIZE", 32),
+                connection_timeout = _positiveEnvFloat("NEO4J_CONNECTION_TIMEOUT", 30.0),
+                max_transaction_retry_time = _positiveEnvFloat("NEO4J_MAX_TX_RETRY", 15.0),
                 keep_alive = True,
             )
     return _DRIVER

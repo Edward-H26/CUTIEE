@@ -256,14 +256,7 @@ class HeuristicReflector:
         return [lesson for lesson in lessons if lesson.confidence >= self.minConfidence]
 
 
-def _domainFromUrl(url: str) -> str:
-    if not url:
-        return ""
-    match = re.match(r"https?://([^/]+)/?", url)
-    if match is None:
-        return ""
-    host = match.group(1)
-    return host.split(":")[0]
+from ..harness.url_utils import hostFromUrl as _domainFromUrl  # noqa: E402 - alias for call-site stability
 
 
 from .text_utils import slugify as _slugify  # noqa: E402 - re-export for legacy call sites

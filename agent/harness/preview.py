@@ -6,18 +6,18 @@ cancels. The preview lives in Neo4j as a `:PreviewApproval` node keyed
 on `executionId`; the HTMX dashboard polls that node and flips its
 status on user input.
 
-Preview generation uses the active `CuClient`, costing about 500
-output tokens (roughly $0.0003 at Gemini Flash pricing). Cancellation
-marks the run complete with `completionReason="user_cancelled_preview"`
-without touching the browser.
+Callers (typically the Django wiring layer) are responsible for
+generating the summary string and passing it in. This module owns the
+Neo4j persist-and-poll helper plus the terminal outcome dataclass; it
+stays free of CuClient coupling so the agent package remains vendorable.
+Cancellation marks the run complete with
+`completionReason="user_cancelled_preview"` without touching the browser.
 """
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
 
 from agent.persistence.neo4j_client import run_query, run_single
 
@@ -83,45 +83,3 @@ async def runPreviewAndWait(
         await asyncio.sleep(pollIntervalSeconds)
 
     return PreviewOutcome(status = "cancelled", summary = summary, note = "preview_timeout")
-
-
-async def generateSummary(
-    *,
-    client: Any,
-    taskDescription: str,
-    currentUrl: str,
-    replayFragments: list[dict[str, Any]] | None = None,
-) -> str:
-    """Produce a short natural-language preview via the CU client.
-
-    Calls the client once with a low-output prompt. If the client
-    raises, we fall back to a deterministic template so the preview
-    always renders something for the user to approve.
-    """
-    bullets = replayFragments or []
-    replayLine = (
-        f"{len(bullets)} procedural step(s) will replay at zero cost: "
-        + ", ".join(b.get("summary", "") for b in bullets)
-        if bullets
-        else "No replay fragments match; every step goes through the model."
-    )
-    fallback = (
-        f"Goal: {taskDescription}\n"
-        f"Starting at: {currentUrl or 'about:blank'}\n"
-        f"{replayLine}"
-    )
-
-    primeTask = getattr(client, "primeTask", None)
-    if callable(primeTask):
-        try:
-            primeTask(
-                f"Summarize your plan in under 100 words. "
-                f"Goal: {taskDescription}. "
-                f"Starting URL: {currentUrl or 'about:blank'}. "
-                f"Replay context: {replayLine}",
-                currentUrl,
-            )
-        except Exception:
-            return fallback
-
-    return fallback

@@ -1,10 +1,19 @@
 # Render deployment for CUTIEE.
 #
-# Single web service. The cross-process progress cache lives on the
-# AuraDB instance we already pay for, so no Redis dyno is required.
-# A lazy sweep on every publish drops snapshots older than 5 minutes
-# and the post-finish purge drops them on the next HTMX poll, so the
-# graph stays bounded for 2-5 concurrent demo users.
+# Two services, both IaC-managed by this blueprint:
+#
+#   cutiee-web     Django + HTMX dashboard. Drives a REMOTE Chromium
+#                  over CDP; never launches a browser locally.
+#   cutiee-worker  Docker image from Dockerfile.worker. Runs Xvfb +
+#                  fluxbox + x11vnc + websockify + Chromium. Serves
+#                  noVNC on port 6080 (public) and Chromium CDP on
+#                  port 9222 (private network only).
+#
+# The cross-process progress cache lives on the AuraDB instance we
+# already pay for, so no Redis dyno is required. A lazy sweep on
+# every publish drops snapshots older than 5 minutes and the
+# post-finish purge drops them on the next HTMX poll, so the graph
+# stays bounded for 2-5 concurrent demo users.
 #
 # Django framework bookkeeping (contenttypes, auth_permission, allauth_*,
 # sites, sessions) lives in a shared-cache in-memory SQLite hard-coded
@@ -17,8 +26,12 @@ services:
     name: cutiee-web
     env: python
     region: oregon
-    # Standard plan (2 GB RAM) is the floor for real Chromium. Starter's
-    # 512 MB OOM-kills the browser on the first heavy page.
+    # Standard plan gives the web dyno headroom for concurrent HTMX
+    # polls, allauth OAuth handshakes, Cypher round-trips, and 2-5
+    # simultaneous demo users. Chromium itself runs on cutiee-worker
+    # and is reached over CDP, so this plan does NOT need to size for
+    # a browser process. Starter (512 MB) is viable when the cohort
+    # is a single user at a time; bump back to Standard before demos.
     plan: standard
     buildCommand: |
       uv sync &&
@@ -26,10 +39,14 @@ services:
       uv run python manage.py migrate --no-input &&
       uv run python manage.py collectstatic --no-input &&
       uv run python -m agent.persistence.bootstrap
-    # Single worker keeps Chromium memory bounded. Threads still fan out
-    # for HTMX polls and other non-CU requests.
+    # Single worker keeps per-request memory bounded. Threads still fan
+    # out for HTMX polls and other non-CU requests.
     startCommand: |
       uv run gunicorn cutiee_site.wsgi --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    # Render marks a deploy as failed when the healthCheckPath does not
+    # return 2xx within the grace window. /health/ is a pure 200 so a
+    # transient Neo4j outage does not take the service out of rotation.
+    healthCheckPath: /health/
     autoDeploy: true
     envVars:
       # Python 3.12 is the current Render default; matches the local
@@ -44,9 +61,9 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "cutiee-web.onrender.com,cutiee.onrender.com"
+        value: "cutiee-web.onrender.com,cutiee.onrender.com,cutiee-1kqk.onrender.com"
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
-        value: "https://cutiee-web.onrender.com,https://cutiee.onrender.com"
+        value: "https://cutiee-web.onrender.com,https://cutiee.onrender.com,https://cutiee-1kqk.onrender.com"
       # === Required secrets (paste in Render dashboard) ===
       - key: GEMINI_API_KEY
         sync: false
@@ -66,17 +83,32 @@ services:
       # across Google model swaps.
       - key: CUTIEE_CU_MODEL
         value: "gemini-flash-latest"
+      - key: CUTIEE_CU_BACKEND
+        value: "gemini"
       - key: NEO4J_DATABASE
         value: "neo4j"
-      # Render dynos have no display server, so the browser must be
-      # headless. The controller defaults to headed for the dev demo.
+      # Render dynos have no display server, so any fallback browser
+      # would need to be headless. In practice the web dyno never
+      # launches a browser; it reaches the worker's headed Chromium
+      # over CDP via the private network.
       - key: CUTIEE_BROWSER_HEADLESS
         value: "true"
-      # Real Chromium drives the page via Playwright. The Standard
-      # plan (2 GB) has the headroom; flip to "true" only for cost-only
-      # demos that do not need a real browser.
       - key: CUTIEE_USE_STUB_BROWSER
         value: "false"
+      # Private-network handle for the worker's Chromium. The worker's
+      # Dockerfile starts Chromium with --remote-debugging-address=0.0.0.0
+      # on port 9222, and Render's private DNS resolves cutiee-worker to
+      # the worker container, so this URL is reachable without any
+      # firewall punch or public exposure.
+      - key: CUTIEE_BROWSER_CDP_URL
+        value: "http://cutiee-worker:9222"
+      # Public noVNC URL the dashboard iframe points at. Render appends
+      # a per-workspace suffix (e.g. cutiee-worker-xyz.onrender.com) so
+      # we cannot predict the exact hostname. Fill this in from the
+      # dashboard once the worker's first deploy completes; format is
+      # https://<worker-hostname>/vnc.html.
+      - key: CUTIEE_NOVNC_URL
+        sync: false
       # Aura-backed progress cache: 30 ms / publish, no Redis dyno needed.
       - key: CUTIEE_PROGRESS_BACKEND
         value: "neo4j"
@@ -87,6 +119,21 @@ services:
         value: "0.85"
       - key: CUTIEE_REQUIRE_APPROVAL_HIGH_RISK
         value: "true"
+      # === Runtime guardrails (mirrored on cutiee-worker) ===
+      - key: CUTIEE_MAX_COST_USD_PER_TASK
+        value: "0.50"
+      - key: CUTIEE_MAX_COST_USD_PER_HOUR
+        value: "5.00"
+      - key: CUTIEE_MAX_COST_USD_PER_DAY
+        value: "1.00"
+      - key: CUTIEE_HEARTBEAT_MINUTES
+        value: "20"
+      - key: CUTIEE_HISTORY_KEEP_TURNS
+        value: "8"
+      - key: CUTIEE_REPLAY_FRAGMENT_CONFIDENCE
+        value: "0.80"
+      - key: CUTIEE_ALLOW_URL_FRAGMENTS
+        value: "0"
       # === Optional ===
       # CUTIEE_CREDENTIAL_KEY (Fernet) is only needed if you persist
       # user secrets via SemanticCredentialStore. Omit unless you've
@@ -94,3 +141,87 @@ services:
       # without it. To enable: generate via
       #   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
       # then add the key to the Render dashboard as a secret.
+
+  - type: web
+    name: cutiee-worker
+    env: docker
+    region: oregon
+    # Standard (2 GB RAM) is the floor for headed Chromium plus Xvfb,
+    # fluxbox, x11vnc, and websockify running in the same container.
+    # Starter OOM-kills the browser on the first heavy page.
+    plan: standard
+    dockerfilePath: ./Dockerfile.worker
+    # Leave dockerContext implicit (repo root) so pyproject.toml and
+    # the agent/ apps/ cutiee_site/ scripts/ directories are copied in.
+    dockerContext: .
+    autoDeploy: true
+    envVars:
+      # PORT=6080 tells Render to route HTTPS for this service at its
+      # public .onrender.com URL to the container's noVNC HTTP server
+      # on port 6080. Chromium's CDP on 9222 stays on the private
+      # network because it binds to 0.0.0.0 inside the container; any
+      # service in this Render workspace can reach cutiee-worker:9222
+      # regardless of which port is "public". Do not change PORT.
+      - key: PORT
+        value: "6080"
+      - key: CUTIEE_ENV
+        value: production
+      # Worker runs a real, headed Chromium inside Xvfb. These two
+      # flags together tell the agent to expect a visible browser
+      # driven over CDP rather than spawning a new Playwright browser.
+      - key: CUTIEE_USE_STUB_BROWSER
+        value: "false"
+      - key: CUTIEE_BROWSER_HEADLESS
+        value: "false"
+      # Local attach: the worker's own Chromium binds CDP inside the
+      # container, and runner_factory uses this URL when it runs in
+      # the worker. From the web dyno, the equivalent URL is
+      # http://cutiee-worker:9222 (see cutiee-web above).
+      - key: CUTIEE_BROWSER_CDP_URL
+        value: "http://localhost:9222"
+      # === Provisional parity secrets (paste in Render dashboard) ===
+      # As of 2026-04-22 the worker's CMD (start-worker.sh) launches
+      # only Xvfb, fluxbox, x11vnc, websockify, and Chromium. No Python
+      # runs at runtime, so these credentials are NOT currently used by
+      # the worker. They are declared here for parity and to unblock a
+      # future sidecar (e.g. a heartbeat writer, a log forwarder, or a
+      # browser-use wrapper) that would run Python inside the container
+      # and reach AuraDB directly. Remove these blocks if you are
+      # confident no such sidecar will land before the next deploy;
+      # keep them if you prefer blast-radius parity between the two
+      # services. Either posture is defensible.
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NEO4J_BOLT_URL
+        sync: false
+      - key: NEO4J_USERNAME
+        sync: false
+      - key: NEO4J_PASSWORD
+        sync: false
+      # === Computer Use tunables (parity with cutiee-web; unused today) ===
+      - key: CUTIEE_CU_MODEL
+        value: "gemini-flash-latest"
+      - key: CUTIEE_CU_BACKEND
+        value: "gemini"
+      - key: NEO4J_DATABASE
+        value: "neo4j"
+      # === Runtime guardrails (parity with cutiee-web; unused today) ===
+      - key: CUTIEE_MAX_COST_USD_PER_TASK
+        value: "0.50"
+      - key: CUTIEE_MAX_COST_USD_PER_HOUR
+        value: "5.00"
+      - key: CUTIEE_MAX_COST_USD_PER_DAY
+        value: "1.00"
+      - key: CUTIEE_HEARTBEAT_MINUTES
+        value: "20"
+      - key: CUTIEE_HISTORY_KEEP_TURNS
+        value: "8"
+      - key: CUTIEE_REPLAY_FRAGMENT_CONFIDENCE
+        value: "0.80"
+      - key: CUTIEE_ALLOW_URL_FRAGMENTS
+        value: "0"
+      # Worker never serves the login page, so Google OAuth creds are
+      # intentionally omitted here. Adding them would be harmless but
+      # increases blast radius of a leaked worker env.
