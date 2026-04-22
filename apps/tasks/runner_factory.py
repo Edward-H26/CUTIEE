@@ -95,13 +95,22 @@ def buildLiveCuRunnerForUser(
         maxSteps = maxSteps,
         approvalGate = ApprovalGate(decider = decider),
     )
-    # Phase 8 concrete DOM probe: when a real Playwright page is
-    # available, scan for password / cc-number / cc-csc inputs and
-    # redact their bounding boxes before screenshots enter the sink.
-    # The stub browser has no `.page`, so the probe returns an empty
-    # region list and redaction is a no-op by default.
-    from apps.audit.redactor import playwrightDomRedactor
-    runner.redactor = playwrightDomRedactor
+    # Phase 8 concrete DOM probe. Composed here so the agent package
+    # stays apps-free: the probe returns regions, `redactScreenshot`
+    # masks them, and the runner sees only an opaque
+    # `(browser, bytes) -> bytes` callable. The stub browser has no
+    # `.page`, so the probe returns an empty region list and the
+    # mask step no-ops on empty inputs, which preserves the original
+    # screenshot unchanged.
+    from apps.audit.redactor import playwrightDomRedactor, redactScreenshot
+
+    async def _composedRedactor(browserArg: Any, screenshotBytes: bytes) -> bytes:
+        regions = await playwrightDomRedactor(browserArg, screenshotBytes)
+        if not regions:
+            return screenshotBytes
+        return redactScreenshot(screenshotBytes, regions)
+
+    runner.redactor = _composedRedactor
     return runner
 
 

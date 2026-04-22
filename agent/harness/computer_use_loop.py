@@ -713,31 +713,31 @@ class ComputerUseRunner:
         return "abandon_fragment"
 
     async def _redactForSink(self, screenshot: bytes) -> bytes:
-        """Pipe a screenshot through the redactor, awaiting async probes.
+        """Pipe the screenshot through the injected redactor.
 
-        Accepts both sync callables (a lambda returning a list of
-        `RedactionRegion`) and async probes (the Playwright DOM probe
-        wired by default in `runner_factory`). If the redactor raises
-        or returns nothing, the screenshot passes through unchanged.
+        The contract is `(browser, screenshot_bytes) -> bytes`, where
+        the callable returns bytes that are safe to persist. The runner
+        does not know how the redaction happens; the host layer
+        (`apps/`) composes whatever probe + masker it wants. This keeps
+        `agent/` Django-free and persistence-agnostic per the package
+        README. Both sync and async redactors are supported via
+        `asyncio.iscoroutine`; exceptions fall back to the original
+        screenshot so a redactor failure never blocks the audit.
         """
         if self.redactor is None or not screenshot:
             return screenshot
         try:
             result = self.redactor(self.browser, screenshot)
             if asyncio.iscoroutine(result):
-                regions = await result
+                redacted = await result
             else:
-                regions = result
+                redacted = result
         except Exception:  # noqa: BLE001
             logger.debug("redactor raised", exc_info = True)
             return screenshot
-        if not regions:
+        if not isinstance(redacted, (bytes, bytearray)) or not redacted:
             return screenshot
-        try:
-            from apps.audit.redactor import redactScreenshot
-        except ImportError:
-            return screenshot
-        return redactScreenshot(screenshot, regions)
+        return bytes(redacted)
 
 
 def _failed(detail: str) -> StepResult:

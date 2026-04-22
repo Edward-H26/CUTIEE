@@ -122,7 +122,81 @@ git push -u origin dev
 
 For the automated autofix-pr workflow, after the push the hook should pick up a feature branch instead of main and proceed.
 
-## 9. Verification receipt
+## 9. Layering violation — found and fixed in the /autofix-pr pass
+
+During the deep-research sweep I found that `agent/harness/computer_use_loop.py:_redactForSink` contained `from apps.audit.redactor import redactScreenshot` on the runner hot path. This violated the package invariant documented in `agent/README.md` that `agent/` has no Django or host-layer dependencies. The lazy import let the violation hide from grep and static analysis until the first screenshot with a real redactor arrived.
+
+**Fix applied**: inverted the redactor contract. The redactor callable now returns already-masked `bytes` rather than a list of regions, so the runner stays ignorant of masking implementation. `apps/tasks/runner_factory.py` composes `playwrightDomRedactor` plus `redactScreenshot` into a closure before injecting it into the runner. Net result: zero `apps.*` imports in `agent/` except the eval harness (which is the documented integration-test entry point).
+
+Verification:
+
+```python
+import importlib, sys
+modules_before = {k for k in sys.modules if k.startswith("apps.")}
+import agent; importlib.reload(agent)
+post = {k for k in sys.modules if k.startswith("apps.")} - modules_before
+assert len(post) == 0  # passes
+```
+
+Follow-on cleanups in the same pass:
+
+- `agent/memory/replay.py`: dropped unused `re`, `ActionType`, `RiskLevel` imports (they were surplus after `_actionFromBullet` became a wrapper over `bullet_reconstruct`).
+- `agent/memory/fragment_replay.py`: same, plus `typing.Any`.
+
+## 10. Additional regressions found in the deep-research sweep
+
+### 10.1 Django import hiding in `agent/persistence/users.py`
+
+A second, more hidden layering violation surfaced: `agent/persistence/users.py:12` imported `from django.contrib.auth.hashers import check_password, make_password`. The `__init__.py` eagerly re-exported `users`, so any vendored consumer running `from agent.persistence import sessions` transitively crashed on the Django import when Django was absent.
+
+Evidence of deadness:
+
+```
+$ grep -rn "\.create_user\b\|\.get_user_by_username\b\|\.get_user_by_email\b\|\.verify_password\b\|\.update_last_login\b" --include="*.py" .
+# (zero matches — no caller anywhere)
+```
+
+The Neo4j-backed auth flow is actually handled by `apps/accounts/signals.py`, which mirrors Django ORM `User` rows into `:User` nodes via a `post_save` hook. That signal uses `run_query` directly and does not depend on `users.py` at all.
+
+**Fix applied**: deleted `agent/persistence/users.py` and removed the `users` entry from `agent/persistence/__init__.py`. Re-running the import audit:
+
+```
+$ grep -rn "from django\|import django" agent/
+# (zero matches)
+```
+
+### 10.2 `PROCEDURAL_DECAY_RATE` tie with `SEMANTIC_DECAY_RATE`
+
+Commit eea04bd bumped `PROCEDURAL_DECAY_RATE` from `0.002` to `0.01` with an inline comment claiming the rate is "still the slowest of the three channels". Numerically both rates then equalled `0.01`, so procedural was no longer strictly slowest, and `test_decayConstantsOrderedCorrectly` immediately failed:
+
+```
+E   assert 0.01 < 0.01
+    PROCEDURAL_DECAY_RATE < SEMANTIC_DECAY_RATE < EPISODIC_DECAY_RATE
+```
+
+**Fix applied**: set `PROCEDURAL_DECAY_RATE = 0.005`. That sits strictly between the prior `0.002` and semantic's `0.01`, so procedural bullets still fade slower than anything else while no longer being effectively frozen, and the comment now matches the numbers.
+
+### 10.3 Stale `test_landingRendersForAnonymous`
+
+The 5c0295f UI refresh replaced the landing page's "Sign in" CTA with "Open app" across four call-sites inside `apps/landing/templates/landing/landing.html`. `tests/apps/test_tasks_views.py:test_landingRendersForAnonymous` still asserted `b"Sign in" in resp.content` and failed on every run.
+
+**Fix applied**: assert `b"/accounts/login/" in resp.content` instead. The login URL stays stable through copy tweaks, so the test now tracks "the landing page points anonymous visitors at the login flow" rather than any one button label.
+
+### 10.4 Observations not acted on
+
+- `agent/persistence/bootstrap.py:28` still creates the `CREATE CONSTRAINT fact_id ... FOR (f:SemanticFact)` constraint, but `agent/memory/semantic.py` was deleted in eea04bd and nothing now writes `:SemanticFact` nodes. The constraint is idempotent and harmless, but a follow-up sweep should drop it.
+- `CLAUDE.md` lists `RecencyPruner` inside the "removed DOM-router stack". It was not removed: `agent/pruning/context_window.py:48` still defines the class and four tests still exercise it. Documentation-only discrepancy.
+
+### 10.5 Test suite after all fixes
+
+```
+$ .venv/bin/python -m pytest tests/ --tb=short -q
+142 passed, 18 warnings in 0.71s
+```
+
+Pre-fix: `140 passed, 2 failed` (decay ordering + landing content). All 142 tests now pass.
+
+## 11. Verification receipt
 
 ```
 $ git branch --show-current

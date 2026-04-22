@@ -15,7 +15,7 @@ def test_landingRendersForAnonymous():
     resp = client.get("/")
     assert resp.status_code == 200
     assert b"CUTIEE" in resp.content
-    assert b"Sign in" in resp.content
+    assert b"/accounts/login/" in resp.content
 
 
 @pytest.mark.django_db

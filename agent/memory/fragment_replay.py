@@ -20,11 +20,9 @@ gate before execution.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
-from typing import Any
 
-from ..harness.state import Action, ActionType, RiskLevel
+from ..harness.state import Action
 from .bullet import Bullet
 from .embeddings import cosineSimilarity, embedTexts
 from .pipeline import ACEPipeline
