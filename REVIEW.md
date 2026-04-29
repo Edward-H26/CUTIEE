@@ -14,6 +14,15 @@ Generated during the 2026-04-22 session that implemented the SPEC.md commitments
 | Shared text utilities | Implemented | `agent/memory/text_utils.py` with `slugify`, `parseJsonLoose`, `stepIndexFromContent` |
 | Heartbeat minutes config | Implemented | `Config.heartbeatMinutes` from `CUTIEE_HEARTBEAT_MINUTES` |
 
+## 1a. Work Completed Post-Session (2026-04-29)
+
+| Area | Status | Artifact |
+|------|--------|----------|
+| Local Qwen3.5-0.8B helper (MIRA pattern) | Implemented | `agent/memory/local_llm.py`, `scripts/cache_local_qwen.py`, `tests/agent/test_local_llm.py` |
+| Reflector + Decomposer Qwen integration | Implemented | `agent/memory/reflector.py:303-318` (Qwen → Gemini → Heuristic chain), `agent/memory/decomposer.py:101-114` (same chain) |
+| `local_llm` optional dep group | Implemented | `pyproject.toml:44-48` and `:50-58` (torch / transformers / huggingface-hub) |
+| Render leak prevention (F0) | Implemented | `.dockerignore`, `agent/memory/local_llm_stub.py`, `render.yaml` post-install stub swap, `scripts/verify_render_isolation.sh`, `Dockerfile.worker` exclusion comment |
+
 ## 2. Items Blocked by the Environment
 
 | Item | Why it did not land | What the operator should do |

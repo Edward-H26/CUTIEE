@@ -75,7 +75,7 @@
         </div>
 
         <div class="cutiee-card cutiee-table-wrap"
-             hx-get="{% url 'tasks:detail' task_id=task.id %}"
+             hx-get="{{ task.get_absolute_url }}"
              hx-trigger="every 2s"
              hx-select=".cutiee-table-wrap"
              hx-swap="outerHTML">
@@ -111,7 +111,7 @@
     {% else %}
         <div id="empty-exec"
              class="cutiee-card"
-             hx-get="{% url 'tasks:detail' task_id=task.id %}"
+             hx-get="{{ task.get_absolute_url }}"
              hx-trigger="every 2s"
              hx-select="#empty-exec"
              hx-swap="outerHTML">

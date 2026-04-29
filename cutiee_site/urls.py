@@ -19,6 +19,7 @@ def _liveness(_request) -> HttpResponse:
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
+    path("me/", include("apps.accounts.urls")),
     path("tasks/", include("apps.tasks.urls")),
     path("memory/", include("apps.memory_app.urls")),
     path("memory/export/", memory_export, name = "memory_export"),

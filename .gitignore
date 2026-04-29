@@ -18,6 +18,7 @@ data/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+.cache/huggingface-models/
 .coverage
 htmlcov/
 
@@ -58,3 +59,19 @@ data/storage_state/
 
 CLAUDE*.md
 CUITEEE_Claude_Code_Implementation.md
+
+# ICML 2026 paper drafts and LaTeX build artifacts
+paper/
+*.aux
+*.bbl
+*.blg
+*.out
+*.pdf
+*.synctex.gz
+*.toc
+*.fdb_latexmk
+*.fls
+
+# The rubric-mandated technical report PDF is tracked despite *.pdf above.
+# Generated from docs/REPORT.md via scripts/build_report_pdf.py.
+!docs/REPORT.pdf

@@ -14,9 +14,9 @@ blindly appending. Three branches:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from .embeddings import cosineSimilarity, embedTexts
+from .embeddings import cosineSimilarity, defaultUseHashEmbedding, embedTexts
 from .reflector import (
     EPISODIC_HINTS,
     PROCEDURAL_HINTS,
@@ -30,7 +30,7 @@ CONTENT_DEDUP_THRESHOLD = 0.90
 
 @dataclass
 class Curator:
-    useHashEmbedding: bool = True
+    useHashEmbedding: bool = field(default_factory = defaultUseHashEmbedding)
 
     def curate(
         self,

@@ -104,15 +104,31 @@ def buildLiveCuRunnerForUser(
     # `.page`, so the probe returns an empty region list and the
     # mask step no-ops on empty inputs, which preserves the original
     # screenshot unchanged.
+    #
+    # The redactor only attaches when the user has not opted out via
+    # `UserPreference.redact_audit_screenshots`. Opt-out is unusual but
+    # supported (some users prefer raw screenshots for debugging their
+    # own demo sites). The default is True so anonymous and
+    # never-set-preferences users get the safer behavior.
+    from apps.accounts.models import UserPreference
     from apps.audit.redactor import playwrightDomRedactor, redactScreenshot
+    from django.contrib.auth import get_user_model
 
-    async def _composedRedactor(browserArg: Any, screenshotBytes: bytes) -> bytes:
-        regions = await playwrightDomRedactor(browserArg, screenshotBytes)
-        if not regions:
-            return screenshotBytes
-        return redactScreenshot(screenshotBytes, regions)
+    User = get_user_model()
+    try:
+        userObj = User.objects.filter(pk = userId).first()
+    except Exception:
+        userObj = None
+    shouldRedact = UserPreference.for_user(userObj).redact_audit_screenshots
 
-    runner.redactor = _composedRedactor
+    if shouldRedact:
+        async def _composedRedactor(browserArg: Any, screenshotBytes: bytes) -> bytes:
+            regions = await playwrightDomRedactor(browserArg, screenshotBytes)
+            if not regions:
+                return screenshotBytes
+            return redactScreenshot(screenshotBytes, regions)
+
+        runner.redactor = _composedRedactor
 
     async def _previewHook(state: AgentState, fragmentPlan: Any) -> Any:
         """Write the :PreviewApproval node, poll until the user decides.

@@ -17,15 +17,14 @@ the SubgraphMatcher (Phase 3).
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
-import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from .action_graph import ActionEdge, ActionNode, ProcedureGraph
+from . import local_llm
 
 logger = logging.getLogger("cutiee.decomposer")
 
@@ -99,6 +98,13 @@ class LlmActionDecomposer:
         taskDescription: str,
         initialUrl: str = "",
     ) -> ProcedureGraph:
+        if local_llm.shouldUseLocalLlmForUrl(initialUrl):
+            try:
+                graph = self._decomposeViaLocalQwen(userId, taskDescription, initialUrl)
+                if graph.nodes:
+                    return graph
+            except Exception as exc:
+                logger.warning("LlmActionDecomposer local-Qwen call failed: %s", exc)
         if self._client is None:
             return _emptyGraph(userId, taskDescription)
         try:
@@ -106,6 +112,20 @@ class LlmActionDecomposer:
         except Exception as exc:
             logger.warning("LlmActionDecomposer Gemini call failed: %s", exc)
             return _emptyGraph(userId, taskDescription)
+
+    def _decomposeViaLocalQwen(
+        self, userId: str, taskDescription: str, initialUrl: str,
+    ) -> ProcedureGraph:
+        prompt = DECOMPOSER_PROMPT.format(
+            task_description = taskDescription,
+            initial_url = initialUrl or "(none — agent infers)",
+        )
+        rawText = local_llm.generateText(
+            systemInstruction = DECOMPOSER_SYSTEM_INSTRUCTION,
+            userPrompt = prompt,
+            maxNewTokens = self.maxOutputTokens,
+        ) or ""
+        return self._parseGraph(rawText, userId, taskDescription)
 
     def _decomposeViaGemini(
         self, userId: str, taskDescription: str, initialUrl: str,

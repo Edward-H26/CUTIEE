@@ -67,7 +67,7 @@
                 <h2>Live browser</h2>
                 <div class="panel__sub">
                     Execution in progress &middot;
-                    <a href="{% url 'tasks:detail' task_id=active_execution.task_id %}">open this task</a>
+                    <a href="{{ active_execution_task_url|default:'#' }}">open this task</a>
                 </div>
             </div>
         </div>
@@ -122,7 +122,7 @@
     {% if tasks %}
         <div class="task-rows">
             {% for task in tasks %}
-                <a href="{% url 'tasks:detail' task_id=task.id %}" data-testid="task-row" class="task-row">
+                <a href="{{ task.get_absolute_url }}" data-testid="task-row" class="task-row">
                     <div class="task-row__main">
                         <div class="task-row__title">{{ task.description|truncatechars:90 }}</div>
                         <div class="task-row__url">{{ task.initial_url|default:"no starting url" }}</div>

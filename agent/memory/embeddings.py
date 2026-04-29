@@ -5,18 +5,43 @@ We deliberately avoid loading FastEmbed during process startup: the model is
 so the pipeline still runs end-to-end without the heavy dependency. The
 hash-based vector keeps the cosine API stable across the two backends so
 ranking math doesn't have to special-case the test path.
+
+`defaultUseHashEmbedding` is the env-driven default for memory components
+that have not been told otherwise. Production (`CUTIEE_ENV=production`) and
+any caller that explicitly opts in via `CUTIEE_PREFER_DENSE_EMBEDDINGS=true`
+get FastEmbed; everything else stays on the hash path so tests and offline
+demos do not trigger a 200MB warmup.
 """
 from __future__ import annotations
 
 import hashlib
 import math
+import os
 import threading
 from collections.abc import Iterable
 from typing import Any
 
+from agent.harness.env_utils import envBool
+
 DEFAULT_DIMENSION = 256
 _MODEL_LOCK = threading.Lock()
 _MODEL: Any = None
+
+
+def defaultUseHashEmbedding() -> bool:
+    """Return True when memory components should default to hash embeddings.
+
+    False (i.e. use FastEmbed `BAAI/bge-small-en-v1.5`) when either
+    `CUTIEE_PREFER_DENSE_EMBEDDINGS=true` is set explicitly or
+    `CUTIEE_ENV=production`. The hash path stays the default for tests and
+    `CUTIEE_ENV=local` so a `pytest` run does not download the FastEmbed
+    weights on every clean checkout.
+    """
+    if envBool("CUTIEE_PREFER_DENSE_EMBEDDINGS", False):
+        return False
+    if os.environ.get("CUTIEE_ENV") == "production":
+        return False
+    return True
 
 
 def cosineSimilarity(a: Iterable[float] | None, b: Iterable[float] | None) -> float:

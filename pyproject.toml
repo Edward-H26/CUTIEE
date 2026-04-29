@@ -41,10 +41,20 @@ dev = [
 browser_use = [
     "browser-use>=0.7",
 ]
+local_llm = [
+    "huggingface-hub>=0.30",
+    "torch>=2.5",
+    "transformers>=4.51",
+]
 
 [project.optional-dependencies]
 browser_use = [
     "browser-use>=0.7",
+]
+local_llm = [
+    "huggingface-hub>=0.30",
+    "torch>=2.5",
+    "transformers>=4.51",
 ]
 
 [tool.pytest.ini_options]

@@ -1,0 +1,26 @@
+# Local-only Qwen integration (CUTIEE_ENV=local). The worker container
+# runs only the browser stack (Xvfb + fluxbox + x11vnc + websockify +
+# Chromium); no Python entrypoint executes inside this image, so the
+# Qwen helper, the cache script, and its tests are dead weight here.
+# Excluded so a security audit of the deployed image does not see
+# ~5 KB of dormant ML-adjacent Python.
+agent/memory/local_llm.py
+agent/memory/local_llm_stub.py
+scripts/cache_local_qwen.py
+tests/agent/test_local_llm.py
+.cache/huggingface-models/
+
+# Standard Python / git noise that should never enter the build context.
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.git/
+.gitignore
+.env
+.env.local
+test-results/
+playwright-report/
+storage_state.json
+.playwright-mcp/

@@ -20,7 +20,6 @@ agents, CU agents, code agents, etc.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -28,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from ..harness.state import ActionType, AgentState
+from . import local_llm
 
 PROCEDURAL_HINTS = ("step", "procedure", "workflow", "sequence", "click", "fill")
 EPISODIC_HINTS = ("user", "asked", "prefers", "wants", "today", "this run")
@@ -301,6 +301,14 @@ class LlmReflector:
             self._client = None
 
     def reflect(self, state: AgentState) -> list[LessonCandidate]:
+        initialUrl = state.history[0].url if state.history else ""
+        if local_llm.shouldUseLocalLlmForUrl(initialUrl):
+            try:
+                lessons = self._reflectViaLocalQwen(state)
+                if lessons:
+                    return lessons
+            except Exception as exc:
+                logger.warning("LlmReflector: local Qwen call failed (%s); falling back", exc)
         if self._client is None:
             return self.fallback.reflect(state)
         try:
@@ -333,6 +341,23 @@ class LlmReflector:
             ),
         )
         rawText = (response.text or "").strip()
+        return self._parseLessons(rawText, state)
+
+    def _reflectViaLocalQwen(self, state: AgentState) -> list[LessonCandidate]:
+        trace = self._formatTrace(state)
+        outcome = "complete" if state.isComplete else "incomplete"
+        if state.completionReason:
+            outcome = f"{outcome} ({state.completionReason})"
+        prompt = REFLECTOR_PROMPT.format(
+            trace = trace,
+            task_description = state.taskDescription,
+            outcome = outcome,
+        )
+        rawText = local_llm.generateText(
+            systemInstruction = REFLECTOR_SYSTEM_INSTRUCTION,
+            userPrompt = prompt,
+            maxNewTokens = self.maxOutputTokens,
+        ) or ""
         return self._parseLessons(rawText, state)
 
     def _formatTrace(self, state: AgentState) -> str:

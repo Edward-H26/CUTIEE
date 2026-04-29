@@ -1,0 +1,36 @@
+# Pre-commit hooks for CUTIEE.
+#
+# Run on demand:
+#   uv run pre-commit run --all-files
+#
+# Install once per checkout:
+#   uv run pre-commit install
+#
+# Hooks intentionally avoid network calls and skip heavy ML-tied paths
+# so the commit-time gate stays fast. Full pytest is still a manual
+# pre-push check (see scripts/verify_render_isolation.sh + the README).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: render-isolation
+        name: Verify Render isolation (no torch/transformers in base deps)
+        entry: bash scripts/verify_render_isolation.sh
+        language: system
+        files: ^(pyproject\.toml|agent/memory/local_llm\.py|agent/memory/local_llm_stub\.py)$
+        pass_filenames: false

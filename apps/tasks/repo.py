@@ -15,7 +15,21 @@ from agent.harness.state import AgentState, ObservationStep
 from agent.persistence.neo4j_client import run_query, run_single
 
 
-TaskRow = dict[str, Any]
+class TaskRow(dict[str, Any]):
+    """Task domain object backed by a Neo4j row.
+
+    Subclasses dict so existing call sites that read `task["id"]` /
+    `task.get("status")` continue to work. Adds `get_absolute_url` so
+    templates can follow the Django convention `{{ task.get_absolute_url }}`
+    even though Task is not a Django ORM model (Neo4j is the source of
+    truth for the domain layer).
+    """
+
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+        return str(reverse("tasks:detail", kwargs = {"task_id": self["id"]}))
+
+
 ExecutionRow = dict[str, Any]
 
 
@@ -59,7 +73,7 @@ def createTask(
     )
     if row is None:
         raise RuntimeError(f"Failed to create task for user {userId!r}")
-    return row["task"]
+    return TaskRow(row["task"])
 
 
 def getTask(userId: str, taskId: str) -> TaskRow | None:
@@ -71,7 +85,7 @@ def getTask(userId: str, taskId: str) -> TaskRow | None:
         user_id = str(userId),
         task_id = str(taskId),
     )
-    return row["task"] if row else None
+    return TaskRow(row["task"]) if row else None
 
 
 def listTasksForUser(userId: str, limit: int = 50) -> list[TaskRow]:
@@ -85,7 +99,7 @@ def listTasksForUser(userId: str, limit: int = 50) -> list[TaskRow]:
         user_id = str(userId),
         limit = int(limit),
     )
-    return [row["task"] for row in rows]
+    return [TaskRow(row["task"]) for row in rows]
 
 
 def updateTaskStatus(

@@ -25,6 +25,26 @@ INFO490 final project (A10).
   distribution. The memory dashboard exposes the learned bullet store
   and the procedural templates.
 
+## AI architecture (hybrid local + API)
+
+CUTIEE is a hybrid system. The browser-control vision-language work runs through
+`gemini-flash-latest` with the Computer Use tool because no offline open-weights model
+is competitive at pixel-coordinate browser control today. Every other AI step has a
+real local component:
+
+- **Memory-side LLM:** cached `Qwen/Qwen3.5-0.8B` (HuggingFace transformers, MIRA
+  pattern) drives the reflector and decomposer for localhost tasks. Falls back to
+  Gemini, then to a heuristic implementation if neither is available. See
+  `agent/memory/local_llm.py` and `agent/memory/reflector.py:303-318`.
+- **Embeddings:** `BAAI/bge-small-en-v1.5` via FastEmbed for memory retrieval and
+  procedural replay matching, with a SHA-256 hash fallback for tests / offline.
+- **Risk classification, curator, quality gate, decay, replay planner, cost wallet,
+  preview generation:** all local, no model.
+
+Full model selection rationale, per-step pipeline, fallback chains, and an API-only
+comparison live in [`README_AI.md`](./README_AI.md). The runtime contract is in
+[`SPEC.md`](./SPEC.md).
+
 ## Quickstart
 
 ### Prerequisites
@@ -56,6 +76,14 @@ port 8000. With `CUTIEE_ENV=local` the agent uses `MockComputerUseClient`
 
 Open http://localhost:8000 . Sign in with Google.
 
+Local Qwen cache:
+Install `uv sync --group local_llm` if you want the localhost dev stack to
+use `Qwen/Qwen3.5-0.8B` for memory-side decomposition/lesson extraction.
+On first localhost run, CUTIEE downloads the weights into
+`.cache/huggingface-models/` and reuses that cache on later runs.
+If you want to warm the cache ahead of time, run
+`python scripts/cache_local_qwen.py`.
+
 ### Reuse the agent in your own project
 
 The `agent/` package is Django-free and persistence-agnostic. You can
@@ -76,23 +104,28 @@ uv run python -m agent.persistence.bootstrap
 # Django dev server
 uv run python manage.py runserver
 
-# llama-server (Qwen) on :8001
-./scripts/start_llama_server.sh
+# Pre-cache Qwen3.5-0.8B for the memory-side LLM (~1.6 GB into
+# .cache/huggingface-models/, gitignored). Only needed when running with
+# CUTIEE_ENV=local against localhost tasks.
+uv run python scripts/cache_local_qwen.py
 
 # Demo Flask sites (5001, 5002, 5003) for end-to-end agent testing
 uv run python scripts/start_demo_sites.py
 
 # Cost benchmark
 uv run python scripts/benchmark_costs.py --scenario all
+
+# Verify torch / transformers stay out of the Render base deps
+bash scripts/verify_render_isolation.sh
 ```
 
 ### Tests
 
 ```bash
-# Fast tests only (skip live Qwen and live Neo4j)
+# Fast tests only (skip live Neo4j, live Qwen, and live Gemini)
 uv run pytest -m "not slow and not local and not production and not integration"
 
-# Everything (requires Neo4j + llama-server up)
+# Everything (requires Neo4j up; Qwen weights cached for the local_llm tests)
 uv run pytest
 ```
 
@@ -152,6 +185,8 @@ the legacy `.env.cutiee.template`). Required keys:
 | `NEO4J_BOLT_URL`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | always | Neo4j domain DB |
 | `GEMINI_API_KEY` | production | Gemini Flash with the ComputerUse tool |
 | `CUTIEE_CU_MODEL` | optional | Override default `gemini-flash-latest`; pin to `gemini-3-flash-preview` for deterministic replay |
+| `CUTIEE_ENABLE_LOCAL_LLM` | optional | Default `true`; when `CUTIEE_ENV=local` and the task targets `localhost` or `127.0.0.1`, prefer cached `Qwen/Qwen3.5-0.8B` for memory-side JSON generation |
+| `CUTIEE_LOCAL_LLM_CACHE_DIR` | optional | Override the Hugging Face cache root (default `.cache/huggingface-models/`) |
 | `CUTIEE_BROWSER_HEADLESS` | optional | `true` for CI; default `false` (visible browser) |
 | `CUTIEE_STORAGE_STATE_PATH` | optional | Path to a Playwright storage_state.json so CU runs are pre-authenticated |
 | `CUTIEE_BROWSER_CDP_URL` | optional | Attach to your real Chrome via `--remote-debugging-port=9222` instead of launching a fresh chromium |

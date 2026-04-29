@@ -21,7 +21,7 @@ from .decay import (
     totalDecayedStrength,
 )
 from .bullet import Bullet, DeltaUpdate
-from .embeddings import cosineSimilarity, embedTexts
+from .embeddings import cosineSimilarity, defaultUseHashEmbedding, embedTexts
 from .store import BulletStore, InMemoryBulletStore
 
 LEARNED_BONUS = 0.08
@@ -51,7 +51,7 @@ class ACEMemory:
     maxBullets: int = 100
     accessClock: int = 0
     bullets: dict[str, Bullet] = field(default_factory = dict)
-    useHashEmbedding: bool = True
+    useHashEmbedding: bool = field(default_factory = defaultUseHashEmbedding)
     loaded: bool = False
     store: BulletStore = field(default_factory = InMemoryBulletStore)
     # Bandit planner state lives on the user's memory record (mirrors

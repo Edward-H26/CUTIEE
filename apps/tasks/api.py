@@ -8,6 +8,8 @@ the single-worker Render instance is fine.
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
@@ -145,15 +147,54 @@ def cost_summary(request: HttpRequest) -> JsonResponse:
     return _safeJson(lambda: tasksRepo.costSummaryForUser(userId), _DEFAULT_COST)
 
 
+def _windowDaysFor(request: HttpRequest) -> int:
+    """Resolve the cost-window size from the user's preference plus the URL.
+
+    Precedence: an explicit `?days=...` query param wins (so a logged-in
+    user can still ad-hoc the dashboard via URL). Falling back, the
+    `UserPreference.dashboard_window_days` value drives the default. If
+    neither is usable we land on 14 days.
+    """
+    from apps.accounts.models import UserPreference
+
+    raw = request.GET.get("days")
+    if raw is not None:
+        return safeInt(raw, default = 14, minimum = 1, maximum = 365)
+    pref = UserPreference.for_user(request.user)
+    return safeInt(str(pref.dashboard_window_days), default = 14, minimum = 1, maximum = 365)
+
+
 @require_GET
 @login_required
 def cost_timeseries(request: HttpRequest) -> JsonResponse:
-    days = safeInt(request.GET.get("days"), default = 14, minimum = 1, maximum = 365)
+    days = _windowDaysFor(request)
     userId = str(request.user.pk)
     return _safeJson(
         lambda: {"series": tasksRepo.costTimeseriesForUser(userId, days = days)},
         {"series": []},
     )
+
+
+@require_GET
+@login_required
+def cost_timeseries_csv(request: HttpRequest) -> HttpResponse:
+    """CSV export of the cost-timeseries data the dashboard charts."""
+    days = _windowDaysFor(request)
+    userId = str(request.user.pk)
+    try:
+        series = tasksRepo.costTimeseriesForUser(userId, days = days)
+    except Exception:
+        series = []
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["day", "daily_cost_usd"])
+    for entry in series:
+        writer.writerow([entry.get("day", ""), entry.get("daily_cost", 0.0)])
+    response = HttpResponse(buf.getvalue(), content_type = "text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="cutiee-cost-timeseries-{days}d.csv"'
+    )
+    return response
 
 
 @require_GET
@@ -215,9 +256,12 @@ def audit_feed(request: HttpRequest) -> JsonResponse:
 def vlm_health(request: HttpRequest) -> HttpResponse:
     """Status banner for the Computer Use model.
 
-    Production reports Gemini readiness based on `GEMINI_API_KEY`.
-    Local mode uses `MockComputerUseClient` (post-pivot — no Qwen server),
-    so the banner is always "ready" with the mock model.
+    Production reports Gemini readiness based on `GEMINI_API_KEY`. Local
+    mode uses `MockComputerUseClient` for the CU loop (so the banner is
+    always "ready" with the mock model). The memory-side reflector and
+    decomposer separately use cached `Qwen/Qwen3.5-0.8B` via HuggingFace
+    transformers when the task targets localhost (see
+    `agent/memory/local_llm.py`); that path does not surface here.
     """
     env = os.environ.get("CUTIEE_ENV", "")
     isHtmx = request.headers.get("HX-Request") == "true"

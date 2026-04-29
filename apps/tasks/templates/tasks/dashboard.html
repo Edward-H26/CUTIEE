@@ -3,7 +3,15 @@
 {% block extra_head %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>{% endblock %}
 {% block content %}
 <section class="cutiee-stack">
-    <h1>Cost dashboard</h1>
+    <div class="page-head">
+        <div>
+            <div class="crumb">Workspace &middot; Spend</div>
+            <h1>Cost dashboard</h1>
+        </div>
+        <div class="page-head__actions">
+            <a href="{% url 'tasks:cost_timeseries_csv' %}" class="btn-secondary">Download CSV</a>
+        </div>
+    </div>
 
     <div class="cutiee-metric-grid" data-testid="cost-cards">
         <div class="cutiee-metric">

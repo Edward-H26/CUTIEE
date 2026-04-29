@@ -51,6 +51,14 @@ RUN pip install --no-cache-dir uv \
 # succeed on jammy anyway. If a future sidecar lands that runs Python in
 # this container AND selects CUTIEE_CU_BACKEND=browser_use, bump the base
 # image to a noble variant (Python 3.12) and install browser-use then.
+#
+# The `local_llm` group (torch, transformers, huggingface-hub) is also
+# intentionally NOT installed. The worker runs no Python at runtime, and
+# `uv pip compile pyproject.toml` resolves only the base [project]
+# dependencies (optional groups are skipped). .dockerignore additionally
+# excludes agent/memory/local_llm*.py, scripts/cache_local_qwen.py, and
+# tests/agent/test_local_llm.py from the build context so the deployed
+# image is free of any Qwen-related Python.
 
 COPY agent/ ./agent/
 COPY apps/ ./apps/

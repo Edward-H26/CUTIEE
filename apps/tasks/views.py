@@ -6,6 +6,7 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from agent.persistence.healthcheck import checkNeo4jReachable
 from apps.tasks import repo as tasksRepo
@@ -51,6 +52,11 @@ def task_list(request: HttpRequest) -> HttpResponse:
             "form": TaskSubmissionForm(),
             "db_error": dbError,
             "active_execution": activeExecution,
+            "active_execution_task_url": (
+                reverse("tasks:detail", kwargs = {"task_id": activeExecution["task_id"]})
+                if activeExecution and activeExecution.get("task_id")
+                else ""
+            ),
         },
     )
 

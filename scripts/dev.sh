@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # One-shot local dev stack: Neo4j (container) + Django (foreground).
 #
-# After the all-CU pivot, local mode no longer runs Qwen / llama-server.
-# CUTIEE_ENV=local now runs the MockComputerUseClient (scripted demo
-# actions) for offline development. To drive a real browser, set
-# CUTIEE_ENV=production and supply GEMINI_API_KEY.
+# CUTIEE_ENV=local runs the MockComputerUseClient (scripted demo actions)
+# for the browser-control loop, plus a cached `Qwen/Qwen3.5-0.8B` (via HF
+# transformers, see agent/memory/local_llm.py) for memory-side reflection
+# and action decomposition when the task targets `localhost`. Pre-cache
+# the Qwen weights once with `python scripts/cache_local_qwen.py`.
+#
+# To drive a real browser, set CUTIEE_ENV=production and supply
+# GEMINI_API_KEY. Production never runs Qwen; the reflector falls back
+# to Gemini Flash, then HeuristicReflector if the API key is absent.
 
 set -euo pipefail
 

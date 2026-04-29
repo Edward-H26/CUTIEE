@@ -157,6 +157,38 @@ Three memory types with independent decay channels. Retrieval ranks by `0.60 * r
 
 **Fragment-level replay (Phase 15)**: each procedural bullet is evaluated independently. Bullets whose stored `value` field was populated become value-variant fragments (coordinate replays; value re-derived by the model). Bullets with empty `value` replay verbatim at zero cost.
 
+## 7a. Local LLM (Memory-Side)
+
+Memory-side reflection and action decomposition can run on a cached local LLM instead of Gemini. The integration mirrors the [MIRA project pattern](https://github.com/Edward-H26/MIRA): HuggingFace transformers, lazy singleton load, repo-local cache via `huggingface_hub.snapshot_download`. Default model is `Qwen/Qwen3.5-0.8B`, overridable via `CUTIEE_LOCAL_LLM_MODEL`.
+
+| Concern | Implementation |
+|---|---|
+| Model loader | `agent/memory/local_llm.py` (218 lines) |
+| Cache directory | `<repo>/.cache/huggingface-models/` (gitignored) or `CUTIEE_LOCAL_LLM_CACHE_DIR` |
+| Pre-download script | `python scripts/cache_local_qwen.py` (idempotent; ~1.6 GB on first run) |
+| Device probe | CUDA → MPS → CPU (`_candidateDevices`) |
+| dtype | float16 on CUDA / MPS; float32 on CPU unless `CUTIEE_LOCAL_LLM_FP16_CPU=true` |
+| Generation | `do_sample=False` (deterministic) so JSON parsing in reflector / decomposer stays reliable at 0.8B parameters |
+| Activation gate | `shouldUseLocalLlmForUrl(url)` requires `CUTIEE_ENABLE_LOCAL_LLM=true` AND `CUTIEE_ENV=local` AND (URL host is `localhost` / `127.0.0.1` OR `CUTIEE_FORCE_LOCAL_LLM=true`) |
+| Optional dep group | `local_llm` (`torch`, `transformers`, `huggingface-hub`) — install via `uv sync --group local_llm` for dev; production skips it |
+| Production isolation | Render build replaces `agent/memory/local_llm.py` with `agent/memory/local_llm_stub.py` and removes `scripts/cache_local_qwen.py` and `tests/agent/test_local_llm.py` so the deployed image carries no Qwen-related code beyond the stub |
+
+**Fallback chain (LlmReflector and LlmActionDecomposer):**
+
+1. If `shouldUseLocalLlmForUrl` is True, call `local_llm.generateText` (Qwen).
+2. If Qwen returns no usable output OR the URL gate is False, call Gemini Flash via `google.genai`.
+3. If Gemini fails or no `GEMINI_API_KEY` is set, fall through to `HeuristicReflector` (or empty `ProcedureGraph` for the decomposer).
+
+This three-tier chain is the reason CUTIEE's memory pipeline still works with zero API budget: a developer running entirely offline gets Qwen-quality lessons, and a developer with no Qwen weights cached still gets heuristic lessons.
+
+**Failure modes:**
+
+- Qwen emits a malformed JSON or `<think>...</think>` reasoning block → `_stripThinkTags` cleans the response; if parsing still fails, fallback fires.
+- HF cache directory missing on first call → `ensureModelCached` triggers a one-time download. Pre-cache via `scripts/cache_local_qwen.py` to keep the first task latency low.
+- torch / transformers not installed → import error caught at the lazy boundary (`agent/memory/local_llm.py:111,183`); fallback fires.
+
+**Why this design:** the reflector and decomposer prompts are short, structured, and not safety-critical. A small open-weights model is enough to keep the ACE memory pipeline alive offline and on demo days when the API key is intentionally unset. For the screenshot Computer Use loop the calculus is different and only Gemini is competitive at flash pricing.
+
 ## 8. Safety Guardrails
 
 Seven layers, each gated behind an env var so deployment can dial intensity.

@@ -194,6 +194,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "cutiee_site.context_processors.runtime",
+                "cutiee_site.context_processors.userTheme",
             ],
         },
     },

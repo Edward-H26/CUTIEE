@@ -40,6 +40,7 @@ urlpatterns = [
     ),
     path("api/cost-summary/", api.cost_summary, name = "cost_summary"),
     path("api/cost-timeseries/", api.cost_timeseries, name = "cost_timeseries"),
+    path("api/cost-timeseries.csv", api.cost_timeseries_csv, name = "cost_timeseries_csv"),
     path("api/tier-distribution/", api.tier_distribution, name = "tier_distribution"),
     path("api/memory-stats/", api.memory_stats, name = "memory_stats"),
     path("api/audit/", api.audit_feed, name = "audit_feed"),

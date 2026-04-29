@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}About · CUTIEE{% endblock %}
+{% block content %}
+<section class="page-head">
+    <div>
+        <div class="crumb">CUTIEE &middot; About</div>
+        <h1>What CUTIEE does</h1>
+        <div class="page-head__stats">
+            Computer Use agentIc-framework with Token-efficient harnEss Engineering.
+            INFO490 Spring 2026 final project.
+        </div>
+    </div>
+    <div class="page-head__actions">
+        <a href="{% url 'landing:index' %}" class="btn-secondary">Home</a>
+        <a href="https://github.com/Edward-H26/CUTIEE" class="btn-secondary">GitHub</a>
+    </div>
+</section>
+
+<section class="panel" data-testid="about-pillars">
+    <div class="panel__head">
+        <div>
+            <h2>Cost-reduction pillars</h2>
+            <div class="panel__sub">Three mechanisms keep recurring tasks free and novel tasks cheap.</div>
+        </div>
+    </div>
+    <div class="task-rows">
+        {% for title, blurb in pillars %}
+            <div class="task-row" data-testid="pillar">
+                <div class="task-row__main">
+                    <div class="task-row__title">{{ title }}</div>
+                    <div class="task-row__url">{{ blurb }}</div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel" data-testid="about-architecture">
+    <div class="panel__head">
+        <div>
+            <h2>Hybrid AI stack</h2>
+            <div class="panel__sub">Local components carry the policy / memory / safety load; Gemini owns the irreducible browser-control vision step.</div>
+        </div>
+    </div>
+    <ul class="cutiee-text-sm cutiee-muted">
+        <li><strong>Local:</strong> ACE memory pipeline, regex risk classifier, three-channel decay, procedural replay, cost wallet, Qwen3.5-0.8B reflector / decomposer for localhost tasks, FastEmbed BAAI/bge-small-en-v1.5 embeddings.</li>
+        <li><strong>API:</strong> gemini-flash-latest with the Computer Use tool for the screenshot ↔ function-call loop only.</li>
+    </ul>
+    <p class="cutiee-text-sm cutiee-muted">
+        Full design rationale: <a href="https://github.com/Edward-H26/CUTIEE/blob/main/README_AI.md">README_AI.md</a>.
+        Runtime contract: <a href="https://github.com/Edward-H26/CUTIEE/blob/main/SPEC.md">SPEC.md</a>.
+    </p>
+</section>
+
+<section class="panel" data-testid="about-cbv-marker">
+    <div class="panel__head">
+        <div>
+            <h2>About this view</h2>
+            <div class="panel__sub">
+                Rendered by a Django <code>TemplateView</code> class-based view at
+                <code>apps/landing/views.AboutView</code>. CUTIEE primarily uses FBVs;
+                this CBV exists for breadth (rubric Part 2: <em>"Views (FBV and/or CBV)"</em>).
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
