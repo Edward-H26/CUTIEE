@@ -15,14 +15,14 @@ class UserPreference(models.Model):
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete = models.CASCADE,
-        related_name = "preference",
+        on_delete=models.CASCADE,
+        related_name="preference",
     )
-    theme = models.CharField(max_length = 24, choices = Theme.choices, default = Theme.AURORA)
-    dashboard_window_days = models.PositiveSmallIntegerField(default = 14)
-    redact_audit_screenshots = models.BooleanField(default = True)
-    created_at = models.DateTimeField(auto_now_add = True)
-    updated_at = models.DateTimeField(auto_now = True)
+    theme = models.CharField(max_length=24, choices=Theme.choices, default=Theme.AURORA)
+    dashboard_window_days = models.PositiveSmallIntegerField(default=14)
+    redact_audit_screenshots = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["user_id"]
@@ -44,4 +44,4 @@ class UserPreference(models.Model):
         try:
             return cast("UserPreference", user.preference)
         except cls.DoesNotExist:
-            return cls(user = user)
+            return cls(user=user)

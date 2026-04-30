@@ -17,6 +17,7 @@ Every CU client now satisfies the `CuClient` runtime-checkable Protocol:
 `ComputerUseStep` lives here as the canonical return type so new adapters
 never have to import the Gemini module just to return a step.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

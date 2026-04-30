@@ -6,6 +6,7 @@ and any non-Django consumer can use `InMemoryBulletStore` (or write
 their own implementation) without depending on Django settings,
 allauth, or the Neo4j driver.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -17,20 +18,15 @@ from .bullet import Bullet, DeltaUpdate
 class BulletStore(Protocol):
     """Minimal contract a backing store must satisfy for ACEMemory."""
 
-    def loadAll(self, userId: str) -> list[Bullet]:
-        ...
+    def loadAll(self, userId: str) -> list[Bullet]: ...
 
-    def upsertBullet(self, userId: str, bullet: Bullet) -> None:
-        ...
+    def upsertBullet(self, userId: str, bullet: Bullet) -> None: ...
 
-    def updateBulletFields(self, userId: str, bulletId: str, patch: dict[str, Any]) -> None:
-        ...
+    def updateBulletFields(self, userId: str, bulletId: str, patch: dict[str, Any]) -> None: ...
 
-    def removeBullet(self, userId: str, bulletId: str) -> None:
-        ...
+    def removeBullet(self, userId: str, bulletId: str) -> None: ...
 
-    def applyDelta(self, userId: str, delta: DeltaUpdate) -> None:
-        ...
+    def applyDelta(self, userId: str, delta: DeltaUpdate) -> None: ...
 
 
 class InMemoryBulletStore:

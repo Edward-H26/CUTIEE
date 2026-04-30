@@ -10,6 +10,7 @@ This module holds the single canonical implementation. Callers set
 `modelVariantOnNonEmptyValue` to opt into fragment semantics; whole-plan
 replay ignores the second tuple element and uses the stored value as-is.
 """
+
 from __future__ import annotations
 
 import re
@@ -52,8 +53,12 @@ def actionFromBullet(
     except ValueError:
         return None, False
 
-    targetMatch = _TARGET_PATTERN_SINGLE.search(bullet.content) or _TARGET_PATTERN_DOUBLE.search(bullet.content)
-    valueMatch = _VALUE_PATTERN_SINGLE.search(bullet.content) or _VALUE_PATTERN_DOUBLE.search(bullet.content)
+    targetMatch = _TARGET_PATTERN_SINGLE.search(bullet.content) or _TARGET_PATTERN_DOUBLE.search(
+        bullet.content
+    )
+    valueMatch = _VALUE_PATTERN_SINGLE.search(bullet.content) or _VALUE_PATTERN_DOUBLE.search(
+        bullet.content
+    )
     coordMatch = _COORD_PATTERN.search(bullet.content)
     keysMatch = _KEYS_PATTERN.search(bullet.content)
     scrollMatch = _SCROLL_PATTERN.search(bullet.content)
@@ -69,10 +74,7 @@ def actionFromBullet(
     # place of the original secret. A replay must never surface that
     # literal string; treat it as value-variant so the model re-derives.
     isRedacted = rawValue.startswith("<redacted:")
-    requiresModelValue = (
-        modelVariantOnNonEmptyValue
-        and (bool(rawValue) or isRedacted)
-    )
+    requiresModelValue = modelVariantOnNonEmptyValue and (bool(rawValue) or isRedacted)
     emittedValue: str | None
     if requiresModelValue:
         emittedValue = None
@@ -82,19 +84,19 @@ def actionFromBullet(
     requiresApproval = "risk:high" in bullet.tags
     risk = RiskLevel.HIGH if requiresApproval else RiskLevel.LOW
     action = Action(
-        type = actionType,
-        target = target,
-        value = emittedValue,
-        coordinate = coordinate,
-        keys = keys,
-        scrollDx = scrollDx,
-        scrollDy = scrollDy,
-        reasoning = f"{reasoningPrefix}:{bullet.id[:8]}",
-        model_used = modelUsed,
-        tier = 0,
-        confidence = 1.0,
-        risk = risk,
-        cost_usd = 0.0,
-        requires_approval = requiresApproval,
+        type=actionType,
+        target=target,
+        value=emittedValue,
+        coordinate=coordinate,
+        keys=keys,
+        scrollDx=scrollDx,
+        scrollDy=scrollDy,
+        reasoning=f"{reasoningPrefix}:{bullet.id[:8]}",
+        model_used=modelUsed,
+        tier=0,
+        confidence=1.0,
+        risk=risk,
+        cost_usd=0.0,
+        requires_approval=requiresApproval,
     )
     return action, requiresModelValue

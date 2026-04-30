@@ -24,6 +24,7 @@ For Computer Use specifically, the actions could be:
 For chat agents (miramemoria's setup):
     ("direct", "explore", "refine", "deep_refine")
 """
+
 from __future__ import annotations
 
 import math
@@ -45,6 +46,7 @@ class Planner:
     Default policy: epsilon-greedy with UCB1 exploration bonus.
     Stats kept per action: `{pulls, updates, reward_sum}`.
     """
+
     memory: ACEMemory
     epsilon: float = DEFAULT_EPSILON
     ucbC: float = DEFAULT_UCB_C

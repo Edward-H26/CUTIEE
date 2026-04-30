@@ -6,6 +6,7 @@ type_priority` plus facet bonuses, and persists every mutation back through
 the Cypher repos. The math comes from the LongTermMemoryBasedSelfEvolving
 reference implementation; only the persistence layer differs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -50,14 +51,14 @@ class ACEMemory:
     userId: str
     maxBullets: int = 100
     accessClock: int = 0
-    bullets: dict[str, Bullet] = field(default_factory = dict)
-    useHashEmbedding: bool = field(default_factory = defaultUseHashEmbedding)
+    bullets: dict[str, Bullet] = field(default_factory=dict)
+    useHashEmbedding: bool = field(default_factory=defaultUseHashEmbedding)
     loaded: bool = False
-    store: BulletStore = field(default_factory = InMemoryBulletStore)
+    store: BulletStore = field(default_factory=InMemoryBulletStore)
     # Bandit planner state lives on the user's memory record (mirrors
     # miramemoria's `Memory.planner_state` JSON column). Owned by the
     # `Planner` class; ACEMemory just persists it alongside bullets.
-    plannerState: dict[str, Any] = field(default_factory = dict)
+    plannerState: dict[str, Any] = field(default_factory=dict)
 
     def loadFromStore(self) -> None:
         self.bullets.clear()
@@ -85,7 +86,7 @@ class ACEMemory:
         if not self.bullets:
             return []
         facets = facets or {}
-        queryEmbedding = embedTexts([query], useHashFallback = self.useHashEmbedding)[0]
+        queryEmbedding = embedTexts([query], useHashFallback=self.useHashEmbedding)[0]
 
         scored: list[tuple[float, str, Bullet]] = []
         for bullet in self.bullets.values():
@@ -94,7 +95,7 @@ class ACEMemory:
             score = self._scoreBullet(bullet, queryEmbedding, facets)
             scored.append((score, dominantChannel(bullet, self.accessClock), bullet))
 
-        scored.sort(key = lambda item: item[0], reverse = True)
+        scored.sort(key=lambda item: item[0], reverse=True)
         topK = scored[:k]
 
         learnedTopK = [item for item in topK if not item[2].is_seed]
@@ -123,17 +124,17 @@ class ACEMemory:
         if bullet.embedding:
             relevance = cosineSimilarity(queryEmbedding, bullet.embedding)
         else:
-            bullet.embedding = embedTexts([bullet.content], useHashFallback = self.useHashEmbedding)[0]
+            bullet.embedding = embedTexts([bullet.content], useHashFallback=self.useHashEmbedding)[
+                0
+            ]
             relevance = cosineSimilarity(queryEmbedding, bullet.embedding)
         relevance = max(0.0, relevance)
 
-        normalizedStrength = totalDecayedStrength(bullet, self.accessClock) / NORMALIZED_STRENGTH_DENOM
-
-        score = (
-            0.60 * relevance
-            + 0.20 * normalizedStrength
-            + 0.20 * bullet.typePriority()
+        normalizedStrength = (
+            totalDecayedStrength(bullet, self.accessClock) / NORMALIZED_STRENGTH_DENOM
         )
+
+        score = 0.60 * relevance + 0.20 * normalizedStrength + 0.20 * bullet.typePriority()
 
         if not bullet.is_seed:
             score += LEARNED_BONUS
@@ -177,7 +178,7 @@ class ACEMemory:
         for bullet in delta.new_bullets:
             if not bullet.embedding:
                 bullet.embedding = embedTexts(
-                    [bullet.content], useHashFallback = self.useHashEmbedding
+                    [bullet.content], useHashFallback=self.useHashEmbedding
                 )[0]
             self.bullets[bullet.id] = bullet
 
@@ -208,7 +209,7 @@ class ACEMemory:
             if totalDecayedStrength(bullet, self.accessClock) <= floor
         ]
         if toRemove:
-            self.applyDelta(DeltaUpdate(remove_bullets = toRemove))
+            self.applyDelta(DeltaUpdate(remove_bullets=toRemove))
         return len(toRemove)
 
     def refine(self) -> int:
@@ -225,8 +226,8 @@ class ACEMemory:
 
         ranked = sorted(
             self.bullets.values(),
-            key = lambda b: totalDecayedStrength(b, self.accessClock) + 0.1 * b.helpful_count,
-            reverse = True,
+            key=lambda b: totalDecayedStrength(b, self.accessClock) + 0.1 * b.helpful_count,
+            reverse=True,
         )
 
         quotas: dict[str, int] = {
@@ -257,11 +258,11 @@ class ACEMemory:
             if len(keepers) >= self.maxBullets:
                 break
 
-        for bullet in ranked[len(keepers) + len(toRemove):]:
+        for bullet in ranked[len(keepers) + len(toRemove) :]:
             toRemove.append(bullet.id)
 
         if toRemove:
-            self.applyDelta(DeltaUpdate(remove_bullets = toRemove))
+            self.applyDelta(DeltaUpdate(remove_bullets=toRemove))
         return len(toRemove)
 
     def asPromptBlock(self, bullets: list[Bullet]) -> str:

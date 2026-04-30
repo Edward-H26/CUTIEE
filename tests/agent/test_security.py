@@ -12,6 +12,7 @@ Two threats this guards against:
    per-user-scoped path takes precedence so user A's auth cookies
    don't leak into user B's CU run.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -39,10 +40,10 @@ def test_safe_domain_rejects_path_traversal() -> None:
         "/etc/passwd",
         "google.com\x00.json",
         "",
-        ".google.com",       # leading dot
-        "google.com.",       # trailing dot
-        "-google.com",       # leading hyphen
-        "google.com-",       # trailing hyphen
+        ".google.com",  # leading dot
+        "google.com.",  # trailing dot
+        "-google.com",  # leading hyphen
+        "google.com-",  # trailing hyphen
     ]
     for d in bad:
         assert not _isSafeDomain(d), f"{d!r} should be rejected as unsafe"
@@ -55,13 +56,14 @@ def test_safe_domain_rejects_oversized_input() -> None:
 
 
 def test_storage_state_falls_back_to_none_for_unsafe_domain(
-    monkeypatch: pytest.MonkeyPatch, tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     """Even if an attacker-controlled file matched the bad path, the
     validator zeros out `domain` so we never construct the lookup."""
     monkeypatch.chdir(tmp_path)
     storageDir = tmp_path / "data" / "storage_state"
-    storageDir.mkdir(parents = True)
+    storageDir.mkdir(parents=True)
     # Plant a file the attacker would want to read
     (storageDir / "..json").write_text("{}")
     # Even though the file exists, the unsafe domain string is rejected
@@ -69,53 +71,58 @@ def test_storage_state_falls_back_to_none_for_unsafe_domain(
 
 
 def test_storage_state_per_user_scoping_takes_precedence(
-    monkeypatch: pytest.MonkeyPatch, tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     """If both `data/storage_state/<userId>/<domain>.json` and
     `data/storage_state/<domain>.json` exist, the per-user file wins
     so user A's cookies aren't loaded into user B's run."""
     from pathlib import Path
+
     monkeypatch.chdir(tmp_path)
     storageRoot = tmp_path / "data" / "storage_state"
-    storageRoot.mkdir(parents = True)
+    storageRoot.mkdir(parents=True)
     (storageRoot / "google.com.json").write_text('{"shared":1}')
     perUserDir = storageRoot / "42"
     perUserDir.mkdir()
     perUserFile = perUserDir / "google.com.json"
     perUserFile.write_text('{"per_user":1}')
 
-    resolved = _resolveStorageStatePath("google.com", userId = "42")
+    resolved = _resolveStorageStatePath("google.com", userId="42")
     assert resolved is not None
     # Resolution returns a relative path; resolve it for comparison
-    assert Path(resolved).resolve().samefile(perUserFile), (
-        f"per-user file should win over shared, got {resolved!r}"
-    )
+    assert (
+        Path(resolved).resolve().samefile(perUserFile)
+    ), f"per-user file should win over shared, got {resolved!r}"
 
 
 def test_storage_state_falls_back_to_shared_when_no_per_user(
-    monkeypatch: pytest.MonkeyPatch, tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     """When no per-user file exists, the legacy shared file is used.
     Acceptable behavior for single-user demos."""
     from pathlib import Path
+
     monkeypatch.chdir(tmp_path)
     storageRoot = tmp_path / "data" / "storage_state"
-    storageRoot.mkdir(parents = True)
+    storageRoot.mkdir(parents=True)
     sharedFile = storageRoot / "github.com.json"
     sharedFile.write_text('{"shared":1}')
 
-    resolved = _resolveStorageStatePath("github.com", userId = "42")
+    resolved = _resolveStorageStatePath("github.com", userId="42")
     assert resolved is not None
     assert Path(resolved).resolve().samefile(sharedFile)
 
 
 def test_user_id_with_path_chars_is_sanitized(
-    monkeypatch: pytest.MonkeyPatch, tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     """Even though Django user_id is a numeric pk, defend against the case
     where it gets manipulated upstream and contains path separators."""
     monkeypatch.chdir(tmp_path)
     # Sanitization strips '/' so "../evil" becomes "evil" then we look at
     # data/storage_state/evil/google.com.json which doesn't exist → None
-    resolved = _resolveStorageStatePath("google.com", userId = "../evil")
+    resolved = _resolveStorageStatePath("google.com", userId="../evil")
     assert resolved is None or "evil" in resolved.replace("..", "")

@@ -37,7 +37,7 @@
         {% if bullets %}
             <div class="cutiee-stack-tight">
             {% for b in bullets %}
-                <div class="cutiee-card" data-testid="bullet-card">
+                <div id="bullet-{{ b.id }}" class="cutiee-card" data-testid="bullet-card">
                     <div class="cutiee-row-between">
                         <span class="cutiee-pill">{{ b.memory_type }}</span>
                         <span class="cutiee-mono">{{ b.id|truncatechars:14 }}</span>

@@ -15,6 +15,7 @@ description into named atomic steps:
 These nodes get persisted and can be matched against future tasks via
 the SubgraphMatcher (Phase 3).
 """
+
 from __future__ import annotations
 
 import logging
@@ -73,6 +74,7 @@ class LlmActionDecomposer:
     Best-effort: if Gemini is unavailable or returns garbage, returns an
     empty `ProcedureGraph` so the caller can fall back to direct CU.
     """
+
     apiKey: str | None = None
     modelId: str = "gemini-flash-latest"
     maxOutputTokens: int = 1200
@@ -86,7 +88,8 @@ class LlmActionDecomposer:
             return
         try:
             from google import genai
-            self._client = genai.Client(api_key = key)
+
+            self._client = genai.Client(api_key=key)
         except Exception as exc:
             logger.warning("LlmActionDecomposer init failed: %s", exc)
             self._client = None
@@ -114,43 +117,55 @@ class LlmActionDecomposer:
             return _emptyGraph(userId, taskDescription)
 
     def _decomposeViaLocalQwen(
-        self, userId: str, taskDescription: str, initialUrl: str,
+        self,
+        userId: str,
+        taskDescription: str,
+        initialUrl: str,
     ) -> ProcedureGraph:
         prompt = DECOMPOSER_PROMPT.format(
-            task_description = taskDescription,
-            initial_url = initialUrl or "(none — agent infers)",
+            task_description=taskDescription,
+            initial_url=initialUrl or "(none — agent infers)",
         )
-        rawText = local_llm.generateText(
-            systemInstruction = DECOMPOSER_SYSTEM_INSTRUCTION,
-            userPrompt = prompt,
-            maxNewTokens = self.maxOutputTokens,
-        ) or ""
+        rawText = (
+            local_llm.generateText(
+                systemInstruction=DECOMPOSER_SYSTEM_INSTRUCTION,
+                userPrompt=prompt,
+                maxNewTokens=self.maxOutputTokens,
+            )
+            or ""
+        )
         return self._parseGraph(rawText, userId, taskDescription)
 
     def _decomposeViaGemini(
-        self, userId: str, taskDescription: str, initialUrl: str,
+        self,
+        userId: str,
+        taskDescription: str,
+        initialUrl: str,
     ) -> ProcedureGraph:
         from google.genai import types
 
         prompt = DECOMPOSER_PROMPT.format(
-            task_description = taskDescription,
-            initial_url = initialUrl or "(none — agent infers)",
+            task_description=taskDescription,
+            initial_url=initialUrl or "(none — agent infers)",
         )
         response = self._client.models.generate_content(
-            model = self.modelId,
-            contents = prompt,
-            config = types.GenerateContentConfig(
-                system_instruction = DECOMPOSER_SYSTEM_INSTRUCTION,
-                temperature = self.temperature,
-                max_output_tokens = self.maxOutputTokens,
-                response_mime_type = "application/json",
+            model=self.modelId,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=DECOMPOSER_SYSTEM_INSTRUCTION,
+                temperature=self.temperature,
+                max_output_tokens=self.maxOutputTokens,
+                response_mime_type="application/json",
             ),
         )
         rawText = (response.text or "").strip()
         return self._parseGraph(rawText, userId, taskDescription)
 
     def _parseGraph(
-        self, rawText: str, userId: str, taskDescription: str,
+        self,
+        rawText: str,
+        userId: str,
+        taskDescription: str,
     ) -> ProcedureGraph:
         payload = _parseJsonLoose(rawText)
         if not isinstance(payload, dict):
@@ -169,36 +184,38 @@ class LlmActionDecomposer:
             if not actionType:
                 continue
             node = ActionNode(
-                action_type = actionType,
-                target = (raw.get("target") or "").strip(),
-                value = (raw.get("value") or "").strip(),
-                description = (raw.get("description") or "").strip(),
+                action_type=actionType,
+                target=(raw.get("target") or "").strip(),
+                value=(raw.get("value") or "").strip(),
+                description=(raw.get("description") or "").strip(),
             )
             nodes.append(node)
 
         for i, current in enumerate(nodes[:-1]):
-            edges.append(ActionEdge(
-                source_id = current.id,
-                target_id = nodes[i + 1].id,
-                procedure_id = procedureId,
-                sequence_index = i,
-            ))
+            edges.append(
+                ActionEdge(
+                    source_id=current.id,
+                    target_id=nodes[i + 1].id,
+                    procedure_id=procedureId,
+                    sequence_index=i,
+                )
+            )
 
         return ProcedureGraph(
-            procedure_id = procedureId,
-            user_id = userId,
-            task_description = taskDescription,
-            nodes = nodes,
-            edges = edges,
-            metadata = {"topic_slug": _slugify(taskDescription)},
+            procedure_id=procedureId,
+            user_id=userId,
+            task_description=taskDescription,
+            nodes=nodes,
+            edges=edges,
+            metadata={"topic_slug": _slugify(taskDescription)},
         )
 
 
 def _emptyGraph(userId: str, taskDescription: str) -> ProcedureGraph:
     return ProcedureGraph(
-        procedure_id = str(uuid.uuid4()),
-        user_id = userId,
-        task_description = taskDescription,
+        procedure_id=str(uuid.uuid4()),
+        user_id=userId,
+        task_description=taskDescription,
     )
 
 

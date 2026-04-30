@@ -5,6 +5,7 @@ keeps a separate `ProceduralTemplate` aggregate that the replay planner reads
 to find existing reusable workflows. The two surfaces stay independent so the
 ACE pipeline can evolve without touching the template view shown in the UI.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,29 @@ from typing import Any
 
 from agent.persistence.neo4j_client import run_query, run_single
 from apps.memory_app.bullet import Bullet, DeltaUpdate
+
+
+class MemoryBulletRow(dict[str, Any]):
+    """Linkable memory-bullet row for template rendering."""
+
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+
+        return f"{reverse('memory_app:list')}#bullet-{self['id']}"
+
+
+class TemplateRow(dict[str, Any]):
+    """Linkable procedural-template row for template rendering.
+
+    Templates render inside the memory dashboard with the bullet store, so the
+    absolute URL targets the same dashboard and anchors to the row id when the
+    template is present on the current page.
+    """
+
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+
+        return f"{reverse('memory_app:list')}#template-{self['id']}"
 
 
 def _nowIso() -> str:
@@ -71,7 +95,7 @@ def upsertBullet(userId: str, bullet: Bullet) -> None:
             b.last_used = $last_used
         MERGE (u)-[:HOLDS]->(b)
         """,
-        user_id = str(userId),
+        user_id=str(userId),
         **props,
     )
 
@@ -89,9 +113,8 @@ def updateBulletFields(userId: str, bulletId: str, patch: dict[str, Any]) -> Non
         params[key] = value
         setFragments.append(f"b.{key} = ${key}")
     setFragments.append("b.last_used = $now")
-    cypher = (
-        "MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet {id: $id})\n"
-        "SET " + ", ".join(setFragments)
+    cypher = "MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet {id: $id})\nSET " + ", ".join(
+        setFragments
     )
     run_query(cypher, **params)
 
@@ -102,22 +125,22 @@ def removeBullet(userId: str, bulletId: str) -> None:
         MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet {id: $id})
         DETACH DELETE b
         """,
-        user_id = str(userId),
-        id = bulletId,
+        user_id=str(userId),
+        id=bulletId,
     )
 
 
 def applyDelta(userId: str, delta: DeltaUpdate) -> None:
     for bullet in delta.new_bullets:
-        upsertBullet(userId = userId, bullet = bullet)
+        upsertBullet(userId=userId, bullet=bullet)
     for bulletId, patch in delta.update_bullets.items():
-        updateBulletFields(userId = userId, bulletId = bulletId, patch = patch)
+        updateBulletFields(userId=userId, bulletId=bulletId, patch=patch)
     for bulletId in delta.remove_bullets:
-        removeBullet(userId = userId, bulletId = bulletId)
+        removeBullet(userId=userId, bulletId=bulletId)
 
 
-def listBulletsForUser(userId: str) -> list[dict[str, Any]]:
-    return run_query(
+def listBulletsForUser(userId: str) -> list[MemoryBulletRow]:
+    rows = run_query(
         """
         MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet)
         RETURN b.id AS id,
@@ -134,8 +157,9 @@ def listBulletsForUser(userId: str) -> list[dict[str, Any]]:
                b.is_seed AS is_seed
         ORDER BY b.procedural_strength + b.episodic_strength + b.semantic_strength DESC
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
+    return [MemoryBulletRow(row) for row in rows]
 
 
 def listAllBulletObjectsForUser(userId: str) -> list[Bullet]:
@@ -144,7 +168,7 @@ def listAllBulletObjectsForUser(userId: str) -> list[Bullet]:
         MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet)
         RETURN b {.*} AS bullet
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
     bullets: list[Bullet] = []
     for row in rows:
@@ -164,8 +188,8 @@ def getBullet(userId: str, bulletId: str) -> Bullet | None:
         MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet {id: $id})
         RETURN b {.*} AS bullet
         """,
-        user_id = str(userId),
-        id = bulletId,
+        user_id=str(userId),
+        id=bulletId,
     )
     if row is None:
         return None
@@ -200,31 +224,31 @@ def upsertTemplate(
             t.created_at = coalesce(t.created_at, $updated_at)
         MERGE (u)-[:OWNS_TEMPLATE]->(t)
         """,
-        user_id = str(userId),
-        id = templateId,
-        description = description,
-        domain = domain,
-        embedding = _serializeEmbedding(embedding),
-        actions_json = json.dumps(actions),
-        success_count = int(successCount),
-        stale = bool(stale),
-        updated_at = _nowIso(),
+        user_id=str(userId),
+        id=templateId,
+        description=description,
+        domain=domain,
+        embedding=_serializeEmbedding(embedding),
+        actions_json=json.dumps(actions),
+        success_count=int(successCount),
+        stale=bool(stale),
+        updated_at=_nowIso(),
     )
     return templateId
 
 
-def listTemplatesForUser(userId: str) -> list[dict[str, Any]]:
+def listTemplatesForUser(userId: str) -> list[TemplateRow]:
     rows = run_query(
         """
         MATCH (u:User {id: $user_id})-[:OWNS_TEMPLATE]->(t:ProceduralTemplate)
         RETURN t {.*} AS template
         ORDER BY t.updated_at DESC
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
-    out: list[dict[str, Any]] = []
+    out: list[TemplateRow] = []
     for row in rows:
-        template = dict(row["template"])
+        template = TemplateRow(row["template"])
         actionsJson = template.get("actions_json")
         try:
             template["actions"] = json.loads(actionsJson) if actionsJson else []
@@ -236,18 +260,18 @@ def listTemplatesForUser(userId: str) -> list[dict[str, Any]]:
     return out
 
 
-def getTemplate(userId: str, templateId: str) -> dict[str, Any] | None:
+def getTemplate(userId: str, templateId: str) -> TemplateRow | None:
     row = run_single(
         """
         MATCH (u:User {id: $user_id})-[:OWNS_TEMPLATE]->(t:ProceduralTemplate {id: $id})
         RETURN t {.*} AS template
         """,
-        user_id = str(userId),
-        id = templateId,
+        user_id=str(userId),
+        id=templateId,
     )
     if row is None:
         return None
-    template = dict(row["template"])
+    template = TemplateRow(row["template"])
     actionsJson = template.get("actions_json")
     try:
         template["actions"] = json.loads(actionsJson) if actionsJson else []
@@ -264,10 +288,10 @@ def markTemplateStale(userId: str, templateId: str, *, reason: str = "") -> None
         MATCH (u:User {id: $user_id})-[:OWNS_TEMPLATE]->(t:ProceduralTemplate {id: $id})
         SET t.stale = true, t.staleness_reason = $reason, t.updated_at = $now
         """,
-        user_id = str(userId),
-        id = templateId,
-        reason = reason,
-        now = _nowIso(),
+        user_id=str(userId),
+        id=templateId,
+        reason=reason,
+        now=_nowIso(),
     )
 
 
@@ -284,11 +308,11 @@ def linkSupersedure(
         MATCH (u)-[:OWNS_TEMPLATE]->(next:ProceduralTemplate {id: $to_id})
         MERGE (prev)-[:SUPERSEDED_BY {reason: $reason, at: $at}]->(next)
         """,
-        user_id = str(userId),
-        from_id = fromTemplateId,
-        to_id = toTemplateId,
-        reason = reason,
-        at = _nowIso(),
+        user_id=str(userId),
+        from_id=fromTemplateId,
+        to_id=toTemplateId,
+        reason=reason,
+        at=_nowIso(),
     )
 
 
@@ -303,7 +327,7 @@ def memoryDashboardStats(userId: str) -> dict[str, Any]:
                coalesce(sum(b.helpful_count), 0) AS total_helpful,
                coalesce(sum(b.harmful_count), 0) AS total_harmful
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
     if row is None:
         return {"bullet_count": 0, "template_count": 0, "total_helpful": 0, "total_harmful": 0}

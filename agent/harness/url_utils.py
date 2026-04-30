@@ -9,6 +9,7 @@ implementation prevents semantic drift (one version stripping the port,
 another keeping it) that would surface as storage-state or domain-scoped
 memory matches quietly failing.
 """
+
 from __future__ import annotations
 
 import re

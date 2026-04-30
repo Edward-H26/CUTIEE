@@ -9,6 +9,7 @@ that real screenshots live in the script-driven capture flow.
 Usage:
     uv run python scripts/make_placeholder_screenshots.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -56,22 +57,22 @@ def loadFont(size: int) -> ImageFont.ImageFont:
 
 
 def drawPlaceholder(filename: str, title: str, route: str) -> None:
-    OUT_DIR.mkdir(parents = True, exist_ok = True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     width, height = 1280, 800
-    img = Image.new("RGB", (width, height), color = PALETTE_BG)
+    img = Image.new("RGB", (width, height), color=PALETTE_BG)
     draw = ImageDraw.Draw(img)
 
     panelMargin = 64
     draw.rounded_rectangle(
         (panelMargin, panelMargin, width - panelMargin, height - panelMargin),
-        radius = 24,
-        fill = PALETTE_PANEL,
+        radius=24,
+        fill=PALETTE_PANEL,
     )
 
     bandHeight = 6
     draw.rectangle(
         (panelMargin, panelMargin, width - panelMargin, panelMargin + bandHeight),
-        fill = PALETTE_PRIMARY,
+        fill=PALETTE_PRIMARY,
     )
 
     titleFont = loadFont(58)
@@ -79,13 +80,13 @@ def drawPlaceholder(filename: str, title: str, route: str) -> None:
     bodyFont = loadFont(22)
     smallFont = loadFont(18)
 
-    draw.text((panelMargin + 56, panelMargin + 64), "CUTIEE", fill = PALETTE_ACCENT, font = routeFont)
-    draw.text((panelMargin + 56, panelMargin + 104), title, fill = PALETTE_TEXT, font = titleFont)
+    draw.text((panelMargin + 56, panelMargin + 64), "CUTIEE", fill=PALETTE_ACCENT, font=routeFont)
+    draw.text((panelMargin + 56, panelMargin + 104), title, fill=PALETTE_TEXT, font=titleFont)
     draw.text(
         (panelMargin + 56, panelMargin + 196),
         route,
-        fill = PALETTE_MUTED,
-        font = bodyFont,
+        fill=PALETTE_MUTED,
+        font=bodyFont,
     )
 
     notes = [
@@ -97,18 +98,18 @@ def drawPlaceholder(filename: str, title: str, route: str) -> None:
     ]
     yCursor = panelMargin + 280
     for line in notes:
-        draw.text((panelMargin + 56, yCursor), line, fill = PALETTE_MUTED, font = smallFont)
+        draw.text((panelMargin + 56, yCursor), line, fill=PALETTE_MUTED, font=smallFont)
         yCursor += 32
 
     footerY = height - panelMargin - 60
     draw.text(
         (panelMargin + 56, footerY),
         "INFO490 A10 submission",
-        fill = PALETTE_PRIMARY,
-        font = smallFont,
+        fill=PALETTE_PRIMARY,
+        font=smallFont,
     )
 
-    img.save(OUT_DIR / filename, format = "PNG", optimize = True)
+    img.save(OUT_DIR / filename, format="PNG", optimize=True)
 
 
 def main() -> int:

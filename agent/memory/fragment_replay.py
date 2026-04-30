@@ -17,6 +17,7 @@ Phase 11 replay confidence scoring applies per fragment. Each fragment
 below `CUTIEE_REPLAY_FRAGMENT_CONFIDENCE` routes through the approval
 gate before execution.
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,7 +43,7 @@ class ReplayFragment:
 
 @dataclass
 class FragmentPlan:
-    fragments: list[ReplayFragment] = field(default_factory = list)
+    fragments: list[ReplayFragment] = field(default_factory=list)
 
     def fragmentForStep(self, stepIndex: int) -> ReplayFragment | None:
         for fragment in self.fragments:
@@ -73,19 +74,19 @@ def findReplayFragments(
     """
     del userId  # ACEMemory inside the pipeline is already user-scoped.
 
-    candidates = pipeline.retrieveRelevantBullets(taskDescription, k = 24)
+    candidates = pipeline.retrieveRelevantBullets(taskDescription, k=24)
     procedural = [b for b in candidates if b.memory_type == "procedural"]
     if not procedural:
         return FragmentPlan()
 
     queryEmbedding = embedTexts(
         [taskDescription],
-        useHashFallback = pipeline.memory.useHashEmbedding,
+        useHashFallback=pipeline.memory.useHashEmbedding,
     )[0]
 
     fragments: list[ReplayFragment] = []
     seenSteps: set[int] = set()
-    for bullet in sorted(procedural, key = _stepIndexFromContent):
+    for bullet in sorted(procedural, key=_stepIndexFromContent):
         stepIndex = _stepIndexFromContent(bullet)
         if stepIndex in seenSteps:
             continue
@@ -96,27 +97,31 @@ def findReplayFragments(
             continue
 
         confidence = _scoreFragment(
-            bullet = bullet,
-            queryEmbedding = queryEmbedding,
-            currentDomain = currentDomain,
+            bullet=bullet,
+            queryEmbedding=queryEmbedding,
+            currentDomain=currentDomain,
         )
         if confidence < fragmentConfidenceThreshold:
             logger.debug(
                 "fragment rejected: bullet=%s step=%d confidence=%.2f",
-                bullet.id, stepIndex, confidence,
+                bullet.id,
+                stepIndex,
+                confidence,
             )
             continue
 
-        fragments.append(ReplayFragment(
-            step_index = stepIndex,
-            action = action,
-            confidence = confidence,
-            requires_model_value = requiresModelValue,
-            bullet_id = bullet.id,
-            reason = f"bullet:{bullet.id[:8]}",
-        ))
+        fragments.append(
+            ReplayFragment(
+                step_index=stepIndex,
+                action=action,
+                confidence=confidence,
+                requires_model_value=requiresModelValue,
+                bullet_id=bullet.id,
+                reason=f"bullet:{bullet.id[:8]}",
+            )
+        )
 
-    return FragmentPlan(fragments = fragments)
+    return FragmentPlan(fragments=fragments)
 
 
 def _scoreFragment(
@@ -159,11 +164,12 @@ def _fragmentActionFromBullet(bullet: Bullet) -> tuple[Action | None, bool]:
     with `value=None` plus `requires_model_value=True`.
     """
     from .bullet_reconstruct import actionFromBullet
+
     return actionFromBullet(
         bullet,
-        modelVariantOnNonEmptyValue = True,
-        reasoningPrefix = "fragment_replay",
-        modelUsed = "replay",
+        modelVariantOnNonEmptyValue=True,
+        reasoningPrefix="fragment_replay",
+        modelUsed="replay",
     )
 
 

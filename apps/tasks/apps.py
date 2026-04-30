@@ -9,6 +9,7 @@ process even when Django re-imports. Bootstrap failures (Neo4j
 unreachable, AuraDB paused) log and continue so a transient outage
 never blocks worker startup.
 """
+
 from __future__ import annotations
 
 import logging
@@ -41,6 +42,7 @@ class TasksConfig(AppConfig):
             return
         try:
             from agent.persistence.bootstrap import bootstrap
+
             bootstrap()
         except Exception as exc:  # noqa: BLE001 - never block worker boot on bootstrap failure
             logger.warning(

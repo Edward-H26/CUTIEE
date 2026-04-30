@@ -439,12 +439,12 @@
     <div class="section-head reveal">
       <span class="kicker">The fix</span>
       <h2 class="section-title">Stop reasoning. <span class="grad">Start replaying.</span></h2>
-      <p class="section-sub">CUTIEE turns every completed task into a zero-cost procedural template, routes live decisions to the cheapest viable model, and prunes context to what still matters.</p>
+      <p class="section-sub">CUTIEE turns every completed task into a zero-cost procedural template, sends novel browser decisions to Gemini Flash Computer Use, and prunes context to what still matters.</p>
     </div>
     <div class="step-grid">
       <article class="step-card reveal"><span class="step-badge">01</span><h3>Learn once</h3><p>The first run through a task pays full rate. Steps, selectors, and decisions are captured into a procedural template.</p></article>
       <article class="step-card reveal"><span class="step-badge">02</span><h3>Replay forever</h3><p>Every run after drops to $0 for any step the template covers. Only genuinely new decisions hit the model.</p></article>
-      <article class="step-card reveal"><span class="step-badge">03</span><h3>Route what's left</h3><p>The remaining decisions route to the cheapest tier that can handle them — with every action logged and signed.</p></article>
+      <article class="step-card reveal"><span class="step-badge">03</span><h3>Model what's left</h3><p>The remaining browser decisions use Gemini Flash Computer Use, with every action logged and signed.</p></article>
     </div>
   </section>
 
@@ -520,24 +520,24 @@
     </div>
   </section>
 
-  <!-- FEATURE 3 — ROUTING -->
+  <!-- FEATURE 3 — DECISION LOOP -->
   <section id="route" class="demo-section">
     <div class="section-head reveal">
-      <span class="kicker">03 · Routing</span>
-      <h2 class="section-title">Cheapest viable model. <span class="grad">Pruned context.</span></h2>
-      <p class="section-sub">Router evaluates tiers bottom-up and locks the cheapest viable one. Meanwhile context gets pruned — tokens cut by 70%.</p>
+      <span class="kicker">03 · Control loop</span>
+      <h2 class="section-title">Gemini CU actions. <span class="grad">Pruned context.</span></h2>
+      <p class="section-sub">The CU loop keeps browser control on Gemini Flash while replay handles known steps and recency pruning keeps context compact.</p>
     </div>
     <div class="browser" data-demo="route" data-stage="0" data-autoplay>
-      <div class="browser-chrome"><div class="dot3"><i></i><i></i><i></i></div><div class="addr">cutiee.ai/tasks/47/router</div></div>
+      <div class="browser-chrome"><div class="dot3"><i></i><i></i><i></i></div><div class="addr">cutiee.ai/tasks/47/run</div></div>
       <div class="browser-main">
         <div class="stage-rail"><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span class="dotr"></span><span>phase <b data-stage-num>0/5</b> · <span data-stage-lbl>idle</span></span><button class="replay-btn" data-replay>↻ replay</button></div>
         <div class="route-wrap">
           <div class="route-panel">
-            <div class="eval-head"><span>Routing decision</span><span class="query">"categorize Uber ride"</span></div>
-            <div class="tier-row" data-tier="1"><span class="tag">T1</span><span>qwen3.5 0.8B</span><span class="price">$0.0004</span><span class="verdict"></span></div>
-            <div class="tier-row" data-tier="2"><span class="tag">T2</span><span>gemini-flash-lite</span><span class="price">$0.0021</span><span class="verdict"></span></div>
-            <div class="tier-row" data-tier="3"><span class="tag">T3</span><span>gemini-flash</span><span class="price">$0.0048</span><span class="verdict"></span></div>
-            <div class="tier-row" data-tier="4"><span class="tag">T4</span><span>gemini-pro</span><span class="price">$0.0180</span><span class="verdict"></span></div>
+            <div class="eval-head"><span>Live CU decision</span><span class="query">"categorize Uber ride"</span></div>
+            <div class="tier-row" data-tier="1"><span class="tag">MEM</span><span>procedural replay</span><span class="price">$0.0000</span><span class="verdict"></span></div>
+            <div class="tier-row" data-tier="2"><span class="tag">CU</span><span>gemini-flash-latest</span><span class="price">$0.0095</span><span class="verdict"></span></div>
+            <div class="tier-row" data-tier="3"><span class="tag">CTX</span><span>recency pruner</span><span class="price">tokens kept</span><span class="verdict"></span></div>
+            <div class="tier-row" data-tier="4"><span class="tag">AUD</span><span>signed step log</span><span class="price">trace</span><span class="verdict"></span></div>
             <div style="margin-top:10px;font-size:11px;color:var(--cutiee-text-muted);font-family:'JetBrains Mono',monospace" data-route-verdict>→ evaluating…</div>
           </div>
           <div class="route-panel">
@@ -589,12 +589,12 @@
     <div class="section-head reveal">
       <span class="kicker">Vs. the alternatives</span>
       <h2 class="section-title">Where every other approach <span class="grad">falls short.</span></h2>
-      <p class="section-sub">Others either burn tokens on every run, skip transparency, or can't handle computer-use at all. CUTIEE combines procedural memory, tiered routing, and full audit in one harness.</p>
+      <p class="section-sub">Others either burn tokens on every run, skip transparency, or can't handle computer-use at all. CUTIEE combines procedural memory, Gemini Flash Computer Use, and full audit in one harness.</p>
     </div>
     <div class="compare">
       <article class="cmp-card reveal"><div class="kick">Frontier-only agents</div><h3>Smart. Expensive.</h3><p>They can do anything — and they'll charge you frontier rates to redo it every single time.</p><span class="cmp-limit">✕ No procedural memory</span></article>
       <article class="cmp-card reveal"><div class="kick">Workflow automation</div><h3>Cheap. Rigid.</h3><p>Record-and-replay tools break the moment a button moves. No recovery, no intelligence.</p><span class="cmp-limit">✕ No model in the loop</span></article>
-      <article class="cmp-card win reveal"><div class="kick">CUTIEE</div><h3>Replay first, route last.</h3><p>Procedural templates + tiered routing + compliance audit. Learn once, run forever at near-zero cost.</p><span class="cmp-win">✓ All three, combined</span></article>
+      <article class="cmp-card win reveal"><div class="kick">CUTIEE</div><h3>Replay first, model only what changed.</h3><p>Procedural templates + Gemini Flash CU + compliance audit. Learn once, run forever at near-zero cost.</p><span class="cmp-win">✓ All three, combined</span></article>
     </div>
   </section>
 
@@ -703,7 +703,7 @@
   const SUB_TARGET = "File my weekly expense report";
   const SUB_LABELS = ['idle','typing','embedding','searching','ranking','matched'];
   const STEP_COSTS = [0, 0, 0.0004, 0, 0.0021, 0];
-  const ROUTE_LABELS = ['idle','eval T1','reject T1','eval T2','lock T2','pruning'];
+  const ROUTE_LABELS = ["idle","check replay","need CU","Gemini CU","action ready","pruning"];
 
   /* Stage appliers (same logic as the scrub version, invoked
      per stage without sub-progress — timelines drive intra-stage updates). */
@@ -826,7 +826,7 @@
     }};
   }
 
-  /* DEMO 3: Route + prune */
+  /* DEMO 3: CU loop + prune */
   function buildRouteTimeline(el){
     const rows = el.querySelectorAll('.tier-row');
     const lbl = el.querySelector('[data-stage-lbl]');
@@ -845,36 +845,36 @@
     }
     function clearRows(){ rows.forEach(r=>{ r.classList.remove('eval','reject','hot'); r.querySelector('.verdict').textContent=''; }); }
 
-    // Stage 1: eval T1
+    // Stage 1: check procedural replay
     tl.call(()=>{
       goStage(1); clearRows();
       rows[0].classList.add('eval');
       rows[0].querySelector('.verdict').textContent = '…';
-      vLine.textContent = '→ T1 evaluating capability…';
+      vLine.textContent = "→ checking procedural template…";
     });
     tl.to({}, { duration: 0.5 });
-    // Stage 2: reject T1
+    // Stage 2: no replay match
     tl.call(()=>{
       goStage(2);
       rows[0].classList.remove('eval'); rows[0].classList.add('reject');
       rows[0].querySelector('.verdict').textContent = '✕';
-      vLine.textContent = '→ T1 insufficient (confidence 0.42) — escalate';
+      vLine.textContent = "→ no safe template match, use Gemini CU";
     });
     tl.to({}, { duration: 0.45 });
-    // Stage 3: eval T2
+    // Stage 3: Gemini CU
     tl.call(()=>{
       goStage(3);
       rows[1].classList.add('eval');
       rows[1].querySelector('.verdict').textContent = '…';
-      vLine.textContent = '→ T2 evaluating capability…';
+      vLine.textContent = "→ Gemini Flash reading screenshot…";
     });
     tl.to({}, { duration: 0.5 });
-    // Stage 4: lock T2
+    // Stage 4: action ready
     tl.call(()=>{
       goStage(4);
       rows[1].classList.remove('eval'); rows[1].classList.add('hot');
       rows[1].querySelector('.verdict').textContent = '✓';
-      vLine.textContent = '→ T2 locked · cheapest viable tier';
+      vLine.textContent = "→ Gemini CU action ready | audit pending";
       thumbs.forEach(t=>{ t.classList.remove('stale'); t.classList.add('kept'); });
     });
     tl.to({}, { duration: 0.35 });

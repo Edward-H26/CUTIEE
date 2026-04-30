@@ -14,6 +14,7 @@ A run is accepted iff:
 Rejection emits `QualityGateDiagnostics` so the UI can show the user why no
 new bullets were stored.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -30,7 +31,7 @@ MAX_OVERLAP = 0.95
 class QualityGateDiagnostics:
     score: float = 0.0
     accepted: bool = False
-    reasons: list[str] = field(default_factory = list)
+    reasons: list[str] = field(default_factory=list)
 
 
 @dataclass

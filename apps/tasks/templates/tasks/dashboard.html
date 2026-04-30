@@ -82,7 +82,7 @@ async function renderCostChart() {
         }
         if (!ts.series || !ts.series.length) return;
         showCanvas("costChart", "costEmpty");
-        new Chart(document.getElementById("costChart").getContext("2d"), {
+        costChartInstance = new Chart(document.getElementById("costChart").getContext("2d"), {
             type: "line",
             data: {
                 labels: ts.series.map(r => r.day),
@@ -115,7 +115,7 @@ async function renderTierChart() {
         }
         if (!tier.distribution || !tier.distribution.length) return;
         showCanvas("tierChart", "tierEmpty");
-        new Chart(document.getElementById("tierChart").getContext("2d"), {
+        tierChartInstance = new Chart(document.getElementById("tierChart").getContext("2d"), {
             type: "doughnut",
             data: {
                 labels: tier.distribution.map(r => "Tier " + r.tier),
@@ -131,7 +131,16 @@ async function renderTierChart() {
     }
 }
 
-renderCostChart();
-renderTierChart();
+let costChartInstance = null;
+let tierChartInstance = null;
+
+async function refreshCharts() {
+    if (costChartInstance) { costChartInstance.destroy(); costChartInstance = null; }
+    if (tierChartInstance) { tierChartInstance.destroy(); tierChartInstance = null; }
+    await Promise.all([renderCostChart(), renderTierChart()]);
+}
+
+refreshCharts();
+setInterval(refreshCharts, 30000);
 </script>
 {% endblock %}

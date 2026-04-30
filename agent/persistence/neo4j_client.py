@@ -5,6 +5,7 @@ Adapted from miramemoria/app/services/neo4j_memory.py. The CUTIEE deltas:
 - Missing credentials raise RuntimeError instead of returning None silently
 - Unreachable bolt endpoints raise RuntimeError on first use with a remediation hint
 """
+
 from __future__ import annotations
 
 import os
@@ -65,11 +66,11 @@ def get_driver() -> Driver:
         if _DRIVER is None:
             _DRIVER = GraphDatabase.driver(
                 uri,
-                auth = (user, password),
-                max_connection_pool_size = _positiveEnvInt("NEO4J_MAX_CONNECTION_POOL_SIZE", 32),
-                connection_timeout = _positiveEnvFloat("NEO4J_CONNECTION_TIMEOUT", 30.0),
-                max_transaction_retry_time = _positiveEnvFloat("NEO4J_MAX_TX_RETRY", 15.0),
-                keep_alive = True,
+                auth=(user, password),
+                max_connection_pool_size=_positiveEnvInt("NEO4J_MAX_CONNECTION_POOL_SIZE", 32),
+                connection_timeout=_positiveEnvFloat("NEO4J_CONNECTION_TIMEOUT", 30.0),
+                max_transaction_retry_time=_positiveEnvFloat("NEO4J_MAX_TX_RETRY", 15.0),
+                keep_alive=True,
             )
     return _DRIVER
 
@@ -94,7 +95,7 @@ def run_query(cypher: str, **params: Any) -> list[dict[str, Any]]:
     db = _database()
     query = Query(cast("Any", cypher))
     try:
-        with driver.session(database = db) as session:
+        with driver.session(database=db) as session:
             result = session.run(query, **params)
             return [dict(record) for record in result]
     except ServiceUnavailable as exc:

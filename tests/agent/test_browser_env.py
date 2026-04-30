@@ -4,6 +4,7 @@ These guard the failure mode where a `.env` typo silently flips the
 default behavior (e.g., `CUTIEE_BROWSER_HEADLESS=tru` should NOT enable
 headless mode just because something was set).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -12,7 +13,7 @@ from agent.browser.controller import BrowserController, browserFromEnv
 from agent.harness.env_utils import envBool, envFloat, envInt, envStr
 
 
-@pytest.fixture(autouse = True)
+@pytest.fixture(autouse=True)
 def _clearEnv(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in (
         "CUTIEE_BROWSER_HEADLESS",
@@ -21,7 +22,7 @@ def _clearEnv(monkeypatch: pytest.MonkeyPatch) -> None:
         "CUTIEE_BROWSER_CDP_URL",
         "CUTIEE_TEST_FOO",
     ):
-        monkeypatch.delenv(key, raising = False)
+        monkeypatch.delenv(key, raising=False)
 
 
 def test_envBool_default_when_unset() -> None:
@@ -77,7 +78,7 @@ def test_envStr_returns_default_on_empty(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 def test_browserFromEnv_default_visible() -> None:
-    ctrl = browserFromEnv(defaultHeadless = False)
+    ctrl = browserFromEnv(defaultHeadless=False)
     assert isinstance(ctrl, BrowserController)
     assert ctrl.headless is False
     assert ctrl.cdpUrl is None
@@ -86,7 +87,7 @@ def test_browserFromEnv_default_visible() -> None:
 
 def test_browserFromEnv_headless_override(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CUTIEE_BROWSER_HEADLESS", "1")
-    ctrl = browserFromEnv(defaultHeadless = False)
+    ctrl = browserFromEnv(defaultHeadless=False)
     assert ctrl.headless is True
 
 
@@ -103,7 +104,8 @@ def test_browserFromEnv_cdp_url(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_browserFromEnv_storage_state_only_if_exists(
-    monkeypatch: pytest.MonkeyPatch, tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     """Setting the env var to a non-existent file should NOT crash;
     Playwright would error on launch, so we silently drop missing paths."""
@@ -119,11 +121,13 @@ def test_browserFromEnv_storage_state_only_if_exists(
 
 
 def test_browserFromEnv_per_domain_state(
-    monkeypatch: pytest.MonkeyPatch, tmp_path, chdir_tmp,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    chdir_tmp,
 ) -> None:
     """If data/storage_state/<domain>.json exists, prefer it over the global path."""
     domainDir = tmp_path / "data" / "storage_state"
-    domainDir.mkdir(parents = True)
+    domainDir.mkdir(parents=True)
     googlePath = domainDir / "docs.google.com.json"
     googlePath.write_text("{}")
 
@@ -131,8 +135,10 @@ def test_browserFromEnv_per_domain_state(
     globalPath.write_text("{}")
     monkeypatch.setenv("CUTIEE_STORAGE_STATE_PATH", str(globalPath))
 
-    ctrl = browserFromEnv(domain = "docs.google.com")
-    assert ctrl.storageStatePath == str(googlePath.relative_to(tmp_path)) or ctrl.storageStatePath == str(googlePath)
+    ctrl = browserFromEnv(domain="docs.google.com")
+    assert ctrl.storageStatePath == str(
+        googlePath.relative_to(tmp_path)
+    ) or ctrl.storageStatePath == str(googlePath)
 
 
 @pytest.fixture

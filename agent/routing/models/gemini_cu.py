@@ -19,15 +19,18 @@ Override with `CUTIEE_CU_MODEL` if you need a specific variant; otherwise
 the default tracks the latest Flash so you get auto-upgrade on Google's
 roll-outs without a code change.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from time import perf_counter
 from typing import Any
 
 from ...harness.state import Action, ActionType
+from ...persistence.metrics import observeGeminiLatency
 from ..cu_client import ComputerUseStep
 
 # Default tracks Google's "latest flash" alias so a Google-side promotion
@@ -45,6 +48,8 @@ CU_PRICING: dict[str, tuple[float, float]] = {
 }
 SUPPORTED_CU_MODELS = frozenset(CU_PRICING.keys())
 FALLBACK_PRICING: tuple[float, float] = (0.15, 0.60)
+ESTIMATED_INPUT_TOKENS_PER_STEP = 4_000
+ESTIMATED_OUTPUT_TOKENS_PER_STEP = 60
 
 # Legacy module-level constants kept as aliases so external imports
 # don't break. Prefer CU_PRICING[modelId] in new code.
@@ -86,15 +91,16 @@ class GeminiComputerUseClient:
     ~250 tokens; with the default 8 turns we cap input growth around 2 MB
     of base64 imagery per request.
     """
+
     modelId: str = DEFAULT_MODEL
     apiKey: str | None = None
     temperature: float = 0.1
     historyKeepTurns: int = 8
-    history: list[Any] = field(default_factory = list)
+    history: list[Any] = field(default_factory=list)
     pendingCallId: str | None = None
     pendingCallName: str | None = None
-    _client: Any = field(default = None, init = False, repr = False)
-    _toolConfig: Any = field(default = None, init = False, repr = False)
+    _client: Any = field(default=None, init=False, repr=False)
+    _toolConfig: Any = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         key = self.apiKey or os.environ.get("GEMINI_API_KEY")
@@ -105,18 +111,29 @@ class GeminiComputerUseClient:
                 "Gemini CU model %r is not in the verified-supported set %s. "
                 "Live API may reject it with 400 'Computer Use is not enabled'. "
                 "Set CUTIEE_CU_MODEL to one of the supported ids to silence this.",
-                self.modelId, sorted(SUPPORTED_CU_MODELS),
+                self.modelId,
+                sorted(SUPPORTED_CU_MODELS),
             )
         from google import genai
         from google.genai import types
 
-        self._client = genai.Client(api_key = key)
-        self._toolConfig = types.Tool(computer_use = types.ComputerUse(environment = "ENVIRONMENT_BROWSER"))
+        self._client = genai.Client(api_key=key)
+        self._toolConfig = types.Tool(
+            computer_use=types.ComputerUse(environment="ENVIRONMENT_BROWSER")
+        )
         self.apiKey = key
 
     @property
     def name(self) -> str:
         return self.modelId
+
+    @property
+    def estimatedStepCostUsd(self) -> float:
+        priceIn, priceOut = CU_PRICING.get(self.modelId, FALLBACK_PRICING)
+        return (
+            ESTIMATED_INPUT_TOKENS_PER_STEP / 1_000_000 * priceIn
+            + ESTIMATED_OUTPUT_TOKENS_PER_STEP / 1_000_000 * priceOut
+        )
 
     def primeTask(self, taskDescription: str, currentUrl: str) -> None:
         """Reset the conversation and seed the first turn with the goal."""
@@ -132,9 +149,7 @@ class GeminiComputerUseClient:
             "Always issue exactly one tool call per turn. When the goal is met, "
             'call `finished` with `reason: "done"` to end the run.'
         )
-        self.history.append(
-            types.Content(role = "user", parts = [types.Part.from_text(text = seedText)])
-        )
+        self.history.append(types.Content(role="user", parts=[types.Part.from_text(text=seedText)]))
 
     async def nextAction(self, screenshotBytes: bytes, currentUrl: str) -> ComputerUseStep:
         """Send the latest screenshot and return the model's next action."""
@@ -142,31 +157,33 @@ class GeminiComputerUseClient:
 
         # Wrap the screenshot as a function response if the model issued a
         # function call last turn; otherwise treat it as the initial user image.
-        screenshotPart = types.Part.from_bytes(data = screenshotBytes, mime_type = "image/png")
+        screenshotPart = types.Part.from_bytes(data=screenshotBytes, mime_type="image/png")
         if self.pendingCallId is not None and self.pendingCallName is not None:
             funcResponse = types.Part.from_function_response(
-                name = self.pendingCallName,
-                response = {
+                name=self.pendingCallName,
+                response={
                     "url": currentUrl,
                     "screenshot": "see attached image",
                 },
             )
             # Some SDK versions accept inline parts on the function response;
             # fall back to a plain user message with the screenshot if needed.
-            self.history.append(types.Content(role = "user", parts = [funcResponse, screenshotPart]))
+            self.history.append(types.Content(role="user", parts=[funcResponse, screenshotPart]))
         else:
-            self.history.append(types.Content(role = "user", parts = [screenshotPart]))
+            self.history.append(types.Content(role="user", parts=[screenshotPart]))
 
         self._trimHistory()
 
+        startedAt = perf_counter()
         response = await self._client.aio.models.generate_content(
-            model = self.modelId,
-            contents = self.history,
-            config = types.GenerateContentConfig(
-                tools = [self._toolConfig],
-                temperature = self.temperature,
+            model=self.modelId,
+            contents=self.history,
+            config=types.GenerateContentConfig(
+                tools=[self._toolConfig],
+                temperature=self.temperature,
             ),
         )
+        observeGeminiLatency(perf_counter() - startedAt)
 
         usage = getattr(response, "usage_metadata", None)
         inputTokens = (getattr(usage, "prompt_token_count", 0) or 0) if usage else 0
@@ -194,16 +211,16 @@ class GeminiComputerUseClient:
             self.pendingCallId = None
             self.pendingCallName = None
             return ComputerUseStep(
-                action = Action(
-                    type = ActionType.FINISH,
-                    reasoning = rawText[:200] or "no_function_call",
-                    model_used = self.modelId,
-                    cost_usd = cost,
-                    confidence = 0.4,
+                action=Action(
+                    type=ActionType.FINISH,
+                    reasoning=rawText[:200] or "no_function_call",
+                    model_used=self.modelId,
+                    cost_usd=cost,
+                    confidence=0.4,
                 ),
-                rawFunctionName = "",
-                rawArgs = {},
-                costUsd = cost,
+                rawFunctionName="",
+                rawArgs={},
+                costUsd=cost,
             )
 
         self.pendingCallId = getattr(functionCall, "id", None)
@@ -214,10 +231,10 @@ class GeminiComputerUseClient:
         action.model_used = self.modelId
         action.confidence = 0.85
         return ComputerUseStep(
-            action = action,
-            rawFunctionName = functionCall.name,
-            rawArgs = dict(functionCall.args or {}),
-            costUsd = cost,
+            action=action,
+            rawFunctionName=functionCall.name,
+            rawArgs=dict(functionCall.args or {}),
+            costUsd=cost,
         )
 
     def _actionFromFunctionCall(self, name: str, args: dict[str, Any]) -> Action:
@@ -241,16 +258,15 @@ class GeminiComputerUseClient:
             scrollDy = int(args.get("dy") or args.get("delta_y") or args.get("amount") or 500)
 
         return Action(
-            type = actionType,
-            target = target,
-            value = str(text) if text is not None else None,
-            coordinate = coord,
-            keys = list(keys) if keys else None,
-            scrollDx = scrollDx,
-            scrollDy = scrollDy,
-            reasoning = f"gemini_cu:{name}",
+            type=actionType,
+            target=target,
+            value=str(text) if text is not None else None,
+            coordinate=coord,
+            keys=list(keys) if keys else None,
+            scrollDx=scrollDx,
+            scrollDy=scrollDy,
+            reasoning=f"gemini_cu:{name}",
         )
-
 
     def _trimHistory(self) -> None:
         """Bound the trailing conversation to `historyKeepTurns` pairs.
@@ -263,12 +279,16 @@ class GeminiComputerUseClient:
         if len(self.history) <= 2 * self.historyKeepTurns + 1:
             return
         seed = self.history[0]
-        tail = self.history[-(2 * self.historyKeepTurns):]
+        tail = self.history[-(2 * self.historyKeepTurns) :]
         self.history = [seed, *tail]
 
 
 def _extractCoordinate(args: dict[str, Any]) -> tuple[int, int] | None:
-    if "coordinate" in args and isinstance(args["coordinate"], (list, tuple)) and len(args["coordinate"]) == 2:
+    if (
+        "coordinate" in args
+        and isinstance(args["coordinate"], (list, tuple))
+        and len(args["coordinate"]) == 2
+    ):
         x, y = args["coordinate"]
         return (int(x), int(y))
     if "x" in args and "y" in args:
@@ -290,8 +310,9 @@ class MockComputerUseClient:
     `primeTask(taskDescription, currentUrl)` and async `nextAction(screenshot, url)`.
     When the script is exhausted it returns FINISH.
     """
+
     label: str = "mock-cu"
-    actionsToReturn: list[Action] = field(default_factory = list)
+    actionsToReturn: list[Action] = field(default_factory=list)
     fixedCostUsd: float = 0.0
     cursor: int = 0
     callCount: int = 0
@@ -305,6 +326,10 @@ class MockComputerUseClient:
     def modelId(self) -> str:
         return self.label
 
+    @property
+    def estimatedStepCostUsd(self) -> float:
+        return max(0.0, self.fixedCostUsd)
+
     def primeTask(self, taskDescription: str, currentUrl: str) -> None:
         del taskDescription, currentUrl
         self.primed = True
@@ -316,12 +341,12 @@ class MockComputerUseClient:
             action = self.actionsToReturn[self.cursor]
             self.cursor += 1
         else:
-            action = Action(type = ActionType.FINISH, reasoning = "mock script exhausted")
+            action = Action(type=ActionType.FINISH, reasoning="mock script exhausted")
         action.model_used = self.label
         action.cost_usd = self.fixedCostUsd
         return ComputerUseStep(
-            action = action,
-            rawFunctionName = action.type.value,
-            rawArgs = {},
-            costUsd = self.fixedCostUsd,
+            action=action,
+            rawFunctionName=action.type.value,
+            rawArgs={},
+            costUsd=self.fixedCostUsd,
         )

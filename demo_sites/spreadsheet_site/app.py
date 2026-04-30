@@ -1,4 +1,5 @@
 """CI-safe spreadsheet target — 10x5 grid the agent can edit, sort, and sum."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -8,8 +9,7 @@ from flask import Flask, jsonify, render_template_string, request
 ROWS = 10
 COLS = 5
 INITIAL_CELLS: list[list[str]] = [
-    [f"R{r}C{c}" if (r, c) != (0, 0) else "Quarter" for c in range(COLS)]
-    for r in range(ROWS)
+    [f"R{r}C{c}" if (r, c) != (0, 0) else "Quarter" for c in range(COLS)] for r in range(ROWS)
 ]
 
 
@@ -19,7 +19,7 @@ def createApp(initialState: list[list[str]] | None = None) -> Flask:
 
     @app.get("/")
     def index() -> str:
-        return render_template_string(_TEMPLATE, rows = state)
+        return render_template_string(_TEMPLATE, rows=state)
 
     @app.post("/edit/<int:row>/<int:col>")
     def edit(row: int, col: int):
@@ -32,7 +32,7 @@ def createApp(initialState: list[list[str]] | None = None) -> Flask:
     def sort_col(col: int):
         if 0 <= col < COLS:
             header, body = state[0], state[1:]
-            body.sort(key = lambda row: row[col])
+            body.sort(key=lambda row: row[col])
             state[:] = [header] + body
         return jsonify({"col": col, "ok": True})
 
@@ -79,4 +79,4 @@ input{width:90%;border:none;background:transparent;font-size:13px;}</style></hea
 
 
 if __name__ == "__main__":
-    createApp().run(host = "127.0.0.1", port = 5001, debug = True)
+    createApp().run(host="127.0.0.1", port=5001, debug=True)

@@ -4,6 +4,7 @@ The Cypher specifics live here so the agent layer never imports the
 Neo4j driver directly. Other consumers (tests, CLI tools, notebooks)
 inject a different store via dependency injection.
 """
+
 from __future__ import annotations
 
 from typing import Any

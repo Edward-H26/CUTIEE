@@ -1,19 +1,23 @@
 """Django settings for CUTIEE.
 
-All domain data lives in Neo4j. Django's framework-only bookkeeping
-(contenttypes, admin, sites, allauth) runs against an ephemeral
-in-memory SQLite that never touches disk. The Django ORM holds zero
-application state — every domain entity (User, Task, Bullet, Audit,
-Procedure) is persisted via Cypher in `apps/*/repo.py`.
+Domain data lives in Neo4j. Django framework state, authentication,
+allauth account links, sessions, and preferences live in SQL. Local
+mode uses process-local SQLite; production requires a durable database
+URL so user primary keys remain stable across restarts.
 """
+
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+from typing import Any
+from urllib.parse import parse_qs, unquote, urlparse
 
 import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+IS_PYTEST = any("pytest" in Path(arg).name for arg in sys.argv)
 
 env = environ.Env()
 environ.Env.read_env(str(BASE_DIR / ".env"))
@@ -71,9 +75,7 @@ def _envFloat(key: str, default: float) -> float:
 
 CUTIEE_ENV = _envStr("CUTIEE_ENV")
 if CUTIEE_ENV not in {"local", "production"}:
-    raise RuntimeError(
-        "CUTIEE_ENV must be set to 'local' or 'production'. See .env.example."
-    )
+    raise RuntimeError("CUTIEE_ENV must be set to 'local' or 'production'. See .env.example.")
 
 for required_key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"):
     if not _envStr(required_key):
@@ -114,15 +116,15 @@ IS_ON_RENDER = bool(RENDER_EXTERNAL_HOSTNAME)
 
 DEBUG = _envBool(
     "DJANGO_DEBUG",
-    default = CUTIEE_ENV == "local" and not IS_ON_RENDER,
+    default=CUTIEE_ENV == "local" and not IS_ON_RENDER,
 )
 ALLOWED_HOSTS = _envList(
     "DJANGO_ALLOWED_HOSTS",
-    default = ["localhost", "127.0.0.1"],
+    default=["localhost", "127.0.0.1"],
 )
 CSRF_TRUSTED_ORIGINS = _envList(
     "DJANGO_CSRF_TRUSTED_ORIGINS",
-    default = [],
+    default=[],
 )
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -203,22 +205,62 @@ TEMPLATES = [
 WSGI_APPLICATION = "cutiee_site.wsgi.application"
 ASGI_APPLICATION = "cutiee_site.asgi.application"
 
-# Shared-cache in-memory SQLite. Lives only inside the running Python
-# process; all Django connections in that process see the same tables.
-# Worker boundaries reset state, which is intentional: the only data
-# stored here is Django's framework bookkeeping (contenttypes,
-# auth_permission seed rows, allauth config). Application data lives
-# exclusively in Neo4j via apps/*/repo.py Cypher queries.
-#
-# Hard-coded by design: this is a Neo4j-only framework. There is no env
-# escape hatch to a disk-backed SQLite, and `DJANGO_INTERNAL_DB_URL` is
-# intentionally ignored.
-DATABASES = {
-    "default": {
+
+def _localDatabaseConfig() -> dict[str, Any]:
+    return {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": "file:cutiee_internals?mode=memory&cache=shared",
         "OPTIONS": {"uri": True, "transaction_mode": "IMMEDIATE"},
-    },
+    }
+
+
+def _databaseConfigFromUrl(rawUrl: str) -> dict[str, Any]:
+    parsed = urlparse(rawUrl)
+    scheme = parsed.scheme.lower()
+    if scheme in {"postgres", "postgresql", "postgresql+psycopg"}:
+        config: dict[str, Any] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(parsed.path.lstrip("/")),
+            "USER": unquote(parsed.username or ""),
+            "PASSWORD": unquote(parsed.password or ""),
+            "HOST": parsed.hostname or "",
+            "PORT": str(parsed.port or ""),
+        }
+        query = parse_qs(parsed.query)
+        sslMode = query.get("sslmode", [""])[0]
+        if sslMode:
+            config["OPTIONS"] = {"sslmode": sslMode}
+        return config
+    if scheme == "sqlite":
+        name = unquote(parsed.path or "")
+        if parsed.netloc:
+            name = f"/{parsed.netloc}{name}"
+        if name == "/:memory:":
+            name = ":memory:"
+        return {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": name,
+        }
+    raise RuntimeError("DJANGO_DATABASE_URL must use postgres://, postgresql://, or sqlite://.")
+
+
+def _productionDatabaseConfig() -> dict[str, Any]:
+    rawUrl = _envStr("DJANGO_DATABASE_URL") or _envStr("DATABASE_URL")
+    if not rawUrl and IS_PYTEST:
+        return _localDatabaseConfig()
+    if not rawUrl:
+        raise RuntimeError(
+            "DJANGO_DATABASE_URL or DATABASE_URL is required when "
+            "CUTIEE_ENV=production. This database stores durable Django "
+            "users, allauth social-account mappings, sessions, and preferences."
+        )
+    return _databaseConfigFromUrl(rawUrl)
+
+
+DATABASES = {
+    "default": _productionDatabaseConfig()
+    if CUTIEE_ENV == "production"
+    else _localDatabaseConfig(),
 }
 
 NEO4J_BOLT_URL = _envStr("NEO4J_BOLT_URL")
@@ -239,7 +281,7 @@ LOGIN_REDIRECT_URL = "/tasks/"
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = _envStr("ACCOUNT_EMAIL_VERIFICATION", "optional")
-ACCOUNT_EMAIL_NOTIFICATIONS = _envBool("ACCOUNT_EMAIL_NOTIFICATIONS", default = False)
+ACCOUNT_EMAIL_NOTIFICATIONS = _envBool("ACCOUNT_EMAIL_NOTIFICATIONS", default=False)
 
 # Email backend defaults to the console in dev so signup never blocks on
 # an SMTP connection. Production sets DJANGO_EMAIL_BACKEND explicitly.
@@ -285,13 +327,15 @@ CUTIEE_CONFIDENCE_THRESHOLDS = {
 # Production hardening. Local mode runs over plain HTTP, so these are gated.
 if CUTIEE_ENV == "production":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_SSL_REDIRECT = _envBool("DJANGO_SECURE_SSL_REDIRECT", default = True)
+    SECURE_SSL_REDIRECT = _envBool("DJANGO_SECURE_SSL_REDIRECT", default=True)
     # Default to 1 year (preload-eligible). Operators can lower this via
     # DJANGO_SECURE_HSTS_SECONDS during the initial rollout to avoid
     # accidentally pinning HTTPS for a year on a misconfigured host.
     SECURE_HSTS_SECONDS = _envInt("DJANGO_SECURE_HSTS_SECONDS", 60 * 60 * 24 * 365)
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = _envBool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default = True)
-    SECURE_HSTS_PRELOAD = _envBool("DJANGO_SECURE_HSTS_PRELOAD", default = SECURE_HSTS_SECONDS >= 31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _envBool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True)
+    SECURE_HSTS_PRELOAD = _envBool(
+        "DJANGO_SECURE_HSTS_PRELOAD", default=SECURE_HSTS_SECONDS >= 31536000
+    )
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
     SESSION_COOKIE_SECURE = True
@@ -303,6 +347,13 @@ if CUTIEE_ENV == "production":
     X_FRAME_OPTIONS = "DENY"
 
 # Logging — structured enough for Render's log drain.
+# Set `LOGGING_FORMAT=json` to emit one JSON object per record. The JSON
+# formatter is hand-rolled (no extra dep) and produces fields that play
+# nicely with Render's log drain, Loki / Grafana queries, and Sentry's
+# breadcrumb capture.
+_LOGGING_FORMAT = _envStr("LOGGING_FORMAT", "verbose").lower()
+_DEFAULT_FORMATTER = "json" if _LOGGING_FORMAT == "json" else "verbose"
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -311,12 +362,15 @@ LOGGING = {
             "format": "{levelname} {asctime} {name} {message}",
             "style": "{",
         },
+        "json": {
+            "()": "cutiee_site.logging_filters.JsonLogFormatter",
+        },
     },
     "handlers": {
         "console": {
             "level": _envStr("DJANGO_LOG_LEVEL", "INFO"),
             "class": "logging.StreamHandler",
-            "formatter": "verbose",
+            "formatter": _DEFAULT_FORMATTER,
         },
     },
     "root": {"handlers": ["console"], "level": _envStr("DJANGO_LOG_LEVEL", "INFO")},
@@ -325,3 +379,36 @@ LOGGING = {
         "cutiee": {"handlers": ["console"], "level": "INFO", "propagate": False},
     },
 }
+
+# Sentry. Optional dep; activates only when SENTRY_DSN is set AND the
+# `sentry-sdk` package is installed. This keeps the local dev path
+# zero-friction while making production-side error capture a one-line
+# pip install away. Sample rate is conservative because CUTIEE runs are
+# long-lived and traces would dominate the budget otherwise.
+SENTRY_DSN = _envStr("SENTRY_DSN")
+if SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        sentry_sdk.init(
+            dsn=SENTRY_DSN,
+            integrations=[
+                DjangoIntegration(),
+                LoggingIntegration(level=None, event_level=None),
+            ],
+            traces_sample_rate=_envFloat("SENTRY_TRACES_SAMPLE_RATE", 0.05),
+            send_default_pii=False,
+            release=_envStr("RENDER_GIT_COMMIT") or "cutiee@dev",
+            environment=CUTIEE_ENV,
+        )
+    except ImportError:
+        pass
+
+# Prometheus exporter, off by default. Enable with
+# CUTIEE_ENABLE_PROMETHEUS=1 and ensure `prometheus-client` is installed
+# (e.g. `uv pip install prometheus-client`). When enabled, the
+# `/metrics/` view returns Prometheus text format with cost, execution,
+# and Gemini call metrics exposed by `agent/persistence/metrics.py`.
+CUTIEE_ENABLE_PROMETHEUS = _envBool("CUTIEE_ENABLE_PROMETHEUS", default=False)

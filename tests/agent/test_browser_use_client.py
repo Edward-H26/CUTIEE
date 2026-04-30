@@ -8,13 +8,12 @@ Covers three things the plan mandates:
    the hard contract that prevents a new adapter from silently breaking
    replay by emitting non-canonical action names.
 """
-from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from __future__ import annotations
 
 import pytest
 
-from agent.harness.state import Action, ActionType
+from agent.harness.state import ActionType
 from agent.memory.bullet import Bullet
 from agent.memory.replay import _actionFromBullet
 from agent.routing.cu_client import CuClient
@@ -45,14 +44,14 @@ def _browserUseInstalled(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_missing_api_key_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("GEMINI_API_KEY", raising = False)
-    with pytest.raises(RuntimeError, match = "GEMINI_API_KEY"):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
         BrowserUseClient()
 
 
 def test_missing_package_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GEMINI_API_KEY", "test")
-    with pytest.raises(RuntimeError, match = "browser-use is not installed"):
+    with pytest.raises(RuntimeError, match="browser-use is not installed"):
         BrowserUseClient()
 
 
@@ -131,15 +130,18 @@ def test_send_keys_maps_to_key_combo() -> None:
     assert action.keys == ["Control", "A"]
 
 
-@pytest.mark.parametrize("rawName", [
-    "click_element_by_index",
-    "input_text",
-    "scroll_down",
-    "scroll_up",
-    "go_to_url",
-    "send_keys",
-    "done",
-])
+@pytest.mark.parametrize(
+    "rawName",
+    [
+        "click_element_by_index",
+        "input_text",
+        "scroll_down",
+        "scroll_up",
+        "go_to_url",
+        "send_keys",
+        "done",
+    ],
+)
 def test_action_round_trips_through_replay(rawName: str) -> None:
     """Hard contract: every adapter emits canonical ActionType values.
 
@@ -173,9 +175,9 @@ def test_action_round_trips_through_replay(rawName: str) -> None:
         bulletContent += f" keys={','.join(action.keys)}"
 
     bullet = Bullet(
-        id = "test-round-trip",
-        content = bulletContent,
-        memory_type = "procedural",
+        id="test-round-trip",
+        content=bulletContent,
+        memory_type="procedural",
     )
     parsed = _actionFromBullet(bullet)
     assert parsed is not None

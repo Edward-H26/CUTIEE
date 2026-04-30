@@ -6,6 +6,7 @@ polling so the user sees per-step updates. The progress cache lives in
 should swap that for Redis once horizontal scaling is needed; for INFO490
 the single-worker Render instance is fine.
 """
+
 from __future__ import annotations
 
 import csv
@@ -15,6 +16,7 @@ import logging
 import os
 import threading
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils.html import format_html
@@ -42,49 +44,49 @@ logger = logging.getLogger("cutiee")
 @require_POST
 @login_required
 def run_task_view(request: HttpRequest, task_id: str) -> JsonResponse:
-    task = tasksRepo.getTask(str(request.user.pk), str(task_id))
+    userId = str(request.user.pk)
+    task = tasksRepo.getTask(userId, str(task_id))
     if task is None:
-        return JsonResponse({"error": "task not found"}, status = 404)
+        return JsonResponse({"error": "task not found"}, status=404)
 
-    # Reject duplicate clicks: if the latest execution is still running,
-    # short-circuit instead of spawning a parallel thread that would race
-    # against the same procedural-graph write.
-    existing = tasksRepo.listExecutionsForTask(str(request.user.pk), str(task_id))
-    if existing and existing[0].get("status") == "running":
-        return JsonResponse({
-            "status": "already_running",
-            "task_id": task["id"],
-            "execution_id": existing[0]["id"],
-        }, status = 409)
+    import uuid as _uuid
 
-    useMockRaw = request.POST.get("use_mock") or request.GET.get("use_mock")
+    executionId = str(_uuid.uuid4())
+    execution, activeExecution = tasksRepo.createExecutionForIdleUser(
+        userId=userId,
+        taskId=task["id"],
+        executionId=executionId,
+    )
+    if activeExecution is not None:
+        return JsonResponse(
+            {
+                "status": "already_running",
+                "task_id": activeExecution.get("task_id") or task["id"],
+                "execution_id": activeExecution["id"],
+            },
+            status=409,
+        )
+    if execution is None:
+        return JsonResponse({"error": "execution not created"}, status=500)
+
     useMock = None
+    useMockRaw = None
+    if getattr(settings, "CUTIEE_ENV", "") != "production":
+        useMockRaw = request.POST.get("use_mock") or request.GET.get("use_mock")
     if useMockRaw is not None:
         useMock = str(useMockRaw).lower() in {"1", "true", "yes"}
 
-    # Create the execution row synchronously BEFORE spawning the thread so
-    # the detail page sees an in-flight execution on the next render. The
-    # row starts with status='running' and step_count=0; the agent loop
-    # writes each step into Neo4j live via _publishProgress hooks.
-    import uuid as _uuid
-    executionId = str(_uuid.uuid4())
-    tasksRepo.createExecution(
-        userId = str(request.user.pk),
-        taskId = task["id"],
-        executionId = executionId,
-    )
-
     threading.Thread(
-        target = _runInBackground,
-        kwargs = {
-            "userId": str(request.user.pk),
+        target=_runInBackground,
+        kwargs={
+            "userId": userId,
             "taskId": task["id"],
             "description": task["description"],
             "initialUrl": task.get("initial_url") or "",
             "useMockAgent": useMock,
             "executionId": executionId,
         },
-        daemon = True,
+        daemon=True,
     ).start()
     return JsonResponse({"status": "started", "task_id": task["id"], "execution_id": executionId})
 
@@ -94,6 +96,34 @@ def _runInBackground(**kwargs: object) -> None:
         runTaskForUser(**kwargs)  # type: ignore[arg-type]
     except Exception as exc:  # noqa: BLE001 - background thread, log and surface
         logger.exception("Background task run failed: %s", exc)
+        _finalizeFailedBackgroundRun(kwargs, exc)
+
+
+def _finalizeFailedBackgroundRun(kwargs: dict[str, object], exc: Exception) -> None:
+    userId = str(kwargs.get("userId") or "")
+    taskId = str(kwargs.get("taskId") or "")
+    executionId = str(kwargs.get("executionId") or "")
+    if not userId or not taskId or not executionId:
+        return
+    try:
+        execution = tasksRepo.getExecution(userId, executionId)
+        if execution is not None and execution.get("status") != "running":
+            return
+        reason = f"background_exception:{exc.__class__.__name__}"
+        tasksRepo.finalizeExecution(
+            userId=userId,
+            executionId=executionId,
+            status="failed",
+            completionReason=reason,
+        )
+        tasksRepo.updateTaskStatus(
+            userId=userId,
+            taskId=taskId,
+            status="failed",
+            lastExecutionId=executionId,
+        )
+    except Exception:  # noqa: BLE001 - avoid recursive thread failures
+        logger.exception("Failed to finalize failed background task")
 
 
 @require_GET
@@ -104,8 +134,11 @@ def task_status(request: HttpRequest, execution_id: str):
         execution = tasksRepo.getExecution(str(request.user.pk), str(execution_id))
         if execution is None:
             if request.headers.get("HX-Request") == "true":
-                return HttpResponse("<span class='cutiee-text-sm cutiee-muted'>Execution not found.</span>", status = 404)
-            return JsonResponse({"status": "unknown"}, status = 404)
+                return HttpResponse(
+                    "<span class='cutiee-text-sm cutiee-muted'>Execution not found.</span>",
+                    status=404,
+                )
+            return JsonResponse({"status": "unknown"}, status=404)
         snapshot = {
             "executionId": execution["id"],
             "stepCount": execution.get("step_count", 0),
@@ -123,10 +156,19 @@ def task_status(request: HttpRequest, execution_id: str):
     return JsonResponse(snapshot)
 
 
-_DEFAULT_COST = {"total_cost": 0.0, "task_count": 0, "execution_count": 0,
-                 "step_count": 0, "replay_step_count": 0}
-_DEFAULT_MEMORY = {"bullet_count": 0, "template_count": 0,
-                   "stale_template_count": 0, "avg_strength": 0.0}
+_DEFAULT_COST = {
+    "total_cost": 0.0,
+    "task_count": 0,
+    "execution_count": 0,
+    "step_count": 0,
+    "replay_step_count": 0,
+}
+_DEFAULT_MEMORY = {
+    "bullet_count": 0,
+    "template_count": 0,
+    "stale_template_count": 0,
+    "avg_strength": 0.0,
+}
 
 
 def _safeJson(builder, fallback):
@@ -134,7 +176,7 @@ def _safeJson(builder, fallback):
     try:
         return JsonResponse(builder())
     except Exception:  # noqa: BLE001 - fail soft for UI-facing JSON
-        logger.warning("Neo4j fetch failed for JSON endpoint", exc_info = True)
+        logger.warning("Neo4j fetch failed for JSON endpoint", exc_info=True)
         payload = dict(fallback)
         payload["db_error"] = "Database temporarily unavailable."
         return JsonResponse(payload)
@@ -159,9 +201,9 @@ def _windowDaysFor(request: HttpRequest) -> int:
 
     raw = request.GET.get("days")
     if raw is not None:
-        return safeInt(raw, default = 14, minimum = 1, maximum = 365)
+        return safeInt(raw, default=14, minimum=1, maximum=365)
     pref = UserPreference.for_user(request.user)
-    return safeInt(str(pref.dashboard_window_days), default = 14, minimum = 1, maximum = 365)
+    return safeInt(str(pref.dashboard_window_days), default=14, minimum=1, maximum=365)
 
 
 @require_GET
@@ -170,7 +212,7 @@ def cost_timeseries(request: HttpRequest) -> JsonResponse:
     days = _windowDaysFor(request)
     userId = str(request.user.pk)
     return _safeJson(
-        lambda: {"series": tasksRepo.costTimeseriesForUser(userId, days = days)},
+        lambda: {"series": tasksRepo.costTimeseriesForUser(userId, days=days)},
         {"series": []},
     )
 
@@ -182,7 +224,7 @@ def cost_timeseries_csv(request: HttpRequest) -> HttpResponse:
     days = _windowDaysFor(request)
     userId = str(request.user.pk)
     try:
-        series = tasksRepo.costTimeseriesForUser(userId, days = days)
+        series = tasksRepo.costTimeseriesForUser(userId, days=days)
     except Exception:
         series = []
     buf = io.StringIO()
@@ -190,10 +232,8 @@ def cost_timeseries_csv(request: HttpRequest) -> HttpResponse:
     writer.writerow(["day", "daily_cost_usd"])
     for entry in series:
         writer.writerow([entry.get("day", ""), entry.get("daily_cost", 0.0)])
-    response = HttpResponse(buf.getvalue(), content_type = "text/csv")
-    response["Content-Disposition"] = (
-        f'attachment; filename="cutiee-cost-timeseries-{days}d.csv"'
-    )
+    response = HttpResponse(buf.getvalue(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="cutiee-cost-timeseries-{days}d.csv"'
     return response
 
 
@@ -230,8 +270,8 @@ def memory_export(request: HttpRequest) -> HttpResponse:
         "bullets": listBulletsForUser(str(request.user.pk)),
     }
     response = HttpResponse(
-        json.dumps(payload, default = str, indent = 2),
-        content_type = "application/json",
+        json.dumps(payload, default=str, indent=2),
+        content_type="application/json",
     )
     response["Content-Disposition"] = 'attachment; filename="cutiee-memory-export.json"'
     return response
@@ -240,12 +280,12 @@ def memory_export(request: HttpRequest) -> HttpResponse:
 @require_GET
 @login_required
 def audit_feed(request: HttpRequest) -> JsonResponse:
-    limit = safeInt(request.GET.get("limit"), default = 50, minimum = 1, maximum = 200)
-    offset = safeInt(request.GET.get("offset"), default = 0, minimum = 0)
+    limit = safeInt(request.GET.get("limit"), default=50, minimum=1, maximum=200)
+    offset = safeInt(request.GET.get("offset"), default=0, minimum=0)
     userId = str(request.user.pk)
     return _safeJson(
         lambda: {
-            "entries": listAuditForUser(userId, limit = limit, offset = offset),
+            "entries": listAuditForUser(userId, limit=limit, offset=offset),
             "total": auditCountForUser(userId),
         },
         {"entries": [], "total": 0},
@@ -282,24 +322,26 @@ def vlm_health(request: HttpRequest) -> HttpResponse:
         return JsonResponse(payload)
 
     if payload["status"] == "ready":
-        return HttpResponse(format_html(
-            "<div id='vlm-status-banner' data-status='ready' data-model='{model}'></div>",
-            model = payload["model"],
-        ))
+        return HttpResponse(
+            format_html(
+                "<div id='vlm-status-banner' data-status='ready' data-model='{model}'></div>",
+                model=payload["model"],
+            )
+        )
     label = (
-        "Connecting to Gemini"
-        if payload["env"] == "production"
-        else f"Loading {payload['model']}"
+        "Connecting to Gemini" if payload["env"] == "production" else f"Loading {payload['model']}"
     )
-    return HttpResponse(format_html(
-        "<div id='vlm-status-banner' class='vlm-banner vlm-banner--{status}'"
-        " hx-get='{path}' hx-trigger='every 2s' hx-swap='outerHTML' hx-target='this'>"
-        "<span class='dot'></span> {label} ({status})"
-        "</div>",
-        status = payload["status"],
-        path = request.path,
-        label = label,
-    ))
+    return HttpResponse(
+        format_html(
+            "<div id='vlm-status-banner' class='vlm-banner vlm-banner--{status}'"
+            " hx-get='{path}' hx-trigger='every 2s' hx-swap='outerHTML' hx-target='this'>"
+            "<span class='dot'></span> {label} ({status})"
+            "</div>",
+            status=payload["status"],
+            path=request.path,
+            label=label,
+        )
+    )
 
 
 @require_http_methods(["POST"])
@@ -315,7 +357,7 @@ def approval_pending(request: HttpRequest, execution_id: str) -> HttpResponse:
     """HTMX poll endpoint that returns the modal HTML when an approval is waiting."""
     userId = str(request.user.pk)
     if tasksRepo.getExecution(userId, str(execution_id)) is None:
-        return HttpResponse(status = 404)
+        return HttpResponse(status=404)
     pending = pendingApprovalFor(str(execution_id))
     return renderApprovalModal(str(execution_id), pending)
 
@@ -325,7 +367,7 @@ def approval_pending(request: HttpRequest, execution_id: str) -> HttpResponse:
 def approval_decide(request: HttpRequest, execution_id: str, decision: str) -> JsonResponse:
     userId = str(request.user.pk)
     if tasksRepo.getExecution(userId, str(execution_id)) is None:
-        return JsonResponse({"error": "execution not found"}, status = 404)
+        return JsonResponse({"error": "execution not found"}, status=404)
     approved = decision.lower() in {"approve", "approved", "yes", "ok"}
     delivered = submitDecision(str(execution_id), approved)
     return JsonResponse({"delivered": delivered, "approved": approved})
@@ -342,7 +384,7 @@ def preview_pending(request: HttpRequest, execution_id: str) -> HttpResponse:
     """
     userId = str(request.user.pk)
     if tasksRepo.getExecution(userId, str(execution_id)) is None:
-        return HttpResponse(status = 404)
+        return HttpResponse(status=404)
     preview = fetchPreviewApproval(str(execution_id))
     return renderPreviewModal(str(execution_id), preview)
 
@@ -359,10 +401,10 @@ def preview_decide(request: HttpRequest, execution_id: str, decision: str) -> Js
     """
     userId = str(request.user.pk)
     if tasksRepo.getExecution(userId, str(execution_id)) is None:
-        return JsonResponse({"error": "execution not found"}, status = 404)
+        return JsonResponse({"error": "execution not found"}, status=404)
     approved = decision.lower() in {"approve", "approved", "yes", "ok"}
     status = "approved" if approved else "cancelled"
-    delivered = setPreviewStatus(str(execution_id), status = status)
+    delivered = setPreviewStatus(str(execution_id), status=status)
     return JsonResponse({"delivered": delivered, "status": status})
 
 
@@ -378,11 +420,11 @@ def step_screenshot(request: HttpRequest, execution_id: str, step_index: int) ->
     userId = str(request.user.pk)
     execution = tasksRepo.getExecution(userId, str(execution_id))
     if execution is None:
-        return HttpResponse(status = 404)
+        return HttpResponse(status=404)
     png = _screenshotStore().fetch(str(execution_id), int(step_index))
     if png is None:
-        return HttpResponse(status = 404)
-    response = HttpResponse(png, content_type = "image/png")
+        return HttpResponse(status=404)
+    response = HttpResponse(png, content_type="image/png")
     response["Cache-Control"] = "private, max-age=3600"
     return response
 
@@ -393,7 +435,7 @@ def task_detail_json(request: HttpRequest, task_id: str) -> JsonResponse:
     userId = str(request.user.pk)
     task = tasksRepo.getTask(userId, str(task_id))
     if task is None:
-        return JsonResponse({"error": "task not found"}, status = 404)
+        return JsonResponse({"error": "task not found"}, status=404)
     executions = tasksRepo.listExecutionsForTask(userId, str(task_id))
     steps: list[dict] = []
     if executions:

@@ -1,4 +1,5 @@
 """Unit tests for the safety subsystem."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,22 +11,22 @@ from agent.safety.risk_classifier import classifyRisk
 
 
 def test_classifyRiskHighOnDelete():
-    action = Action(type = ActionType.CLICK, target = "#delete-account", reasoning = "delete the account")
+    action = Action(type=ActionType.CLICK, target="#delete-account", reasoning="delete the account")
     assert classifyRisk(action, "remove account") == RiskLevel.HIGH
 
 
 def test_classifyRiskHighOnPasswordFill():
-    action = Action(type = ActionType.FILL, target = "input[type=password]", value = "secret-password")
+    action = Action(type=ActionType.FILL, target="input[type=password]", value="secret-password")
     assert classifyRisk(action, "log into bank") == RiskLevel.HIGH
 
 
 def test_classifyRiskLowOnNavigate():
-    action = Action(type = ActionType.NAVIGATE, target = "http://example.com")
+    action = Action(type=ActionType.NAVIGATE, target="http://example.com")
     assert classifyRisk(action, "browse") == RiskLevel.LOW
 
 
 def test_classifyRiskSafeOnFinish():
-    assert classifyRisk(Action(type = ActionType.FINISH), "anything") == RiskLevel.SAFE
+    assert classifyRisk(Action(type=ActionType.FINISH), "anything") == RiskLevel.SAFE
 
 
 def test_classifyRiskIgnoresPartialMatches():
@@ -40,20 +41,20 @@ def test_classifyRiskIgnoresPartialMatches():
         ("resubscribe newsletter", "resubscribe to the newsletter"),
     ]
     for target, description in safeCases:
-        action = Action(type = ActionType.CLICK, target = target, reasoning = "")
+        action = Action(type=ActionType.CLICK, target=target, reasoning="")
         assert classifyRisk(action, description) != RiskLevel.HIGH, target
 
 
 def test_classifyRiskMatchesWholeWordDeleteInsideSelector():
     # Hyphens and pound signs are non-word chars so the boundary still
     # fires inside CSS selectors the agent commonly emits.
-    action = Action(type = ActionType.CLICK, target = "button.delete-row")
+    action = Action(type=ActionType.CLICK, target="button.delete-row")
     assert classifyRisk(action, "") == RiskLevel.HIGH
 
 
 def test_approvalGateAutoApprovesBelowThreshold():
-    gate = ApprovalGate(autoApproveBelow = RiskLevel.MEDIUM)
-    action = Action(type = ActionType.NAVIGATE, target = "http://x", risk = RiskLevel.LOW)
+    gate = ApprovalGate(autoApproveBelow=RiskLevel.MEDIUM)
+    action = Action(type=ActionType.NAVIGATE, target="http://x", risk=RiskLevel.LOW)
     assert asyncio.run(gate.requestApproval(action)) is True
 
 
@@ -64,8 +65,8 @@ def test_approvalGateInvokesDeciderOnHighRisk():
         decisions.append(True)
         return False
 
-    gate = ApprovalGate(decider = decider)
-    action = Action(type = ActionType.CLICK, target = "#delete", risk = RiskLevel.HIGH)
+    gate = ApprovalGate(decider=decider)
+    action = Action(type=ActionType.CLICK, target="#delete", risk=RiskLevel.HIGH)
     result = asyncio.run(gate.requestApproval(action))
     assert decisions == [True]
     assert result is False
@@ -73,24 +74,24 @@ def test_approvalGateInvokesDeciderOnHighRisk():
 
 def test_buildAuditPayloadFromStep():
     step = ObservationStep(
-        index = 2,
-        url = "http://x",
-        action = Action(
-            type = ActionType.CLICK,
-            target = "#submit",
-            tier = 2,
-            cost_usd = 0.0005,
-            risk = RiskLevel.LOW,
-            model_used = "mock",
-            reasoning = "click",
+        index=2,
+        url="http://x",
+        action=Action(
+            type=ActionType.CLICK,
+            target="#submit",
+            tier=2,
+            cost_usd=0.0005,
+            risk=RiskLevel.LOW,
+            model_used="mock",
+            reasoning="click",
         ),
-        verificationOk = True,
+        verificationOk=True,
     )
     payload = buildAuditPayload(
-        userId = "u1",
-        taskId = "t1",
-        executionId = "e1",
-        step = step,
+        userId="u1",
+        taskId="t1",
+        executionId="e1",
+        step=step,
     )
     d = payload.asDict()
     assert d["user_id"] == "u1"

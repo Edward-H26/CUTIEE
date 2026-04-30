@@ -2,7 +2,7 @@
 
 Per INFO490 A10 rubric Section 4.2: at least two real failure cases, each with
 **what failed**, **why it failed** (model | retrieval | prompt | data root cause),
-**evidence**, and **planned mitigation**. Three are documented below.
+**evidence**, and **planned mitigation**. Four are documented below.
 
 ---
 
@@ -158,6 +158,11 @@ lost.
 - **Already shipped:** the reflector / decomposer fallback chain (Qwen → Gemini →
   Heuristic) means a Qwen JSON parse failure does not lose the lesson; it just
   promotes the call to Gemini (~$0.001 per call) or to the heuristic implementation.
+- **Already verified:** `tests/agent/test_reflector_fallback_chain.py` exercises the
+  three-tier chain by monkeypatching both `local_llm.generateText` and
+  `LlmReflector._reflectViaGemini` to raise within a single `reflect()` call. The
+  test asserts that `HeuristicReflector` still emits at least one lesson, so the
+  documented mitigation is testable rather than narrative-only.
 - **Future work:** wrap `local_llm.generateText` with a JSON-mode generation flag
   if a future Qwen release supports OpenAI-style `response_format={"type":"json_object"}`.
   Today only the cloud Gemini path enforces JSON via `response_mime_type` config.
@@ -167,16 +172,75 @@ lost.
 
 ---
 
+## Failure D — Plan drift on a cached procedural template
+
+### What failed
+
+A user re-runs a task whose procedural template was learned against an earlier
+version of the target site. The cached fragment expects the next step at
+`/checkout/preferences`, but the site has been redesigned and the route is now
+`/checkout/account`. Without protection, the replay would click on stale
+coordinates, type into the wrong fields, and either fail silently or commit
+the wrong data. Plan drift is the data-side analog of model drift: the runner's
+plan is correct against the world it learned, but the world has moved on.
+
+### Why it failed
+
+**Root cause class: data.**
+
+- **Cached procedural templates encode the world at learning time.** The template
+  records `expected_url` plus pixel coordinates per step. Site redesigns,
+  A/B-test variants, and feature-flag rollouts all break this contract.
+- **No external invalidation signal.** CUTIEE has no webhook from the target
+  site that says "we redesigned the checkout flow"; the fragment confidence
+  threshold (`CUTIEE_REPLAY_FRAGMENT_CONFIDENCE=0.80`) was useful in the
+  reverse direction (rejecting low-confidence fragments at learn time) but
+  cannot detect site drift after the fact.
+
+### Evidence
+
+- `agent/harness/computer_use_loop.py:_handlePlanDrift` is the dedicated hook
+  that fires on every replay step. It compares the live URL to the fragment's
+  `expected_url` via `_urlsMatchLoose` and pauses the runner on divergence.
+- `SPEC.md:136-138` describes the contract: a drift event surfaces the original
+  task description plus the drift summary to the approval gate; the user
+  approves the new direction or cancels the run.
+- `tests/agent/test_hybrid_replay.py` includes drift-handling assertions that
+  verify the runner does not execute a stale fragment when the URL diverges.
+- Audit trail records `completion_reason="plan_drift_cancelled"` when the user
+  cancels and resumes with a fresh Gemini call when the user approves.
+
+### Planned mitigation
+
+- **Already shipped:** Phase 17 plan-drift detection at the replay step boundary
+  (`_handlePlanDrift` plus `_urlsMatchLoose`) blocks the runner before any
+  stale action executes. The user is asked to confirm or cancel.
+- **Already shipped:** the approval modal renders the goal and the drift summary
+  side by side so the user can judge whether the new layout is the same task or
+  a different one.
+- **Already shipped:** procedural template strength decays per `agent/memory/decay.py`
+  so a stale template gradually loses its retrieval priority and a fresh template
+  takes over once it accumulates enough strength on the new layout.
+- **Future work:** introduce a "template invalidation event" surfaced from the
+  domain telemetry layer so a known site redesign deletes affected templates
+  before the user encounters them. Today the user does this implicitly by
+  cancelling on drift.
+
+---
+
 ## Summary
 
-All three failures are **gracefully degraded** rather than crashing the runner:
+All four failures are **gracefully degraded** rather than crashing the runner:
 
 - Failure A exits the run with a clear reason (`auth_expired`) instead of looping
   on a login page until the cost cap fires.
 - Failure B drifts toward a partial completion; Phase 17 catches the URL
   divergence and asks the user; replay short-circuits the issue on subsequent runs.
 - Failure C silently falls through to Gemini or to the heuristic implementation;
-  the task succeeds even if memory write-back was suppressed.
+  the task succeeds even if memory write-back was suppressed; the chaos test at
+  `tests/agent/test_reflector_fallback_chain.py` verifies the three-tier chain.
+- Failure D blocks the runner before any stale fragment executes; the user
+  approves or cancels via the same approval gate that handles high-risk actions.
 
 The shared lesson is that CUTIEE's safety / fallback layers exist precisely
 because every component (CU model, Qwen, Gemini, the recency pruner, the user's

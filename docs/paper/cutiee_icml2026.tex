@@ -1,0 +1,194 @@
+%%%%%%%% ICML 2026 PREPRINT SUBMISSION CUTIEE %%%%%%%%%%%%%%%%%
+
+\documentclass{article}
+
+% Recommended, but optional, packages for figures and better typesetting:
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs} % for professional tables
+
+% hyperref makes hyperlinks in the resulting PDF.
+% If your build breaks (sometimes temporarily if a hyperlink spans a page)
+% please comment out the following usepackage line and replace
+% \usepackage{icml2026} with \usepackage[nohyperref]{icml2026} above.
+\usepackage{hyperref}
+
+% Attempt to make hyperref and algorithmic work together better:
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+% Use the following line for the initial blind version submitted for review:
+% \usepackage{icml2026}
+
+% For preprint, use
+\usepackage[preprint]{icml2026}
+
+% If accepted, instead use the following line for the camera-ready submission:
+% \usepackage[accepted]{icml2026}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{amsthm}
+
+% if you use cleveref..
+\usepackage[capitalize,noabbrev]{cleveref}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{assumption}[theorem]{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% Todonotes is useful during development; simply uncomment the next line
+%    and comment out the line below the next line to turn off comments
+%\usepackage[disable,textsize=tiny]{todonotes}
+\usepackage[textsize=tiny]{todonotes}
+
+% Running title
+\icmltitlerunning{CUTIEE: Token Efficient Computer Use for the Enterprise}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{CUTIEE: A Business to Business Platform for Transparent, \\
+Token Efficient Computer Use Agents \\
+Unifying Personal Task Automation and Compliance Audit Automation}
+
+\icmlsetsymbol{equal}{*}
+\icmlsetsymbol{first}{$\dagger$}
+
+\begin{icmlauthorlist}
+\icmlauthor{Qiran Hu}{first,uiuc}
+\icmlauthor{Alex Zurita}{equal,uiuc}
+\icmlauthor{Mia Huang}{equal,uiuc}
+\icmlauthor{Shoi Rathi}{equal,uiuc}
+\end{icmlauthorlist}
+
+\icmlaffiliation{uiuc}{University of Illinois Urbana-Champaign, USA}
+
+\icmlcorrespondingauthor{Qiran Hu}{qiranh2@illinois.edu}
+
+\icmlkeywords{Computer Use Agents, Vision-Language Models, Procedural Memory, Compliance Automation, Enterprise AI}
+
+\vskip 0.3in
+]
+
+\printAffiliationsAndNotice{$\dagger$First author and framework originator. *These authors contributed equally to application development.}
+
+\begin{abstract}
+We present CUTIEE (Computer Use agentIc framework with Token efficient harnEss Engineering), business-to-business platform that increases internal productivity for operational tasks as they navigate through enterprise systems to collect compliance evidence. Current computer use agents remain prohibitively expensive at approximately \$0.10 - \$0.40 per task. They are inefficient to many scenarios, such as interface changes and precise audit in enterprise environments. CUTIEE addresses these challenges through three distinct mechanisms. Procedural memory replay succeed task trajectories, eliminating redundant inference on recurring workflows and extending prior work on workflow induction. Temporal context pruning retains the most recent interaction states, reducing context tokens by 60 to 80\%. Multimodel routing dynamically assigns tasks with different difficulty to the different models, reducing inference costs by 70 to 78\% while maintaining performance. As a result, these mechanisms reduce per-task cost from \$0.30 to \$0.004 at steady state, representing a 98.7\% reduction. This improvement enables scalable, auditable automation of enterprise workflows while maintaining efficiency and robustness.
+
+\textbf{Team Name:} CUTIEE \quad \textbf{Team Number:} 1
+\end{abstract}
+
+\section{Problem Statement}
+\label{sec:problem}
+
+Enterprises face two parallel productivity crises rooted in the same bottleneck: graphical interface work that resists automation. Knowledge workers at regulated enterprises lose on the order of 200 hours per employee per year to repetitive browser bound tasks such as expense reconciliation, cross system data migration, and recurring report generation, each of which blocks higher leverage output. Compliance teams carry a parallel burden of 300 to 500 hours per audit cycle collecting evidence from legacy systems that expose no programmatic interface, at roughly \$150 per hour in external consultant labor. Existing solutions each fail on at least one dimension: cloud Computer Use Agents on frontier models remain prohibitively expensive at \$0.10 to \$0.40 per task because every screenshot encodes to thousands of visual tokens; classical robotic process automation breaks on every interface change; and programmatic compliance platforms cannot reach systems without APIs. Industry projections place task specific AI agents inside 40 percent of enterprise applications by 2026, yet per task cost remains the deployment blocker: 1{,}000 employees at \$0.30 per task incurs over \$312{,}000 per year. Recent research addresses the cost problem in isolation. Microsoft Fara-7B matches frontier accuracy at only 7 billion parameters~\cite{fara7b2025}; \citet{wang2024awm} induce reusable workflow memory that lifts task success by 24.6 percent on Mind2Web and 51.1 percent on WebArena, and \citet{fang2025memp,zhang2025ace} treat agent memory as a first class optimization target through procedural lifecycles and generation reflection curation loops; \citet{li2026pruning} identify a recency effect that enables aggressive screenshot pruning; \citet{liu2026avr} report that adaptive vision language model routing yields 78 percent inference cost reduction within two percentage points of an all large model baseline. CUTIEE composes the most production ready of these advances into a single auditable harness. Fragment level memory replay, temporal recency pruning, and confidence based multi model routing together cut steady state per task cost from approximately \$0.30 to \$0.004, a 98.7 percent reduction, while a pre run preview and an immutable evidence trail preserve auditability.
+
+\section{Target Users}
+\label{sec:users}
+
+CUTIEE targets regulated mid market and enterprise organizations of 500 to 50{,}000 employees in financial services, healthcare, technology SaaS, and professional services, where knowledge workers and compliance teams face the two cost pressures simultaneously. Three stakeholders with complementary objectives anchor the buying decision. The Chief Human Resources Officer derives an estimated recovery of 200 or more hours per employee per year for higher leverage activity, framed as a capacity gain rather than a headcount reduction. The Chief Information Security Officer extends evidence coverage to the streams that API based platforms such as Vanta and Drata cannot reach, producing immutable trails consistent with SOC~2 Type~II, ISO~27001, HIPAA, PCI~DSS, GDPR, and NIST~800-53. The Chief Financial Officer records composite savings exceeding \$500{,}000 per year for an organization of 1{,}000 employees, with payback under three months. End users, whether knowledge workers or compliance analysts, share a single web interface backed by per user memory and audit isolation enforced at the database constraint layer, common audit provenance, and identical safety gates that pause on any irreversible action.
+
+\section{Final Feature Set}
+\label{sec:features}
+
+\textbf{Three core efficiency mechanisms.}
+\emph{Fragment level procedural memory replay} stores each successful trajectory as a set of canonical action bullets and replays them at zero inference cost when a per fragment confidence threshold (default 0.80) is met. Bullets with empty value fields replay verbatim through Playwright, while bullets with populated value fields reuse the recorded coordinate and let the model regenerate only the dynamic value, supporting parametric reuse across runs. Bullets are managed by an agentic context engineering loop following \citet{zhang2025ace}: a Generator produces the trajectory, a Reflector distills lessons from successes and failures, a quality gate filters at threshold 0.60, and a Curator merges accepted lessons into memory through deterministic delta edits. Each bullet carries three strength channels (semantic, episodic, procedural) with separate exponential decay rates, and retrieval ranks candidates by a convex combination of relevance, total strength, type priority, and a capped facet bonus, building on the workflow induction of \citet{wang2024awm}, the procedural memory lifecycle of \citet{fang2025memp}, and benchmark practice from \citet{xie2024osworld,zhou2023webarena}.
+\emph{Temporal recency pruning} retains the most recent three observation steps verbatim, condenses the next three to action text only, summarizes the long tail to a deterministic rollup, and applies an additional eight turn cap on the Computer Use tool history, cutting context tokens by 60 to 80 percent without measurable accuracy loss~\cite{li2026pruning}.
+\emph{Multi model routing} classifies each action by difficulty and dispatches it to a tiered model pool with confidence based escalation, cutting inference cost by approximately 70 to 78 percent relative to a single frontier baseline~\cite{liu2026avr}. A small local model such as Qwen3 0.8B or ShowUI-2B handles routine clicks and form fills on CPU at near zero marginal cost, a compact specialist such as Fara-7B quantized to four bits~\cite{fara7b2025} handles moderately complex reasoning on a local GPU at roughly \$0.003 per call, and a cloud frontier model such as Gemini 3 Flash or Claude Sonnet handles ambiguous or high stakes actions at roughly \$0.02 per call. Every tier returns actions in the same canonical form so that audit provenance and replay semantics are invariant across routes.
+
+\textbf{Transparency and trust.} A pre run natural language preview, generated by one short Computer Use call before any browser action fires, lets the user approve or cancel the planned task. A plan drift detector pauses the loop and requests a fresh approval when the observed page state diverges from a fragment's recorded URL or perceptual hash. Every executed action writes an immutable audit entry capturing the model used, tokens, cost, risk class, verification outcome, and approval status, and a per step screenshot is archived in Neo4j with a three day TTL. A memory dashboard surfaces every stored bullet for inspection and stale marking, high risk actions identified by a word boundary keyword classifier pause the runner on an in process approval queue, and a hard wallet ceiling at the per task, per hour, and per day grain is enforced through an atomic Neo4j cost ledger that terminates any breaching run with an explicit completion reason, following the verification discipline of \citet{nguyen2025verificagent}.
+
+\textbf{Product surface.} The \emph{operational automation module} accepts natural language tasks with an optional starting URL and runs them on a managed Chromium instance streamed to the user via noVNC. The \emph{compliance audit module} surfaces the same audit log under filterable views and supports JSON export for external workpaper assembly, covering the 20 to 40 percent of evidence that requires graphical navigation of legacy systems. Per user data isolation is enforced at the Neo4j layer through a constraint that requires a populated \texttt{user\_id} on every memory bullet.
+
+\textbf{Deprioritized for the first release.} Native mobile clients, multi agent orchestration, and a custom fine tuning pipeline were scoped out. The initial release targets browser based workflows on a frozen Gemini Flash backbone, and the three mechanisms above deliver the cost profile without needing those surfaces.
+
+\section{User Flow}
+\label{sec:functionality}
+
+A user interacts with CUTIEE through a single Django web application that exposes four surfaces: a task submission and progress view with a live embedded browser, a memory dashboard that visualizes stored bullets and supports template export, a paginated audit trail with on demand screenshot retrieval, and a Chart.js cost dashboard. Authentication is federated through Google OAuth via django-allauth, sessions persist to Neo4j, and each user's memory and audit data are isolated at the constraint layer. The end to end journey spans two operational stages.
+
+\textbf{Stage 1: First run, preview, and template creation.} A user signs in with Google and submits a task as a short natural language description plus an optional starting URL. Before any browser action fires, CUTIEE issues one low cost preview call that summarizes the planned trajectory, persists it as a \texttt{:PreviewApproval} node, and renders an HTMX modal for the user to approve or cancel. On approval the runner enters the Computer Use loop: each step is screenshotted, sent through the recency pruner, evaluated by Gemini Flash, classified for risk, charged against the per user cost ledger, and committed to the audit log, with the live browser visible to the user via noVNC throughout. High risk actions pause on the same modal pattern. On successful completion the agentic context engineering pipeline runs once: the Reflector mines lessons from the trajectory, the quality gate filters them at threshold 0.60, and the Curator computes a delta over existing memory so the new bullets become the procedural template that future runs can replay. \emph{Features surfaced:} pre run preview, recency pruning, in flight approval gates, immutable audit log, live cost dashboard, post run memory writeback.
+
+\textbf{Stage 2: Continuous operation, fragment replay, and self healing.} On every subsequent run the fragment matcher evaluates each stored bullet against the current task and page state, assigns a per fragment confidence, and chains the matches into a replay plan. Matched fragments execute through Playwright at zero inference cost; value variant fragments reuse the recorded coordinate while the model regenerates only the dynamic value. When a target portal changes and an observed page state diverges from a recorded fragment, the plan drift detector pauses the runner, opens a fresh \texttt{:PreviewApproval} node with a revised summary, and waits for the user to approve continuation under the new plan. The Reflector and Curator continue to refine memory across runs through decay and strength updates, while ad hoc model calls regenerate any selectors that no longer match. Compliance leads export immutable audit trails, finance leads read live cost reports against the daily wallet cap, and the memory dashboard surfaces every bullet for inspection or stale marking. \emph{Features surfaced:} fragment level replay, plan drift detection, agentic context engineering memory evolution, recency pruning, immutable audit log, cost governance with hard ceilings.
+
+\small
+
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Awadallah et~al.(2025)]{fara7b2025}
+A.~Awadallah, Y.~Lara, R.~Magazine, H.~Mozannar, A.~Nambi, Y.~Pandya,
+  A.~Rajeswaran, C.~Rosset, A.~Taymanov, V.~Vineet, S.~Whitehead, and A.~Zhao.
+\newblock {Fara-7B}: An efficient agentic model for computer use.
+\newblock \emph{arXiv preprint arXiv:2511.19663}, 2025.
+
+\bibitem[Fang et~al.(2025)]{fang2025memp}
+R.~Fang, Y.~Liang, X.~Wang, J.~Wu, S.~Qiao, P.~Xie, F.~Huang, H.~Chen, and
+  N.~Zhang.
+\newblock {Memp}: Exploring agent procedural memory.
+\newblock \emph{arXiv preprint arXiv:2508.06433}, 2025.
+
+\bibitem[Li et~al.(2026)]{li2026pruning}
+D.~Li, Z.~Pan, Z.~Zhang, R.~Chen, H.~Wang, H.~Chen, and H.~Jiang.
+\newblock Rethinking token pruning for historical screenshots in {GUI} visual
+  agents: Semantic, spatial, and temporal perspectives.
+\newblock \emph{arXiv preprint arXiv:2603.26041}, 2026.
+
+\bibitem[Liu et~al.(2026)]{liu2026avr}
+X.~Liu, B.~He, X.~Liu, A.~Luo, H.~Zhang, and H.~Chen.
+\newblock Adaptive vision language model routing for computer use agents.
+\newblock \emph{arXiv preprint arXiv:2603.12823}, 2026.
+
+\bibitem[Nguyen et~al.(2025)]{nguyen2025verificagent}
+T.~Q.~Nguyen, S.~Desai, R.~H.~Anwar, F.~Shaik, V.~Suryanarayanan, and
+  V.~Chowdhary.
+\newblock {VerificAgent}: Domain specific memory verification for scalable
+  oversight of aligned computer use agents.
+\newblock \emph{arXiv preprint arXiv:2506.02539}, 2025.
+
+\bibitem[Wang et~al.(2024)]{wang2024awm}
+Z.~Wang, J.~Mao, D.~Fried, and G.~Neubig.
+\newblock Agent workflow memory.
+\newblock \emph{arXiv preprint arXiv:2409.07429}, 2024.
+
+\bibitem[Xie et~al.(2024)]{xie2024osworld}
+T.~Xie, D.~Zhang, J.~Chen, X.~Li, S.~Zhao, R.~Cao, T.~J. Hua, Z.~Cheng,
+  D.~Shin, F.~Lei, Y.~Liu, Y.~Xu, S.~Zhou, S.~Savarese, C.~Xiong, V.~Zhong, and
+  T.~Yu.
+\newblock {OSWorld}: Benchmarking multimodal agents for open ended tasks in
+  real computer environments.
+\newblock \emph{arXiv preprint arXiv:2404.07972}, 2024.
+
+\bibitem[Zhang et~al.(2025)]{zhang2025ace}
+Q.~Zhang, C.~Hu, S.~Upasani, B.~Ma, F.~Hong, V.~Kamanuru, J.~Rainton, C.~Wu,
+  M.~Ji, H.~Li, U.~Thakker, J.~Zou, and K.~Olukotun.
+\newblock Agentic context engineering: Evolving contexts for self improving
+  language models.
+\newblock \emph{arXiv preprint arXiv:2510.04618}, 2025.
+
+\bibitem[Zhou et~al.(2023)]{zhou2023webarena}
+S.~Zhou, F.~F. Xu, H.~Zhu, X.~Zhou, R.~Lo, A.~Sridhar, X.~Cheng, T.~Ou,
+  Y.~Bisk, D.~Fried, U.~Alon, and G.~Neubig.
+\newblock {WebArena}: A realistic web environment for building autonomous
+  agents.
+\newblock \emph{arXiv preprint arXiv:2307.13854}, 2023.
+
+\end{thebibliography}
+
+\end{document}

@@ -10,12 +10,13 @@ installed or if we cannot compute any redaction regions, we return the
 original bytes and rely on Phase 10 reflector scrubbing to catch
 credentials in bullet content.
 """
+
 from __future__ import annotations
 
 import io
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 logger = logging.getLogger("cutiee.redactor")
@@ -29,6 +30,7 @@ CREDENTIAL_LABEL_RE = re.compile(
 @dataclass
 class RedactionRegion:
     """A rectangle in screen coordinates to mask before persistence."""
+
     x: int
     y: int
     width: int
@@ -78,12 +80,12 @@ def redactScreenshot(
                     region.x + region.width,
                     region.y + region.height,
                 )
-                draw.rectangle(box, fill = (0, 0, 0))
+                draw.rectangle(box, fill=(0, 0, 0))
             buffer = io.BytesIO()
-            img.save(buffer, format = "PNG", optimize = True, compress_level = 9)
+            img.save(buffer, format="PNG", optimize=True, compress_level=9)
             return buffer.getvalue()
     except Exception:
-        logger.warning("Screenshot redaction failed; returning original bytes", exc_info = True)
+        logger.warning("Screenshot redaction failed; returning original bytes", exc_info=True)
         return pngBytes
 
 
@@ -99,13 +101,15 @@ def regionsFromTexts(
     out: list[RedactionRegion] = []
     for label, region in texts:
         if CREDENTIAL_LABEL_RE.search(label):
-            out.append(RedactionRegion(
-                x = region.x,
-                y = region.y,
-                width = region.width,
-                height = region.height,
-                reason = f"label:{label}",
-            ))
+            out.append(
+                RedactionRegion(
+                    x=region.x,
+                    y=region.y,
+                    width=region.width,
+                    height=region.height,
+                    reason=f"label:{label}",
+                )
+            )
     return out
 
 
@@ -170,7 +174,7 @@ async def playwrightDomRedactor(
             try:
                 elements = await page.query_selector_all(selector)
             except Exception:  # noqa: BLE001 - selector failures never block the run
-                logger.debug("redactor selector failed: %s", selector, exc_info = True)
+                logger.debug("redactor selector failed: %s", selector, exc_info=True)
                 continue
             for element in elements:
                 try:
@@ -179,14 +183,16 @@ async def playwrightDomRedactor(
                     continue
                 if not box:
                     continue
-                regions.append(RedactionRegion(
-                    x = int(box["x"]),
-                    y = int(box["y"]),
-                    width = max(1, int(box["width"])),
-                    height = max(1, int(box["height"])),
-                    reason = f"selector:{selector}",
-                ))
+                regions.append(
+                    RedactionRegion(
+                        x=int(box["x"]),
+                        y=int(box["y"]),
+                        width=max(1, int(box["width"])),
+                        height=max(1, int(box["height"])),
+                        reason=f"selector:{selector}",
+                    )
+                )
     except Exception:  # noqa: BLE001 - never crash the audit pipeline
-        logger.debug("playwrightDomRedactor top-level failure", exc_info = True)
+        logger.debug("playwrightDomRedactor top-level failure", exc_info=True)
         return []
     return regions

@@ -20,8 +20,10 @@ Standalone usage:
     pruner = RecencyPruner(recencyWindow=3, middleWindow=3)
     pruned = pruner.prune(state.history)
     prompt_block = pruner.formatForPrompt(pruned)
-    print(f"Reduction: {pruner.reductionRatio(state.history) * 100:.0f}%")
+    # Example inspection:
+    # logging.getLogger(__name__).info("Reduction: %.0f%%", pruner.reductionRatio(state.history) * 100)
 """
+
 from .context_window import (
     DEFAULT_MIDDLE_WINDOW,
     DEFAULT_RECENCY_WINDOW,

@@ -7,6 +7,7 @@ template-match threshold, the planner reconstructs an ordered list of
 browser controller. The first failed verification falls back to the router,
 which produces a replacement procedural bullet via `DeltaUpdate`.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,8 +22,8 @@ from .bullet import Bullet
 @dataclass
 class ReplayPlan:
     topic: str
-    bullets: list[Bullet] = field(default_factory = list)
-    actions: list[Action] = field(default_factory = list)
+    bullets: list[Bullet] = field(default_factory=list)
+    actions: list[Action] = field(default_factory=list)
     score: float = 0.0
 
 
@@ -34,14 +35,16 @@ class ReplayPlanner:
 
     async def findReplayPlan(self, taskDescription: str, userId: str) -> ReplayPlan | None:
         del userId  # ACEMemory inside the pipeline is already user-scoped.
-        candidates = self.pipeline.retrieveRelevantBullets(taskDescription, k = 24)
+        candidates = self.pipeline.retrieveRelevantBullets(taskDescription, k=24)
         procedural = [b for b in candidates if b.memory_type == "procedural"]
         if not procedural:
             return None
 
         topicScores: dict[str, float] = {}
         topicBullets: dict[str, list[Bullet]] = {}
-        queryEmbedding = embedTexts([taskDescription], useHashFallback = self.pipeline.memory.useHashEmbedding)[0]
+        queryEmbedding = embedTexts(
+            [taskDescription], useHashFallback=self.pipeline.memory.useHashEmbedding
+        )[0]
 
         for bullet in procedural:
             if not bullet.topic:
@@ -53,18 +56,18 @@ class ReplayPlanner:
         if not topicScores:
             return None
 
-        bestTopic = max(topicScores, key = lambda t: topicScores[t])
+        bestTopic = max(topicScores, key=lambda t: topicScores[t])
         bestScore = topicScores[bestTopic]
         if bestScore < self.matchThreshold:
             return None
 
         bullets = topicBullets[bestTopic]
-        bullets.sort(key = _stepIndexFromContent)
+        bullets.sort(key=_stepIndexFromContent)
         actions = [_actionFromBullet(b) for b in bullets[: self.maxActions]]
         actions = [a for a in actions if a is not None]
         if not actions:
             return None
-        return ReplayPlan(topic = bestTopic, bullets = bullets, actions = actions, score = bestScore)
+        return ReplayPlan(topic=bestTopic, bullets=bullets, actions=actions, score=bestScore)
 
 
 from .text_utils import stepIndexFromContent as _stepIndexBase  # noqa: E402
@@ -83,11 +86,12 @@ def _actionFromBullet(bullet: Bullet) -> Action | None:
     function directly with `modelVariantOnNonEmptyValue=True`.
     """
     from .bullet_reconstruct import actionFromBullet
+
     action, _ = actionFromBullet(
         bullet,
-        modelVariantOnNonEmptyValue = False,
-        reasoningPrefix = "replay",
-        modelUsed = "replay",
+        modelVariantOnNonEmptyValue=False,
+        reasoningPrefix="replay",
+        modelUsed="replay",
     )
     return action
 

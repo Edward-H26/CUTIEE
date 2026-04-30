@@ -26,17 +26,22 @@ Requirements for a meaningful run:
     is installed; otherwise the stub browser is used and tasks
     still complete but only exercise the harness plumbing.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
+import logging
 import os
 import sys
 import traceback
-import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from agent.harness.completion import completionReasonSucceeded
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,22 +65,22 @@ class EvalResult:
 
 DEFAULT_TASKS: list[EvalTask] = [
     EvalTask(
-        name = "open_spreadsheet",
-        description = "Open the demo spreadsheet and locate row 17.",
-        startUrl = "http://localhost:5001/",
-        expectedFinish = "row_found",
+        name="open_spreadsheet",
+        description="Open the demo spreadsheet and locate row 17.",
+        startUrl="http://localhost:5001/",
+        expectedFinish="row_found",
     ),
     EvalTask(
-        name = "fill_form_wizard",
-        description = "Complete page 1 of the form wizard with sample data.",
-        startUrl = "http://localhost:5003/",
-        expectedFinish = "page_submitted",
+        name="fill_form_wizard",
+        description="Complete page 1 of the form wizard with sample data.",
+        startUrl="http://localhost:5003/",
+        expectedFinish="page_submitted",
     ),
     EvalTask(
-        name = "navigate_slides",
-        description = "Advance through five slides in the slide deck.",
-        startUrl = "http://localhost:5002/",
-        expectedFinish = "final_slide",
+        name="navigate_slides",
+        description="Advance through five slides in the slide deck.",
+        startUrl="http://localhost:5002/",
+        expectedFinish="final_slide",
     ),
 ]
 
@@ -92,6 +97,7 @@ def runSingle(task: EvalTask, backend: str, verbose: bool = False) -> EvalResult
     # has already set CUTIEE_ENV=production. Production + live Gemini
     # incurs real cost and should be opt-in.
     os.environ.setdefault("CUTIEE_ENV", "local")
+    effectiveBackend = _effectiveBackendLabel(backend)
     from apps.tasks import repo as tasksRepo
     from apps.tasks import services
 
@@ -101,52 +107,71 @@ def runSingle(task: EvalTask, backend: str, verbose: bool = False) -> EvalResult
     # mimics that contract so real audit, memory, and progress paths
     # exercise identically to a user-submitted run.
     taskRow = tasksRepo.createTask(
-        userId = "eval-harness",
-        description = task.description,
-        initialUrl = task.startUrl,
+        userId="eval-harness",
+        description=task.description,
+        initialUrl=task.startUrl,
     )
     # Compatible with both dataclass and dict returns from createTask.
-    taskId = taskRow["id"] if isinstance(taskRow, dict) else getattr(taskRow, "id", getattr(taskRow, "task_id", None))
+    taskId = (
+        taskRow["id"]
+        if isinstance(taskRow, dict)
+        else getattr(taskRow, "id", getattr(taskRow, "task_id", None))
+    )
     if not taskId:
         raise RuntimeError(f"createTask returned unrecognized shape: {taskRow!r}")
     try:
         summary = services.runTaskForUser(
-            userId = "eval-harness",
-            taskId = taskId,
-            description = task.description,
-            initialUrl = task.startUrl,
+            userId="eval-harness",
+            taskId=taskId,
+            description=task.description,
+            initialUrl=task.startUrl,
         )
         finished = datetime.now(timezone.utc)
+        notes = f"elapsed={(finished - started).total_seconds():.2f}s execution={summary.executionId[:8]}"
+        if effectiveBackend != backend:
+            notes = f"{notes} requested_backend={backend}"
         return EvalResult(
-            task = task.name,
-            backend = backend,
-            success = bool(summary.completed and summary.completionReason != "cost_cap_reached"),
-            steps = summary.stepCount,
-            costUsd = summary.totalCostUsd,
-            completionReason = summary.completionReason,
-            notes = f"elapsed={(finished - started).total_seconds():.2f}s execution={summary.executionId[:8]}",
+            task=task.name,
+            backend=effectiveBackend,
+            success=bool(summary.completed and completionReasonSucceeded(summary.completionReason)),
+            steps=summary.stepCount,
+            costUsd=summary.totalCostUsd,
+            completionReason=summary.completionReason,
+            notes=notes,
         )
     except Exception as exc:
         tail = traceback.format_exc().splitlines()[-3:]
         if verbose:
-            traceback.print_exc(file = sys.stderr)
+            _logger.exception("eval task %s failed on backend %s", task.name, backend)
         return EvalResult(
-            task = task.name,
-            backend = backend,
-            success = False,
-            steps = 0,
-            costUsd = 0.0,
-            completionReason = "eval_error",
-            notes = f"{exc!r} | {' | '.join(tail)}",
+            task=task.name,
+            backend=effectiveBackend,
+            success=False,
+            steps=0,
+            costUsd=0.0,
+            completionReason="eval_error",
+            notes=f"{exc!r} | {' | '.join(tail)}",
         )
 
 
+def _effectiveBackendLabel(requestedBackend: str) -> str:
+    cutieeEnv = os.environ.get("CUTIEE_ENV", "")
+    localUsesGemini = cutieeEnv == "local" and os.environ.get(
+        "CUTIEE_LOCAL_USE_GEMINI", "false"
+    ).lower() in {"1", "true", "yes"}
+    if cutieeEnv == "production" or localUsesGemini:
+        return requestedBackend
+    return "mock"
+
+
 def writeOutputs(results: list[EvalResult], outDir: Path) -> Path:
-    outDir.mkdir(parents = True, exist_ok = True)
+    outDir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
     csvPath = outDir / f"{stamp}-backend-comparison.csv"
-    with csvPath.open("w", newline = "") as fh:
-        writer = csv.DictWriter(fh, fieldnames = list(asdict(EvalResult("", "", False, 0, 0.0)).keys()))
+    with csvPath.open("w", newline="") as fh:
+        writer = csv.DictWriter(
+            fh, fieldnames=list(asdict(EvalResult("", "", False, 0, 0.0)).keys())
+        )
         writer.writeheader()
         for row in results:
             writer.writerow(asdict(row))
@@ -178,57 +203,61 @@ def runSuite(backends: list[str], tasks: list[EvalTask], verbose: bool) -> list[
     out: list[EvalResult] = []
     for backend in backends:
         for task in tasks:
-            out.append(runSingle(task, backend, verbose = verbose))
+            out.append(runSingle(task, backend, verbose=verbose))
     return out
 
 
 def parseArgs(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog = "webvoyager_lite")
+    parser = argparse.ArgumentParser(prog="webvoyager_lite")
     parser.add_argument(
         "--backend",
-        action = "append",
-        choices = ["gemini", "browser_use"],
-        default = [],
-        help = "CU backend to exercise. Pass more than once to run multiple.",
+        action="append",
+        choices=["gemini", "browser_use"],
+        default=[],
+        help="CU backend to exercise. Pass more than once to run multiple.",
     )
     parser.add_argument(
         "--out",
-        default = "data/eval",
-        help = "Output directory for the CSV and markdown summary.",
+        default="data/eval",
+        help="Output directory for the CSV and markdown summary.",
     )
     parser.add_argument(
         "--live",
-        action = "store_true",
-        help = "Unlock real-site runs. Requires CUTIEE_EVAL_LIVE=1.",
+        action="store_true",
+        help="Unlock real-site runs. Requires CUTIEE_EVAL_LIVE=1.",
     )
     parser.add_argument(
-        "-v", "--verbose",
-        action = "store_true",
-        help = "Print tracebacks for each failing task to stderr.",
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print tracebacks for each failing task to stderr.",
     )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = parseArgs(argv)
     backends = args.backend or ["gemini"]
     if args.live and os.environ.get("CUTIEE_EVAL_LIVE") != "1":
-        print("--live requires CUTIEE_EVAL_LIVE=1; aborting.", file = sys.stderr)
+        _logger.error("--live requires CUTIEE_EVAL_LIVE=1; aborting.")
         return 2
 
-    results = runSuite(backends, DEFAULT_TASKS, verbose = args.verbose)
+    results = runSuite(backends, DEFAULT_TASKS, verbose=args.verbose)
     csvPath = writeOutputs(results, Path(args.out))
-    print()
-    print(f"{'backend':14s} {'task':24s} {'ok':5s} {'steps':>5s} {'cost':>9s} {'reason':20s} notes")
-    print("-" * 100)
+    _logger.info("")
+    _logger.info(
+        f"{'backend':14s} {'task':24s} {'ok':5s} {'steps':>5s} {'cost':>9s} {'reason':20s} notes"
+    )
+    _logger.info("-" * 100)
     for row in results:
-        print(
+        _logger.info(
             f"{row.backend:14s} {row.task:24s} "
             f"{str(row.success):5s} {row.steps:>5d} ${row.costUsd:>7.4f} "
             f"{row.completionReason[:19]:20s} {row.notes[:60]}"
         )
-    print()
-    print(f"CSV: {csvPath}")
+    _logger.info("")
+    _logger.info("CSV: %s", csvPath)
     return 0
 
 

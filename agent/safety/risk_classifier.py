@@ -11,6 +11,7 @@ match "unpublished". The password and SSN check for FILL actions keeps
 substring matching because sensitive selectors routinely appear as
 "input[name=password]" or "ssn-last-four".
 """
+
 from __future__ import annotations
 
 import re
@@ -51,9 +52,7 @@ MEDIUM_RISK_KEYWORDS: tuple[str, ...] = (
 
 
 def _compile(keywords: tuple[str, ...]) -> tuple[re.Pattern[str], ...]:
-    return tuple(
-        re.compile(r"\b" + re.escape(k) + r"\b", re.IGNORECASE) for k in keywords
-    )
+    return tuple(re.compile(r"\b" + re.escape(k) + r"\b", re.IGNORECASE) for k in keywords)
 
 
 _HIGH_RISK_PATTERNS: tuple[re.Pattern[str], ...] = _compile(HIGH_RISK_KEYWORDS)

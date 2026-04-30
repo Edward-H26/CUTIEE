@@ -6,6 +6,7 @@ record goes into the audit stream (as a debug-level log line today)
 and can be redirected to Neo4j or the HTMX dashboard without changing
 the caller.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,7 +16,7 @@ from dataclasses import dataclass
 logger = logging.getLogger("cutiee.cost_telemetry")
 
 
-@dataclass(frozen = True)
+@dataclass(frozen=True)
 class StepCost:
     stepIndex: int
     backend: str
@@ -36,10 +37,10 @@ def emitStepCost(cost: StepCost) -> None:
         "usd": round(cost.costUsd, 6),
         "cumulative_usd": round(cost.cumulativeUsd, 6),
     }
-    logger.info("cost %s", json.dumps(payload, sort_keys = True))
+    logger.info("cost %s", json.dumps(payload, sort_keys=True))
 
 
-@dataclass(frozen = True)
+@dataclass(frozen=True)
 class TaskCost:
     userId: str
     executionId: str
@@ -60,4 +61,4 @@ def emitTaskCost(cost: TaskCost) -> None:
         "replay_hits": cost.replayHitCount,
         "saved_via_replay": savedViaReplay,
     }
-    logger.info("task_cost %s", json.dumps(payload, sort_keys = True))
+    logger.info("task_cost %s", json.dumps(payload, sort_keys=True))

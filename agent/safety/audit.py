@@ -5,6 +5,7 @@ formats a row and hands it to `apps.audit.repo.append_audit`. Persisting
 through the repo (rather than in-line Cypher here) keeps the database surface
 in one place and lets us swap the storage backend later if needed.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -48,20 +49,20 @@ def buildAuditPayload(
 ) -> AuditPayload:
     action = step.action
     return AuditPayload(
-        id = str(uuid.uuid4()),
-        user_id = str(userId),
-        task_id = str(taskId),
-        execution_id = str(executionId),
-        step_index = step.index,
-        timestamp = (step.timestamp or datetime.now(timezone.utc)).isoformat(),
-        action = action.type.value if action else "noop",
-        target = (action.target if action else "") or "",
-        value = (action.value if action and action.value else "") or "",
-        reasoning = (action.reasoning if action else "") or "",
-        model = (action.model_used if action else "") or "",
-        tier = action.tier if action else 0,
-        cost_usd = action.cost_usd if action else 0.0,
-        risk = action.risk.value if action else "safe",
-        approval_status = approvalStatus,
-        verification_ok = step.verificationOk,
+        id=str(uuid.uuid4()),
+        user_id=str(userId),
+        task_id=str(taskId),
+        execution_id=str(executionId),
+        step_index=step.index,
+        timestamp=(step.timestamp or datetime.now(timezone.utc)).isoformat(),
+        action=action.type.value if action else "noop",
+        target=(action.target if action else "") or "",
+        value=(action.value if action and action.value else "") or "",
+        reasoning=(action.reasoning if action else "") or "",
+        model=(action.model_used if action else "") or "",
+        tier=action.tier if action else 0,
+        cost_usd=action.cost_usd if action else 0.0,
+        risk=action.risk.value if action else "safe",
+        approval_status=approvalStatus,
+        verification_ok=step.verificationOk,
     )

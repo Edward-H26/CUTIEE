@@ -9,6 +9,7 @@ should never appear on a freshly-recorded step. These tests guard
 against accidental regressions where someone re-introduces the old
 tier numbering or makes replay charge a non-zero tier.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,14 +20,14 @@ import pytest
 
 from agent.harness.computer_use_loop import ComputerUseRunner
 from agent.harness.state import Action, ActionType
-from agent.routing.models.gemini_cu import ComputerUseStep, MockComputerUseClient
+from agent.routing.models.gemini_cu import MockComputerUseClient
 from agent.safety.approval_gate import ApprovalGate
 
 
 @dataclass
 class _SilentBrowser:
     fakeUrl: str = "https://example.com/app"
-    actions: list[Action] = field(default_factory = list)
+    actions: list[Action] = field(default_factory=list)
     started: bool = False
     stopped: bool = False
 
@@ -50,6 +51,7 @@ class _SilentBrowser:
             success: bool = True
             detail: str = ""
             durationMs: int = 1
+
         return _R()
 
 
@@ -57,18 +59,18 @@ class _SilentBrowser:
 async def test_cu_step_records_tier_one() -> None:
     """Every model-driven step must record tier=1."""
     client = MockComputerUseClient(
-        actionsToReturn = [
-            Action(type = ActionType.CLICK_AT, coordinate = (10, 10)),
-            Action(type = ActionType.FINISH, reasoning = "done"),
+        actionsToReturn=[
+            Action(type=ActionType.CLICK_AT, coordinate=(10, 10)),
+            Action(type=ActionType.FINISH, reasoning="done"),
         ],
     )
     runner = ComputerUseRunner(
-        browser = _SilentBrowser(),
-        client = client,
-        approvalGate = ApprovalGate(),
-        initialUrl = "https://example.com",
+        browser=_SilentBrowser(),
+        client=client,
+        approvalGate=ApprovalGate(),
+        initialUrl="https://example.com",
     )
-    state = await runner.run(userId = "u", taskId = "t", taskDescription = "demo")
+    state = await runner.run(userId="u", taskId="t", taskDescription="demo")
 
     # Initial nav step is tier 0 (harness-emitted, no model call).
     assert state.history[0].action.tier == 0
@@ -90,11 +92,11 @@ def test_replay_action_is_tier_zero() -> None:
     from agent.memory.replay import _actionFromBullet
 
     bullet = Bullet(
-        content = "step_index=0 action=click_at target='' value='' coordinate=(100,200)",
-        memory_type = "procedural",
-        topic = "task:demo",
-        concept = "click_at",
-        tags = ["task:demo", "domain:example.com"],
+        content="step_index=0 action=click_at target='' value='' coordinate=(100,200)",
+        memory_type="procedural",
+        topic="task:demo",
+        concept="click_at",
+        tags=["task:demo", "domain:example.com"],
     )
     action = _actionFromBullet(bullet)
     assert action is not None
@@ -110,11 +112,11 @@ def test_replay_with_legacy_cu_tag_still_tier_zero() -> None:
     from agent.memory.replay import _actionFromBullet
 
     bullet = Bullet(
-        content = "step_index=0 action=click_at target='' value='' coordinate=(50,60)",
-        memory_type = "procedural",
-        topic = "task:demo",
-        concept = "click_at",
-        tags = ["task:demo", "tier:cu"],  # legacy tag from pre-pivot bullets
+        content="step_index=0 action=click_at target='' value='' coordinate=(50,60)",
+        memory_type="procedural",
+        topic="task:demo",
+        concept="click_at",
+        tags=["task:demo", "tier:cu"],  # legacy tag from pre-pivot bullets
     )
     action = _actionFromBullet(bullet)
     assert action is not None
@@ -126,20 +128,20 @@ def test_no_tier_higher_than_one_is_emitted() -> None:
     """A whole-run scan: no live-recorded step should ever land at tier 2/3/4."""
     asyncio.set_event_loop_policy(None)
     client = MockComputerUseClient(
-        actionsToReturn = [
-            Action(type = ActionType.CLICK_AT, coordinate = (1, 2)),
-            Action(type = ActionType.TYPE_AT, coordinate = (3, 4), value = "hello"),
-            Action(type = ActionType.SCROLL_AT, coordinate = (5, 6), scrollDy = 100),
-            Action(type = ActionType.FINISH, reasoning = "done"),
+        actionsToReturn=[
+            Action(type=ActionType.CLICK_AT, coordinate=(1, 2)),
+            Action(type=ActionType.TYPE_AT, coordinate=(3, 4), value="hello"),
+            Action(type=ActionType.SCROLL_AT, coordinate=(5, 6), scrollDy=100),
+            Action(type=ActionType.FINISH, reasoning="done"),
         ],
     )
     runner = ComputerUseRunner(
-        browser = _SilentBrowser(),
-        client = client,
-        approvalGate = ApprovalGate(),
-        initialUrl = "https://example.com",
+        browser=_SilentBrowser(),
+        client=client,
+        approvalGate=ApprovalGate(),
+        initialUrl="https://example.com",
     )
-    state = asyncio.run(runner.run(userId = "u", taskId = "t", taskDescription = "demo"))
+    state = asyncio.run(runner.run(userId="u", taskId="t", taskDescription="demo"))
 
     for step in state.history:
         assert step.action.tier in {0, 1}, (

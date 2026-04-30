@@ -22,6 +22,7 @@ Match shape:
 
 The runner replays h1, h2, h3 and only invokes the model for hX, hY.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -32,11 +33,12 @@ from .action_graph import ActionNode, ProcedureGraph
 @dataclass
 class SubgraphMatch:
     """Result of matching a new task against a stored procedure."""
+
     storedProcedureId: str
-    matchedNodes: list[ActionNode]          # the prefix that matches (replayable)
-    matchedLength: int                      # len(matchedNodes), surfaced for ranking
-    newTaskTotalLength: int                 # so caller can compute coverage ratio
-    unmatchedSuffixLength: int              # len(new task) - matchedLength
+    matchedNodes: list[ActionNode]  # the prefix that matches (replayable)
+    matchedLength: int  # len(matchedNodes), surfaced for ranking
+    newTaskTotalLength: int  # so caller can compute coverage ratio
+    unmatchedSuffixLength: int  # len(new task) - matchedLength
 
     @property
     def coverageRatio(self) -> float:
@@ -55,6 +57,7 @@ class SubgraphMatcher:
       requireFullMatch: if True, only return matches that cover the
         ENTIRE new task (equivalent to the existing whole-template replay).
     """
+
     minPrefixLength: int = 2
     requireFullMatch: bool = False
 
@@ -78,11 +81,11 @@ class SubgraphMatcher:
             if self.requireFullMatch and prefix != len(newHashes):
                 continue
             match = SubgraphMatch(
-                storedProcedureId = stored.procedure_id,
-                matchedNodes = stored.nodes[:prefix],
-                matchedLength = prefix,
-                newTaskTotalLength = len(newHashes),
-                unmatchedSuffixLength = len(newHashes) - prefix,
+                storedProcedureId=stored.procedure_id,
+                matchedNodes=stored.nodes[:prefix],
+                matchedLength=prefix,
+                newTaskTotalLength=len(newHashes),
+                unmatchedSuffixLength=len(newHashes) - prefix,
             )
             if best is None or match.matchedLength > best.matchedLength:
                 best = match
@@ -110,6 +113,7 @@ class ReusableStep:
     matches are returned for telemetry but not auto-executed because the
     page state may diverge from what the stored node expects.
     """
+
     newTaskIndex: int
     matchedNode: ActionNode
     sourceProcedureId: str
@@ -160,12 +164,14 @@ def findReusableSteps(
             inPrefix = False
             continue
         matchedNode, procId = match
-        out.append(ReusableStep(
-            newTaskIndex = i,
-            matchedNode = matchedNode,
-            sourceProcedureId = procId,
-            safeToReplay = inPrefix,
-        ))
+        out.append(
+            ReusableStep(
+                newTaskIndex=i,
+                matchedNode=matchedNode,
+                sourceProcedureId=procId,
+                safeToReplay=inPrefix,
+            )
+        )
 
     return out
 

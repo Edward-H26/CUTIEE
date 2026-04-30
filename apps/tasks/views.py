@@ -1,4 +1,5 @@
 """Server-rendered views for the tasks app."""
+
 from __future__ import annotations
 
 import logging
@@ -23,15 +24,24 @@ def _safeListAndCost(userId: str) -> tuple[list, dict, str]:
     UI render with an actionable remediation hint.
     """
     try:
-        tasks = tasksRepo.listTasksForUser(userId, limit = 50)
+        tasks = tasksRepo.listTasksForUser(userId, limit=50)
         cost = tasksRepo.costSummaryForUser(userId)
         return tasks, cost, ""
     except Exception:  # noqa: BLE001 - fail soft for UI
-        _logger.warning("Neo4j fetch failed for /tasks/", exc_info = True)
+        _logger.warning("Neo4j fetch failed for /tasks/", exc_info=True)
         health = checkNeo4jReachable()
         msg = health.remediation or "Database temporarily unavailable."
-        return [], {"total_cost": 0.0, "task_count": 0, "execution_count": 0,
-                    "step_count": 0, "replay_step_count": 0}, msg
+        return (
+            [],
+            {
+                "total_cost": 0.0,
+                "task_count": 0,
+                "execution_count": 0,
+                "step_count": 0,
+                "replay_step_count": 0,
+            },
+            msg,
+        )
 
 
 @login_required
@@ -42,7 +52,7 @@ def task_list(request: HttpRequest) -> HttpResponse:
     try:
         activeExecution = tasksRepo.findActiveExecutionForUser(userId)
     except Exception:  # noqa: BLE001 - optional panel, fail soft for UI
-        _logger.debug("findActiveExecutionForUser failed; hiding live panel", exc_info = True)
+        _logger.debug("findActiveExecutionForUser failed; hiding live panel", exc_info=True)
     return render(
         request,
         "tasks/list.html",
@@ -53,7 +63,7 @@ def task_list(request: HttpRequest) -> HttpResponse:
             "db_error": dbError,
             "active_execution": activeExecution,
             "active_execution_task_url": (
-                reverse("tasks:detail", kwargs = {"task_id": activeExecution["task_id"]})
+                reverse("tasks:detail", kwargs={"task_id": activeExecution["task_id"]})
                 if activeExecution and activeExecution.get("task_id")
                 else ""
             ),
@@ -68,23 +78,23 @@ def create_task(request: HttpRequest) -> HttpResponse:
     form = TaskSubmissionForm(request.POST)
     if not form.is_valid():
         userId = str(request.user.pk)
-        tasks = tasksRepo.listTasksForUser(userId, limit = 50)
+        tasks = tasksRepo.listTasksForUser(userId, limit=50)
         cost = tasksRepo.costSummaryForUser(userId)
         return render(
             request,
             "tasks/list.html",
             {"tasks": tasks, "cost": cost, "form": form},
-            status = 400,
+            status=400,
         )
 
     description, initialUrl, domainHint = form.cleanedTuple()
     task = tasksRepo.createTask(
-        userId = str(request.user.pk),
-        description = description,
-        initialUrl = initialUrl,
-        domainHint = domainHint,
+        userId=str(request.user.pk),
+        description=description,
+        initialUrl=initialUrl,
+        domainHint=domainHint,
     )
-    return redirect("tasks:detail", task_id = task["id"])
+    return redirect("tasks:detail", task_id=task["id"])
 
 
 @login_required
@@ -107,15 +117,20 @@ def task_detail(request: HttpRequest, task_id: str) -> HttpResponse:
 @login_required
 def cost_dashboard(request: HttpRequest) -> HttpResponse:
     userId = str(request.user.pk)
-    cost = {"total_cost": 0.0, "task_count": 0, "execution_count": 0,
-            "step_count": 0, "replay_step_count": 0}
+    cost = {
+        "total_cost": 0.0,
+        "task_count": 0,
+        "execution_count": 0,
+        "step_count": 0,
+        "replay_step_count": 0,
+    }
     tier_distribution: list = []
     db_error = ""
     try:
         cost = tasksRepo.costSummaryForUser(userId)
         tier_distribution = tasksRepo.tierDistributionForUser(userId)
     except Exception:  # noqa: BLE001 - fail soft for UI
-        _logger.warning("Neo4j fetch failed for /tasks/dashboard/", exc_info = True)
+        _logger.warning("Neo4j fetch failed for /tasks/dashboard/", exc_info=True)
         db_error = checkNeo4jReachable().remediation or "Database temporarily unavailable."
     return render(
         request,

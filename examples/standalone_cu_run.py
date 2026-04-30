@@ -10,6 +10,7 @@ Usage:
 Override the model with CUTIEE_CU_MODEL=gemini-3-flash-preview if you
 want deterministic replay across Google Flash promotions.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,22 +26,20 @@ from agent import (
 
 async def main() -> None:
     if not os.environ.get("GEMINI_API_KEY"):
-        raise SystemExit(
-            "Set GEMINI_API_KEY in your env. Get one at https://aistudio.google.com."
-        )
+        raise SystemExit("Set GEMINI_API_KEY in your env. Get one at https://aistudio.google.com.")
 
     runner = ComputerUseRunner(
-        browser = BrowserController(),  # visible window by default
-        client = GeminiComputerUseClient(),  # gemini-flash-latest
-        approvalGate = ApprovalGate(),  # auto-approves below MEDIUM risk
-        initialUrl = "https://en.wikipedia.org",
-        maxSteps = 6,
+        browser=BrowserController(),  # visible window by default
+        client=GeminiComputerUseClient(),  # gemini-flash-latest
+        approvalGate=ApprovalGate(),  # auto-approves below MEDIUM risk
+        initialUrl="https://en.wikipedia.org",
+        maxSteps=6,
     )
 
     state = await runner.run(
-        userId = "demo-user",
-        taskId = "wiki-jupiter-moons",
-        taskDescription = "Search Wikipedia for the four largest moons of Jupiter and click on the top result.",
+        userId="demo-user",
+        taskId="wiki-jupiter-moons",
+        taskDescription="Search Wikipedia for the four largest moons of Jupiter and click on the top result.",
     )
 
     print()

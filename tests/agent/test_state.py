@@ -1,4 +1,5 @@
 """Unit tests for the agent state dataclasses."""
+
 from __future__ import annotations
 
 from agent.harness.state import (
@@ -11,7 +12,7 @@ from agent.harness.state import (
 
 
 def test_actionDefaults():
-    action = Action(type = ActionType.CLICK)
+    action = Action(type=ActionType.CLICK)
     assert action.target == ""
     assert action.tier == 0
     assert action.confidence == 0.0
@@ -22,11 +23,11 @@ def test_actionDefaults():
 
 def test_actionAsDict():
     action = Action(
-        type = ActionType.FILL,
-        target = "#email",
-        value = "alice@example.com",
-        tier = 1,
-        cost_usd = 0.0001,
+        type=ActionType.FILL,
+        target="#email",
+        value="alice@example.com",
+        tier=1,
+        cost_usd=0.0001,
     )
     d = action.asDict()
     assert d["type"] == "fill"
@@ -36,36 +37,36 @@ def test_actionAsDict():
 
 
 def test_actionFinishDetect():
-    assert Action(type = ActionType.FINISH).isFinish() is True
-    assert Action(type = ActionType.CLICK).isFinish() is False
+    assert Action(type=ActionType.FINISH).isFinish() is True
+    assert Action(type=ActionType.CLICK).isFinish() is False
 
 
 def test_observationStepShortSummary():
     step = ObservationStep(
-        index = 3,
-        action = Action(type = ActionType.NAVIGATE, target = "http://example.com"),
-        verificationOk = True,
+        index=3,
+        action=Action(type=ActionType.NAVIGATE, target="http://example.com"),
+        verificationOk=True,
     )
     summary = step.shortSummary()
     assert "step=3" in summary
     assert "action=navigate" in summary
     assert "ok" in summary
 
-    failed = ObservationStep(index = 4, action = Action(type = ActionType.CLICK), verificationOk = False)
+    failed = ObservationStep(index=4, action=Action(type=ActionType.CLICK), verificationOk=False)
     assert "fail" in failed.shortSummary()
 
 
 def test_agentStateAccumulatesCost():
-    state = AgentState(taskId = "t", userId = "u", taskDescription = "demo")
-    state.appendStep(ObservationStep(index = 0, action = Action(type = ActionType.CLICK, cost_usd = 0.001)))
-    state.appendStep(ObservationStep(index = 1, action = Action(type = ActionType.CLICK, cost_usd = 0.002)))
+    state = AgentState(taskId="t", userId="u", taskDescription="demo")
+    state.appendStep(ObservationStep(index=0, action=Action(type=ActionType.CLICK, cost_usd=0.001)))
+    state.appendStep(ObservationStep(index=1, action=Action(type=ActionType.CLICK, cost_usd=0.002)))
     assert abs(state.totalCostUsd - 0.003) < 1e-9
     assert state.stepCount() == 2
     assert len(state.lastNSteps(1)) == 1
 
 
 def test_markComplete():
-    state = AgentState(taskId = "t", userId = "u", taskDescription = "demo")
+    state = AgentState(taskId="t", userId="u", taskDescription="demo")
     state.markComplete("done")
     assert state.isComplete is True
     assert state.completionReason == "done"

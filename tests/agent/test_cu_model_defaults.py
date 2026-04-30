@@ -10,6 +10,7 @@ the default at a model that doesn't support CU (gemini-3.1-flash-lite-preview)
 or a model that's pro-priced (the 2.5 specialty preview) would silently
 break runs or burn budget.
 """
+
 from __future__ import annotations
 
 import os
@@ -33,9 +34,9 @@ def test_default_model_is_flash_priced() -> None:
 def test_supported_set_excludes_known_unsupported_models() -> None:
     """The live API rejects these with 400 'Computer Use is not enabled'."""
     for unsupported in ("gemini-3.1-flash-lite-preview", "gemini-3.1-flash"):
-        assert unsupported not in gemini_cu.SUPPORTED_CU_MODELS, (
-            f"{unsupported!r} does not support CU and should not be in SUPPORTED_CU_MODELS"
-        )
+        assert (
+            unsupported not in gemini_cu.SUPPORTED_CU_MODELS
+        ), f"{unsupported!r} does not support CU and should not be in SUPPORTED_CU_MODELS"
 
 
 def test_specialty_preview_kept_for_opt_in() -> None:
@@ -59,7 +60,7 @@ def test_env_override_changes_default(monkeypatch: pytest.MonkeyPatch) -> None:
     finally:
         # Restore the original module state so subsequent tests get the
         # real default.
-        monkeypatch.delenv("CUTIEE_CU_MODEL", raising = False)
+        monkeypatch.delenv("CUTIEE_CU_MODEL", raising=False)
         importlib.reload(gemini_cu)
 
 

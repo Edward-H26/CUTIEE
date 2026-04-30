@@ -5,6 +5,7 @@ expected header row, the right Content-Type, and the attachment-style
 Content-Disposition. The endpoint catches Neo4j failures and falls back
 to an empty series, so the test stays independent of a live Neo4j.
 """
+
 from __future__ import annotations
 
 from unittest import mock
@@ -16,7 +17,7 @@ from django.test import Client
 
 @pytest.mark.django_db
 def test_costTimeseriesCsvHeadersAndShape() -> None:
-    user = get_user_model().objects.create_user(username = "csv-export", password = "pw")
+    user = get_user_model().objects.create_user(username="csv-export", password="pw")
     client = Client()
     client.force_login(user)
 
@@ -26,7 +27,7 @@ def test_costTimeseriesCsvHeadersAndShape() -> None:
     ]
     with mock.patch(
         "apps.tasks.repo.costTimeseriesForUser",
-        return_value = sample,
+        return_value=sample,
     ):
         response = client.get("/tasks/api/cost-timeseries.csv?days=14")
 
@@ -44,13 +45,13 @@ def test_costTimeseriesCsvHeadersAndShape() -> None:
 
 @pytest.mark.django_db
 def test_costTimeseriesCsvEmptyOnDbError() -> None:
-    user = get_user_model().objects.create_user(username = "csv-empty", password = "pw")
+    user = get_user_model().objects.create_user(username="csv-empty", password="pw")
     client = Client()
     client.force_login(user)
 
     with mock.patch(
         "apps.tasks.repo.costTimeseriesForUser",
-        side_effect = RuntimeError("neo4j down"),
+        side_effect=RuntimeError("neo4j down"),
     ):
         response = client.get("/tasks/api/cost-timeseries.csv")
 

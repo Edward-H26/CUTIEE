@@ -10,6 +10,7 @@ The pruner is stateless. It accepts a list of `ObservationStep`s, partitions
 them into the three zones, and returns a `PrunedContext` the orchestrator
 hands to the VLM. Empirical reduction on a 15-step trace is ~80%.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -30,17 +31,18 @@ def estimateTokens(text: str) -> int:
         return 0
     return max(1, len(text) // 4)
 
+
 DEFAULT_RECENCY_WINDOW = 3
 DEFAULT_MIDDLE_WINDOW = 3
 
 
 @dataclass
 class PrunedContext:
-    recent: list[ObservationStep] = field(default_factory = list)
-    middle: list[ObservationStep] = field(default_factory = list)
+    recent: list[ObservationStep] = field(default_factory=list)
+    middle: list[ObservationStep] = field(default_factory=list)
     distantSummary: str = ""
     estimatedTokens: int = 0
-    fgBgBudgets: list[TokenBudget] = field(default_factory = list)
+    fgBgBudgets: list[TokenBudget] = field(default_factory=list)
     rawHistoryLength: int = 0
 
 
@@ -54,15 +56,12 @@ class RecencyPruner:
         if not history:
             return PrunedContext()
         history = list(history)
-        recent = history[-self.recencyWindow:] if self.recencyWindow > 0 else []
+        recent = history[-self.recencyWindow :] if self.recencyWindow > 0 else []
         beforeRecent = history[: max(0, len(history) - self.recencyWindow)]
-        middle = beforeRecent[-self.middleWindow:] if self.middleWindow > 0 else []
+        middle = beforeRecent[-self.middleWindow :] if self.middleWindow > 0 else []
         distant = beforeRecent[: max(0, len(beforeRecent) - self.middleWindow)]
 
-        budgets = [
-            allocateFgBgBudget(self.perStepFullBudget, idx)
-            for idx in range(len(recent))
-        ]
+        budgets = [allocateFgBgBudget(self.perStepFullBudget, idx) for idx in range(len(recent))]
 
         recentTokens = sum(estimateTokens(step.domMarkdown or "") for step in recent)
         middleTokens = sum(estimateTokens(step.shortSummary()) for step in middle)
@@ -70,12 +69,12 @@ class RecencyPruner:
         distantTokens = estimateTokens(distantSummary)
 
         return PrunedContext(
-            recent = recent,
-            middle = middle,
-            distantSummary = distantSummary,
-            estimatedTokens = recentTokens + middleTokens + distantTokens,
-            fgBgBudgets = budgets,
-            rawHistoryLength = len(history),
+            recent=recent,
+            middle=middle,
+            distantSummary=distantSummary,
+            estimatedTokens=recentTokens + middleTokens + distantTokens,
+            fgBgBudgets=budgets,
+            rawHistoryLength=len(history),
         )
 
     def formatForPrompt(self, pruned: PrunedContext) -> str:
@@ -91,8 +90,12 @@ class RecencyPruner:
             recentBlocks: list[str] = []
             for offset, step in enumerate(reversed(pruned.recent)):
                 recencyIndex = offset
-                budget = pruned.fgBgBudgets[recencyIndex] if recencyIndex < len(pruned.fgBgBudgets) else None
-                domSlice = (step.domMarkdown or "")
+                budget = (
+                    pruned.fgBgBudgets[recencyIndex]
+                    if recencyIndex < len(pruned.fgBgBudgets)
+                    else None
+                )
+                domSlice = step.domMarkdown or ""
                 if budget is not None and budget.foreground:
                     domSlice = domSlice[: budget.foreground * 4]
                 blockHeader = f"[recent step {step.index}] {step.shortSummary()}"

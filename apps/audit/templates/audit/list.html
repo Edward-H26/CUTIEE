@@ -24,7 +24,7 @@
                 </thead>
                 <tbody>
                 {% for e in entries %}
-                    <tr>
+                    <tr id="audit-{{ e.id }}">
                         <td class="mono">{{ e.timestamp|slice:":19" }}</td>
                         <td>{{ e.action }}</td>
                         <td class="mono">{{ e.target|truncatechars:50 }}</td>

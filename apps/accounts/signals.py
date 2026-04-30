@@ -9,6 +9,7 @@ store, and the mirror retries lazily next time any domain code touches Neo4j
 (it's an idempotent MERGE). This prevents transient infra issues from
 blocking auth.
 """
+
 from __future__ import annotations
 
 import logging
@@ -23,7 +24,7 @@ from agent.persistence.neo4j_client import run_query
 logger = logging.getLogger("cutiee.accounts")
 
 
-@receiver(post_save, sender = settings.AUTH_USER_MODEL)
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def sync_user_to_neo4j(sender, instance, created, **kwargs) -> None:
     try:
         run_query(
@@ -35,17 +36,18 @@ def sync_user_to_neo4j(sender, instance, created, **kwargs) -> None:
                 u.is_staff = $is_staff,
                 u.updated_at = $updated_at
             """,
-            id = str(instance.pk),
-            username = instance.get_username(),
-            email = getattr(instance, "email", "") or "",
-            is_active = bool(instance.is_active),
-            is_staff = bool(instance.is_staff),
-            updated_at = datetime.now(timezone.utc).isoformat(),
+            id=str(instance.pk),
+            username=instance.get_username(),
+            email=getattr(instance, "email", "") or "",
+            is_active=bool(instance.is_active),
+            is_staff=bool(instance.is_staff),
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
     except Exception as exc:  # noqa: BLE001 - never block auth on Neo4j hiccups
         logger.warning(
             "Neo4j user mirror failed for user %s (%s); signup proceeds in "
             "Django's in-memory framework store. MERGE will retry lazily on "
             "next domain query.",
-            instance.pk, exc,
+            instance.pk,
+            exc,
         )

@@ -9,6 +9,7 @@ read its values. These tests pin the integration in three places:
 3. The base template renders `theme-<value>` on the body class via the
    `userTheme` context processor.
 """
+
 from __future__ import annotations
 
 from unittest import mock
@@ -23,12 +24,12 @@ from apps.accounts.models import UserPreference
 
 @pytest.mark.django_db
 def test_costTimeseriesUsesPreferenceWhenNoQueryParam() -> None:
-    user = get_user_model().objects.create_user(username = "pref-default", password = "pw")
-    UserPreference.objects.create(user = user, dashboard_window_days = 30)
+    user = get_user_model().objects.create_user(username="pref-default", password="pw")
+    UserPreference.objects.create(user=user, dashboard_window_days=30)
     client = Client()
     client.force_login(user)
 
-    with mock.patch("apps.tasks.repo.costTimeseriesForUser", return_value = []) as fake:
+    with mock.patch("apps.tasks.repo.costTimeseriesForUser", return_value=[]) as fake:
         response = client.get(reverse("tasks:cost_timeseries"))
     assert response.status_code == 200
     fake.assert_called_once()
@@ -38,12 +39,12 @@ def test_costTimeseriesUsesPreferenceWhenNoQueryParam() -> None:
 
 @pytest.mark.django_db
 def test_costTimeseriesQueryParamOverridesPreference() -> None:
-    user = get_user_model().objects.create_user(username = "pref-override", password = "pw")
-    UserPreference.objects.create(user = user, dashboard_window_days = 30)
+    user = get_user_model().objects.create_user(username="pref-override", password="pw")
+    UserPreference.objects.create(user=user, dashboard_window_days=30)
     client = Client()
     client.force_login(user)
 
-    with mock.patch("apps.tasks.repo.costTimeseriesForUser", return_value = []) as fake:
+    with mock.patch("apps.tasks.repo.costTimeseriesForUser", return_value=[]) as fake:
         response = client.get(reverse("tasks:cost_timeseries") + "?days=7")
     assert response.status_code == 200
     fake.assert_called_once()
@@ -52,12 +53,12 @@ def test_costTimeseriesQueryParamOverridesPreference() -> None:
 
 @pytest.mark.django_db
 def test_costTimeseriesUsesDefaultWhenNoPreferenceRow() -> None:
-    user = get_user_model().objects.create_user(username = "pref-missing", password = "pw")
+    user = get_user_model().objects.create_user(username="pref-missing", password="pw")
     client = Client()
     client.force_login(user)
-    assert not UserPreference.objects.filter(user = user).exists()
+    assert not UserPreference.objects.filter(user=user).exists()
 
-    with mock.patch("apps.tasks.repo.costTimeseriesForUser", return_value = []) as fake:
+    with mock.patch("apps.tasks.repo.costTimeseriesForUser", return_value=[]) as fake:
         response = client.get(reverse("tasks:cost_timeseries"))
     assert response.status_code == 200
     assert fake.call_args.kwargs["days"] == 14
@@ -65,8 +66,8 @@ def test_costTimeseriesUsesDefaultWhenNoPreferenceRow() -> None:
 
 @pytest.mark.django_db
 def test_themeContextProcessorOnBodyClass() -> None:
-    user = get_user_model().objects.create_user(username = "theme-user", password = "pw")
-    UserPreference.objects.create(user = user, theme = "slate")
+    user = get_user_model().objects.create_user(username="theme-user", password="pw")
+    UserPreference.objects.create(user=user, theme="slate")
     client = Client()
     client.force_login(user)
 
@@ -95,7 +96,7 @@ def test_userPreferenceForUserHandlesAnonymous() -> None:
 
 @pytest.mark.django_db
 def test_userPreferenceForUserMissingRowReturnsUnsavedDefault() -> None:
-    user = get_user_model().objects.create_user(username = "no-pref", password = "pw")
+    user = get_user_model().objects.create_user(username="no-pref", password="pw")
     pref = UserPreference.for_user(user)
     assert pref.pk is None
     assert pref.theme == "aurora"
@@ -104,8 +105,8 @@ def test_userPreferenceForUserMissingRowReturnsUnsavedDefault() -> None:
 
 @pytest.mark.django_db
 def test_userPreferenceForUserExistingRow() -> None:
-    user = get_user_model().objects.create_user(username = "has-pref", password = "pw")
-    UserPreference.objects.create(user = user, theme = "slate", dashboard_window_days = 60)
+    user = get_user_model().objects.create_user(username="has-pref", password="pw")
+    UserPreference.objects.create(user=user, theme="slate", dashboard_window_days=60)
     pref = UserPreference.for_user(user)
     assert pref.pk is not None
     assert pref.theme == "slate"

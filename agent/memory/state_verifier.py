@@ -22,6 +22,7 @@ A node passes verification only when BOTH signals agree (or when the
 expected fields are empty, in which case verification is skipped — so
 old ActionNodes saved before this Phase 4 upgrade still work).
 """
+
 from __future__ import annotations
 
 import io
@@ -38,10 +39,11 @@ DEFAULT_PHASH_HAMMING_THRESHOLD = 16  # max bit-difference (out of 64) to count 
 @dataclass
 class VerificationResult:
     """Outcome of a single state-verification check."""
+
     safe: bool
-    reason: str          # human-readable diagnosis (for audit log)
+    reason: str  # human-readable diagnosis (for audit log)
     urlMatch: bool
-    phashDistance: int | None     # None if either side lacked a phash
+    phashDistance: int | None  # None if either side lacked a phash
 
 
 def computeAverageHash(pngBytes: bytes, hashSize: int = 8) -> str:
@@ -67,11 +69,17 @@ def computeAverageHash(pngBytes: bytes, hashSize: int = 8) -> str:
         # Fallback: use sha256 (strict — any byte change defeats it).
         # Marked with a sentinel prefix so verifier knows it's degraded.
         import hashlib
+
         return "sha256:" + hashlib.sha256(pngBytes).hexdigest()[:16]
 
     try:
-        img = Image.open(io.BytesIO(pngBytes)).convert("L").resize(
-            (hashSize, hashSize), Image.Resampling.LANCZOS,
+        img = (
+            Image.open(io.BytesIO(pngBytes))
+            .convert("L")
+            .resize(
+                (hashSize, hashSize),
+                Image.Resampling.LANCZOS,
+            )
         )
         pixels = list(img.getdata())
         if not pixels:
@@ -132,12 +140,13 @@ class StateVerifier:
     a 64-bit aHash, which empirically tracks "looks the same to a
     human" on most browser pages.
     """
+
     phashThreshold: int = DEFAULT_PHASH_HAMMING_THRESHOLD
 
     def verify(
         self,
         *,
-        node: Any,                     # ActionNode (kept loose to avoid circular import)
+        node: Any,  # ActionNode (kept loose to avoid circular import)
         currentUrl: str,
         currentScreenshot: bytes,
     ) -> VerificationResult:
@@ -168,8 +177,8 @@ class StateVerifier:
         else:
             reasonParts.append(f"phash={phashDistance}/{self.phashThreshold}")
         return VerificationResult(
-            safe = safe,
-            reason = " ".join(reasonParts),
-            urlMatch = urlOk,
-            phashDistance = phashDistance,
+            safe=safe,
+            reason=" ".join(reasonParts),
+            urlMatch=urlOk,
+            phashDistance=phashDistance,
         )

@@ -1,4 +1,5 @@
 """CI-safe 4-step form wizard target — pruning-heavy long-horizon test."""
+
 from __future__ import annotations
 
 from flask import Flask, jsonify, redirect, render_template_string, request, session, url_for
@@ -12,9 +13,9 @@ def createApp() -> Flask:
 
     @app.get("/")
     def index():
-        return redirect(url_for("step", name = STEPS[0]))
+        return redirect(url_for("step", name=STEPS[0]))
 
-    @app.route("/step/<name>", methods = ["GET", "POST"])
+    @app.route("/step/<name>", methods=["GET", "POST"])
     def step(name: str):
         if name not in STEPS:
             return ("not found", 404)
@@ -23,9 +24,15 @@ def createApp() -> Flask:
             session.setdefault("data", {})[name] = request.form.to_dict()
             session.modified = True
             if index + 1 < len(STEPS):
-                return redirect(url_for("step", name = STEPS[index + 1]))
+                return redirect(url_for("step", name=STEPS[index + 1]))
             return redirect(url_for("submit"))
-        return render_template_string(_TEMPLATE, name = name, index = index, total = len(STEPS), data = session.get("data", {}).get(name, {}))
+        return render_template_string(
+            _TEMPLATE,
+            name=name,
+            index=index,
+            total=len(STEPS),
+            data=session.get("data", {}).get(name, {}),
+        )
 
     @app.post("/submit")
     def submit():
@@ -61,4 +68,4 @@ button{padding:8px 14px;background:#6C86C0;color:#fff;border:none;border-radius:
 
 
 if __name__ == "__main__":
-    createApp().run(host = "127.0.0.1", port = 5003, debug = True)
+    createApp().run(host="127.0.0.1", port=5003, debug=True)

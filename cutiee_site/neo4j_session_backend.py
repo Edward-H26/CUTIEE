@@ -2,6 +2,7 @@
 
 Adapted from miramemoria's SessionStore pattern.
 """
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class SessionStore(SessionBase):
-
     def load(self) -> dict:
         record = sessions_repo.load_django_session(self.session_key)
         if record and record.get("data"):
@@ -33,7 +33,7 @@ class SessionStore(SessionBase):
         for _ in range(10):
             self._session_key = self._get_new_session_key()
             try:
-                self.save(must_create = True)
+                self.save(must_create=True)
             except CreateError:
                 continue
             self.modified = True
@@ -46,7 +46,7 @@ class SessionStore(SessionBase):
             return self.create()
         if must_create and self.exists(self.session_key):
             raise CreateError()
-        data = self.encode(self._get_session(no_load = must_create))
+        data = self.encode(self._get_session(no_load=must_create))
         expire = self.get_expiry_date().isoformat()
         sessions_repo.save_django_session(self.session_key, data, expire)
 

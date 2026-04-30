@@ -11,12 +11,12 @@ for the distinctive visual signatures of Cloudflare Turnstile, Google
 reCAPTCHA v2, and hCaptcha. The scan uses a fuzzy hash comparison so
 minor UI changes do not break the detector.
 """
+
 from __future__ import annotations
 
 import io
 import logging
 from dataclasses import dataclass
-from typing import Any
 
 logger = logging.getLogger("cutiee.captcha_detector")
 
@@ -27,8 +27,8 @@ logger = logging.getLogger("cutiee.captcha_detector")
 # captured Cloudflare Turnstile and reCAPTCHA v2 widgets.
 CAPTCHA_SIGNATURES: tuple[tuple[str, tuple[int, int], float], ...] = (
     ("cloudflare_turnstile", (200, 240), 0.01),  # blue widget
-    ("recaptcha_v2", (210, 230), 0.02),          # light blue "I'm not a robot" box
-    ("hcaptcha", (25, 40), 0.01),                # yellow/orange accent
+    ("recaptcha_v2", (210, 230), 0.02),  # light blue "I'm not a robot" box
+    ("hcaptcha", (25, 40), 0.01),  # yellow/orange accent
 )
 
 
@@ -46,11 +46,11 @@ def detectCaptcha(pngBytes: bytes) -> CaptchaDetection:
     raise and never block on missing optional dependencies.
     """
     if not pngBytes:
-        return CaptchaDetection(detected = False)
+        return CaptchaDetection(detected=False)
     try:
         from PIL import Image
     except ImportError:
-        return CaptchaDetection(detected = False)
+        return CaptchaDetection(detected=False)
 
     try:
         with Image.open(io.BytesIO(pngBytes)) as img:
@@ -58,7 +58,7 @@ def detectCaptcha(pngBytes: bytes) -> CaptchaDetection:
             width, height = img.size
             pixels = img.getdata()
     except Exception:
-        return CaptchaDetection(detected = False)
+        return CaptchaDetection(detected=False)
 
     total = max(1, width * height)
     bestMatch: tuple[str, float] | None = None
@@ -76,6 +76,6 @@ def detectCaptcha(pngBytes: bytes) -> CaptchaDetection:
                 bestMatch = (name, fraction)
 
     if bestMatch is None:
-        return CaptchaDetection(detected = False)
+        return CaptchaDetection(detected=False)
     name, fraction = bestMatch
-    return CaptchaDetection(detected = True, kind = name, confidence = fraction)
+    return CaptchaDetection(detected=True, kind=name, confidence=fraction)

@@ -13,14 +13,15 @@ wall-clock runtime independently of step count. Two thresholds:
 The heartbeat reads its clock from a caller-provided `time_source` so
 tests can fast-forward without `asyncio.sleep`.
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
 from typing import Callable
 
-DEFAULT_SILENT_THRESHOLD_SECONDS = 300   # 5 minutes
-DEFAULT_HARD_CAP_SECONDS = 1200          # 20 minutes
+DEFAULT_SILENT_THRESHOLD_SECONDS = 300  # 5 minutes
+DEFAULT_HARD_CAP_SECONDS = 1200  # 20 minutes
 
 
 @dataclass
@@ -31,8 +32,8 @@ class HeartbeatDecision:
 
 @dataclass
 class HeartbeatTracker:
-    startedAt: float = field(default_factory = time.monotonic)
-    lastSuccessAt: float = field(default_factory = time.monotonic)
+    startedAt: float = field(default_factory=time.monotonic)
+    lastSuccessAt: float = field(default_factory=time.monotonic)
     silentThresholdSeconds: float = DEFAULT_SILENT_THRESHOLD_SECONDS
     hardCapSeconds: float = DEFAULT_HARD_CAP_SECONDS
     timeSource: Callable[[], float] = time.monotonic
@@ -44,12 +45,12 @@ class HeartbeatTracker:
         now = self.timeSource()
         if now - self.startedAt >= self.hardCapSeconds:
             return HeartbeatDecision(
-                action = "terminate",
-                reason = "wallclock_heartbeat",
+                action="terminate",
+                reason="wallclock_heartbeat",
             )
         if now - self.lastSuccessAt >= self.silentThresholdSeconds:
             return HeartbeatDecision(
-                action = "prompt",
-                reason = "heartbeat",
+                action="prompt",
+                reason="heartbeat",
             )
-        return HeartbeatDecision(action = "continue")
+        return HeartbeatDecision(action="continue")

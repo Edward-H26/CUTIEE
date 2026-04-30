@@ -17,6 +17,7 @@ A lazy sweep on every publish drops snapshots older than `NEO4J_TTL_SECONDS`
 so the graph never grows unbounded; finished snapshots are removed by the
 post-finish purge so HTMX pollers stop hammering the DB once the run ends.
 """
+
 from __future__ import annotations
 
 import json
@@ -48,13 +49,13 @@ class _RedisBackend:
     def __init__(self, url: str) -> None:
         import redis
 
-        self._client = redis.Redis.from_url(url, decode_responses = True)
+        self._client = redis.Redis.from_url(url, decode_responses=True)
 
     def publish(self, executionId: str, payload: dict[str, Any]) -> None:
         self._client.set(
             REDIS_KEY_PREFIX + executionId,
-            json.dumps(payload, default = str),
-            ex = REDIS_TTL_SECONDS,
+            json.dumps(payload, default=str),
+            ex=REDIS_TTL_SECONDS,
         )
 
     def fetch(self, executionId: str) -> dict[str, Any] | None:
@@ -92,9 +93,9 @@ class _Neo4jBackend:
                 p.updated_at = datetime(),
                 p.finished = $finished
             """,
-            eid = executionId,
-            payload = json.dumps(payload, default = str),
-            finished = bool(payload.get("finished")),
+            eid=executionId,
+            payload=json.dumps(payload, default=str),
+            finished=bool(payload.get("finished")),
         )
         # Lazy sweep: drop snapshots older than TTL. Cheap when the table is small.
         self._run(
@@ -103,7 +104,7 @@ class _Neo4jBackend:
             WHERE p.updated_at < datetime() - duration({seconds: $ttl})
             DETACH DELETE p
             """,
-            ttl = self.DEFAULT_TTL_SECONDS,
+            ttl=self.DEFAULT_TTL_SECONDS,
         )
 
     def fetch(self, executionId: str) -> dict[str, Any] | None:
@@ -112,7 +113,7 @@ class _Neo4jBackend:
             MATCH (p:ProgressSnapshot {execution_id: $eid})
             RETURN p.payload AS payload, p.finished AS finished
             """,
-            eid = executionId,
+            eid=executionId,
         )
         if not rows:
             return None
@@ -125,7 +126,7 @@ class _Neo4jBackend:
             # drop the node so subsequent polls hit the DB-backed fallback path.
             self._run(
                 "MATCH (p:ProgressSnapshot {execution_id: $eid}) DETACH DELETE p",
-                eid = executionId,
+                eid=executionId,
             )
         return payload
 

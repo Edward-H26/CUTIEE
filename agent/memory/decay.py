@@ -6,6 +6,7 @@ near-zero because they remain valid until the underlying interface changes.
 Episodic memories (`user did Y last Tuesday`) decay fastest because they are
 inherently time-bound. Semantic facts sit in the middle.
 """
+
 from __future__ import annotations
 
 import math
@@ -61,4 +62,4 @@ def dominantChannel(bullet: Any, currentClock: int) -> str:
         "episodic": channelDecayedStrength(bullet, "episodic", currentClock),
         "procedural": channelDecayedStrength(bullet, "procedural", currentClock),
     }
-    return max(contributions, key = lambda channel: contributions[channel])
+    return max(contributions, key=lambda channel: contributions[channel])

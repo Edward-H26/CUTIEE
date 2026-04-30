@@ -1,4 +1,5 @@
 """CI-safe slides target — 3 initial slides; add, edit, reorder."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -15,11 +16,11 @@ class Slide:
 
 @dataclass
 class SlideStore:
-    slides: list[Slide] = field(default_factory = list)
+    slides: list[Slide] = field(default_factory=list)
     nextId: int = 1
 
     def add(self, title: str, body: str) -> Slide:
-        slide = Slide(title = title, body = body, id = self.nextId)
+        slide = Slide(title=title, body=body, id=self.nextId)
         self.nextId += 1
         self.slides.append(slide)
         return slide
@@ -39,7 +40,7 @@ def createApp() -> Flask:
 
     @app.get("/")
     def index() -> str:
-        return render_template_string(_TEMPLATE, slides = store.slides)
+        return render_template_string(_TEMPLATE, slides=store.slides)
 
     @app.post("/slides")
     def add_slide():
@@ -92,4 +93,4 @@ button{padding:6px 12px;background:#6C86C0;color:#fff;border:none;border-radius:
 
 
 if __name__ == "__main__":
-    createApp().run(host = "127.0.0.1", port = 5002, debug = True)
+    createApp().run(host="127.0.0.1", port=5002, debug=True)

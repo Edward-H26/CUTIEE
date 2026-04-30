@@ -26,6 +26,7 @@ Two safety mechanisms keep the AuraDB Free 50MB quota safe under abuse:
 Hit rate matters: don't sweep on `fetch()` because the post-finish
 polls would pay for cleanup nobody asked for.
 """
+
 from __future__ import annotations
 
 import base64
@@ -54,11 +55,15 @@ class Neo4jScreenshotStore:
         ttlDays: int | None = None,
         maxTotalBytes: int | None = None,
     ) -> None:
-        self.ttlDays = ttlDays if ttlDays is not None else envInt(
-            "CUTIEE_SCREENSHOT_TTL_DAYS", DEFAULT_TTL_DAYS
+        self.ttlDays = (
+            ttlDays
+            if ttlDays is not None
+            else envInt("CUTIEE_SCREENSHOT_TTL_DAYS", DEFAULT_TTL_DAYS)
         )
-        self.maxTotalBytes = maxTotalBytes if maxTotalBytes is not None else envInt(
-            "CUTIEE_SCREENSHOT_MAX_TOTAL_BYTES", DEFAULT_MAX_TOTAL_BYTES
+        self.maxTotalBytes = (
+            maxTotalBytes
+            if maxTotalBytes is not None
+            else envInt("CUTIEE_SCREENSHOT_MAX_TOTAL_BYTES", DEFAULT_MAX_TOTAL_BYTES)
         )
 
     def save(self, executionId: str, stepIndex: int, pngBytes: bytes) -> ScreenshotRecord | None:
@@ -79,7 +84,9 @@ class Neo4jScreenshotStore:
                 "Screenshot save dropped: global byte cap reached "
                 "(current=%s + new=%s > cap=%s). Older screenshots will "
                 "free space at the next TTL sweep.",
-                currentBytes, size, self.maxTotalBytes,
+                currentBytes,
+                size,
+                self.maxTotalBytes,
             )
             return None
 
@@ -91,21 +98,19 @@ class Neo4jScreenshotStore:
                 s.size_bytes = $size,
                 s.created_at = datetime()
             """,
-            eid = str(executionId),
-            idx = int(stepIndex),
-            data = encoded,
-            size = size,
+            eid=str(executionId),
+            idx=int(stepIndex),
+            data=encoded,
+            size=size,
         )
         return ScreenshotRecord(
-            executionId = str(executionId),
-            stepIndex = int(stepIndex),
-            sizeBytes = size,
+            executionId=str(executionId),
+            stepIndex=int(stepIndex),
+            sizeBytes=size,
         )
 
     def _totalBytes(self) -> int:
-        row = run_single(
-            "MATCH (s:Screenshot) RETURN coalesce(sum(s.size_bytes), 0) AS total"
-        )
+        row = run_single("MATCH (s:Screenshot) RETURN coalesce(sum(s.size_bytes), 0) AS total")
         return int(row["total"]) if row else 0
 
     def fetch(self, executionId: str, stepIndex: int) -> bytes | None:
@@ -114,8 +119,8 @@ class Neo4jScreenshotStore:
             MATCH (s:Screenshot {execution_id: $eid, step_index: $idx})
             RETURN s.data_b64 AS data
             """,
-            eid = str(executionId),
-            idx = int(stepIndex),
+            eid=str(executionId),
+            idx=int(stepIndex),
         )
         if row is None or not row.get("data"):
             return None
@@ -131,7 +136,7 @@ class Neo4jScreenshotStore:
             RETURN s.step_index AS idx
             ORDER BY s.step_index ASC
             """,
-            eid = str(executionId),
+            eid=str(executionId),
         )
         return [int(row["idx"]) for row in rows]
 
@@ -143,7 +148,7 @@ class Neo4jScreenshotStore:
             DETACH DELETE s
             RETURN n AS deleted
             """,
-            eid = str(executionId),
+            eid=str(executionId),
         )
         return int(rows[0]["deleted"]) if rows else 0
 
@@ -154,5 +159,5 @@ class Neo4jScreenshotStore:
             WHERE s.created_at < datetime() - duration({days: $days})
             DETACH DELETE s
             """,
-            days = int(self.ttlDays),
+            days=int(self.ttlDays),
         )

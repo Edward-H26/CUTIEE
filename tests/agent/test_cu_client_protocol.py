@@ -7,6 +7,7 @@ two existing clients (Gemini and Mock) to the Protocol so a future
 adapter that drops one of the required methods fails here instead of
 inside the runner's loop.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -20,9 +21,9 @@ from agent.routing.models.gemini_cu import (
 
 def test_mock_client_satisfies_protocol() -> None:
     client = MockComputerUseClient(
-        label = "mock-cu-test",
-        actionsToReturn = [],
-        fixedCostUsd = 0.0,
+        label="mock-cu-test",
+        actionsToReturn=[],
+        fixedCostUsd=0.0,
     )
     assert isinstance(client, CuClient)
 
@@ -37,10 +38,10 @@ def test_computer_use_step_shape() -> None:
     from agent.harness.state import Action, ActionType
 
     step = ComputerUseStep(
-        action = Action(type = ActionType.FINISH, reasoning = "protocol-check"),
-        rawFunctionName = "finished",
-        rawArgs = {},
-        costUsd = 0.0,
+        action=Action(type=ActionType.FINISH, reasoning="protocol-check"),
+        rawFunctionName="finished",
+        rawArgs={},
+        costUsd=0.0,
     )
     assert step.action.type == ActionType.FINISH
     assert step.rawFunctionName == "finished"

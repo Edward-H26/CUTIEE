@@ -3,6 +3,7 @@
 The tests are pure-Django (no Neo4j needed). The auth-protected routes
 should redirect anonymous users to the login page.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -60,9 +61,9 @@ def test_vlmHealthHtmxEscapesModelValue(monkeypatch: pytest.MonkeyPatch):
     # block an HTML-breaking value from leaking into the attribute.
     monkeypatch.setenv("CUTIEE_ENV", "production")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setenv("CUTIEE_CU_MODEL", "model\"><script>alert(1)</script>")
+    monkeypatch.setenv("CUTIEE_CU_MODEL", 'model"><script>alert(1)</script>')
     client = Client()
-    resp = client.get("/api/vlm-health/", HTTP_HX_REQUEST = "true")
+    resp = client.get("/api/vlm-health/", HTTP_HX_REQUEST="true")
     assert resp.status_code == 200
     body = resp.content.decode("utf-8")
     assert "<script>" not in body
@@ -84,8 +85,9 @@ def test_deleteTaskRejectsRequestsWithoutCsrfToken():
     # users; otherwise a cross-site form could delete a task on their
     # behalf.
     from django.contrib.auth import get_user_model
-    user = get_user_model().objects.create_user(username = "alice", password = "pw")
-    client = Client(enforce_csrf_checks = True)
+
+    user = get_user_model().objects.create_user(username="alice", password="pw")
+    client = Client(enforce_csrf_checks=True)
     client.force_login(user)
     resp = client.post("/tasks/any-task-id/delete/")
     assert resp.status_code == 403
@@ -96,16 +98,18 @@ def test_previewPendingUrlResolves():
     # Regression guard: detail.html references tasks:preview_pending via
     # {% url %}. A NoReverseMatch here was the 500 on every detail page.
     from django.urls import reverse
-    url = reverse("tasks:preview_pending", kwargs = {"execution_id": "abc-123"})
+
+    url = reverse("tasks:preview_pending", kwargs={"execution_id": "abc-123"})
     assert url.endswith("/tasks/api/preview/abc-123/")
 
 
 @pytest.mark.django_db
 def test_previewDecideUrlResolves():
     from django.urls import reverse
+
     url = reverse(
         "tasks:preview_decide",
-        kwargs = {"execution_id": "abc-123", "decision": "approve"},
+        kwargs={"execution_id": "abc-123", "decision": "approve"},
     )
     assert url.endswith("/tasks/api/preview/abc-123/approve/")
 
@@ -117,7 +121,8 @@ def test_baseTemplateInjectsHtmxCsrfHeader():
     # source of truth; losing it would silently 403 approve/cancel clicks
     # in production.
     from django.contrib.auth import get_user_model
-    user = get_user_model().objects.create_user(username = "bob", password = "pw")
+
+    user = get_user_model().objects.create_user(username="bob", password="pw")
     client = Client()
     client.force_login(user)
     resp = client.get("/tasks/dashboard/")
@@ -128,12 +133,134 @@ def test_baseTemplateInjectsHtmxCsrfHeader():
 
 
 @pytest.mark.django_db
+def testRunTaskRejectsAnyActiveExecutionForUser(monkeypatch: pytest.MonkeyPatch):
+    from django.contrib.auth import get_user_model
+    from apps.tasks import api as tasksApi
+
+    user = get_user_model().objects.create_user(username="drew", password="pw")
+    client = Client()
+    client.force_login(user)
+    didCreateExecution = False
+
+    def fakeCreateExecution(**_kwargs):
+        nonlocal didCreateExecution
+        didCreateExecution = True
+
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "getTask",
+        lambda _userId, taskId: {"id": taskId, "description": "new task", "initial_url": ""},
+    )
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "createExecutionForIdleUser",
+        lambda **_kwargs: (
+            None,
+            {"id": "exec-active", "task_id": "task-active", "status": "running"},
+        ),
+    )
+    monkeypatch.setattr(tasksApi.tasksRepo, "createExecution", fakeCreateExecution)
+
+    resp = client.post("/tasks/task-new/run/")
+
+    assert resp.status_code == 409
+    assert resp.json() == {
+        "status": "already_running",
+        "task_id": "task-active",
+        "execution_id": "exec-active",
+    }
+    assert didCreateExecution is False
+
+
+@pytest.mark.django_db
+def testRunTaskIgnoresMockOverrideInProduction(
+    monkeypatch: pytest.MonkeyPatch,
+    settings,
+):
+    from django.contrib.auth import get_user_model
+    from apps.tasks import api as tasksApi
+
+    settings.CUTIEE_ENV = "production"
+    user = get_user_model().objects.create_user(username="prod-user", password="pw")
+    client = Client()
+    client.force_login(user)
+    capturedThreadKwargs = {}
+
+    class FakeThread:
+        def __init__(self, *, target, kwargs, daemon):
+            del target, daemon
+            capturedThreadKwargs.update(kwargs)
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "getTask",
+        lambda _userId, taskId: {"id": taskId, "description": "new task", "initial_url": ""},
+    )
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "createExecutionForIdleUser",
+        lambda **kwargs: ({"id": kwargs["executionId"], "status": "running"}, None),
+    )
+    monkeypatch.setattr(tasksApi.threading, "Thread", FakeThread)
+
+    resp = client.post("/tasks/task-prod/run/?use_mock=true")
+
+    assert resp.status_code == 200
+    assert capturedThreadKwargs["useMockAgent"] is None
+
+
+def testBackgroundFailureFinalizesRunningExecution(monkeypatch: pytest.MonkeyPatch):
+    from apps.tasks import api as tasksApi
+
+    finalized = {}
+    updated = {}
+
+    def fakeRunTaskForUser(**_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(tasksApi, "runTaskForUser", fakeRunTaskForUser)
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "getExecution",
+        lambda _userId, _executionId: {"id": "exec-failed", "status": "running"},
+    )
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "finalizeExecution",
+        lambda **kwargs: finalized.update(kwargs),
+    )
+    monkeypatch.setattr(
+        tasksApi.tasksRepo,
+        "updateTaskStatus",
+        lambda **kwargs: updated.update(kwargs),
+    )
+
+    tasksApi._runInBackground(
+        userId="user-1",
+        taskId="task-1",
+        description="task",
+        initialUrl="",
+        useMockAgent=None,
+        executionId="exec-failed",
+    )
+
+    assert finalized["status"] == "failed"
+    assert finalized["completionReason"] == "background_exception:RuntimeError"
+    assert updated["status"] == "failed"
+    assert updated["lastExecutionId"] == "exec-failed"
+
+
+@pytest.mark.django_db
 def test_previewDecideRejectsUnknownExecution():
     # Authorization boundary: if the execution does not exist under
     # the caller's User node, the endpoint must return 404 without
     # writing to Neo4j. Guards against execution-id enumeration.
     from django.contrib.auth import get_user_model
-    user = get_user_model().objects.create_user(username = "carol", password = "pw")
+
+    user = get_user_model().objects.create_user(username="carol", password="pw")
     client = Client()
     client.force_login(user)
     resp = client.post("/tasks/api/preview/missing-exec-id/approve/")

@@ -4,13 +4,17 @@ Every function takes `userId` as its first argument so the cypher MATCH
 pattern starts at `(:User {id: $userId})`. This enforces per-tenant scoping
 at the query level and prevents accidental cross-user reads.
 """
+
 from __future__ import annotations
 
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
+from neo4j.exceptions import ClientError
+
+from agent.harness.completion import agentStateSucceeded
 from agent.harness.state import AgentState, ObservationStep
 from agent.persistence.neo4j_client import run_query, run_single
 
@@ -27,7 +31,8 @@ class TaskRow(dict[str, Any]):
 
     def get_absolute_url(self) -> str:
         from django.urls import reverse
-        return str(reverse("tasks:detail", kwargs = {"task_id": self["id"]}))
+
+        return str(reverse("tasks:detail", kwargs={"task_id": self["id"]}))
 
 
 ExecutionRow = dict[str, Any]
@@ -63,13 +68,13 @@ def createTask(
         MERGE (u)-[:OWNS]->(t)
         RETURN t {.*} AS task
         """,
-        user_id = str(userId),
-        id = taskId,
-        description = description,
-        initial_url = initialUrl,
-        domain_hint = domainHint,
-        status = "pending",
-        created_at = _nowIso(),
+        user_id=str(userId),
+        id=taskId,
+        description=description,
+        initial_url=initialUrl,
+        domain_hint=domainHint,
+        status="pending",
+        created_at=_nowIso(),
     )
     if row is None:
         raise RuntimeError(f"Failed to create task for user {userId!r}")
@@ -82,8 +87,8 @@ def getTask(userId: str, taskId: str) -> TaskRow | None:
         MATCH (u:User {id: $user_id})-[:OWNS]->(t:Task {id: $task_id})
         RETURN t {.*} AS task
         """,
-        user_id = str(userId),
-        task_id = str(taskId),
+        user_id=str(userId),
+        task_id=str(taskId),
     )
     return TaskRow(row["task"]) if row else None
 
@@ -96,8 +101,8 @@ def listTasksForUser(userId: str, limit: int = 50) -> list[TaskRow]:
         ORDER BY t.updated_at DESC
         LIMIT $limit
         """,
-        user_id = str(userId),
-        limit = int(limit),
+        user_id=str(userId),
+        limit=int(limit),
     )
     return [TaskRow(row["task"]) for row in rows]
 
@@ -118,12 +123,12 @@ def updateTaskStatus(
             t.last_execution_id = coalesce($last_execution_id, t.last_execution_id),
             t.total_cost_usd = coalesce(t.total_cost_usd, 0.0) + $cost_delta
         """,
-        user_id = str(userId),
-        task_id = str(taskId),
-        status = status,
-        updated_at = _nowIso(),
-        last_execution_id = lastExecutionId,
-        cost_delta = float(costDelta),
+        user_id=str(userId),
+        task_id=str(taskId),
+        status=status,
+        updated_at=_nowIso(),
+        last_execution_id=lastExecutionId,
+        cost_delta=float(costDelta),
     )
 
 
@@ -134,14 +139,15 @@ def deleteTask(userId: str, taskId: str) -> None:
     # so the DETACH DELETE below would leave them as orphans that
     # persist for up to ttlDays.
     execIds = [
-        row["id"] for row in run_query(
+        row["id"]
+        for row in run_query(
             """
             MATCH (u:User {id: $user_id})-[:OWNS]->(t:Task {id: $task_id})
                 -[:EXECUTED_AS]->(e:Execution)
             RETURN e.id AS id
             """,
-            user_id = str(userId),
-            task_id = str(taskId),
+            user_id=str(userId),
+            task_id=str(taskId),
         )
     ]
     run_query(
@@ -151,8 +157,8 @@ def deleteTask(userId: str, taskId: str) -> None:
         OPTIONAL MATCH (e)-[:HAS_STEP]->(s:Step)
         DETACH DELETE t, e, s
         """,
-        user_id = str(userId),
-        task_id = str(taskId),
+        user_id=str(userId),
+        task_id=str(taskId),
     )
     if execIds:
         run_query(
@@ -161,7 +167,7 @@ def deleteTask(userId: str, taskId: str) -> None:
             WHERE sh.execution_id IN $exec_ids
             DETACH DELETE sh
             """,
-            exec_ids = execIds,
+            exec_ids=execIds,
         )
         # :PreviewApproval nodes are keyed on execution_id and do not
         # carry a relationship to :Execution, so the DETACH DELETE above
@@ -173,7 +179,7 @@ def deleteTask(userId: str, taskId: str) -> None:
             WHERE p.execution_id IN $exec_ids
             DETACH DELETE p
             """,
-            exec_ids = execIds,
+            exec_ids=execIds,
         )
 
 
@@ -195,6 +201,7 @@ def createExecution(
           id: $id,
           run_index: $run_index,
           status: 'running',
+          active_user_id: $active_user_id,
           started_at: $started_at,
           finished_at: null,
           step_count: 0,
@@ -210,17 +217,45 @@ def createExecution(
         )
         RETURN e {.*} AS execution
         """,
-        user_id = str(userId),
-        task_id = str(taskId),
-        id = executionId,
-        run_index = runIndex,
-        started_at = _nowIso(),
-        replayed = bool(replayed),
-        template_id = templateId,
+        user_id=str(userId),
+        task_id=str(taskId),
+        id=executionId,
+        active_user_id=str(userId),
+        run_index=runIndex,
+        started_at=_nowIso(),
+        replayed=bool(replayed),
+        template_id=templateId,
     )
     if row is None:
         raise RuntimeError(f"Failed to create execution for task {taskId!r}")
-    return row["execution"]
+    return cast(dict[str, Any], row["execution"])
+
+
+def createExecutionForIdleUser(
+    userId: str,
+    taskId: str,
+    *,
+    executionId: str | None = None,
+) -> tuple[ExecutionRow | None, ExecutionRow | None]:
+    activeExecution = findActiveExecutionForUser(userId)
+    if activeExecution is not None:
+        return None, activeExecution
+    try:
+        execution = createExecution(
+            userId=userId,
+            taskId=taskId,
+            executionId=executionId,
+        )
+    except ClientError as exc:
+        if _isActiveExecutionConstraintError(exc):
+            return None, findActiveExecutionForUser(userId)
+        raise
+    return execution, None
+
+
+def _isActiveExecutionConstraintError(exc: ClientError) -> bool:
+    message = str(exc)
+    return "active_execution_user" in message or "active_user_id" in message
 
 
 def _nextRunIndex(userId: str, taskId: str) -> int:
@@ -229,8 +264,8 @@ def _nextRunIndex(userId: str, taskId: str) -> int:
         MATCH (:User {id: $user_id})-[:OWNS]->(:Task {id: $task_id})-[:EXECUTED_AS]->(e:Execution)
         RETURN coalesce(max(e.run_index), -1) + 1 AS next_index
         """,
-        user_id = str(userId),
-        task_id = str(taskId),
+        user_id=str(userId),
+        task_id=str(taskId),
     )
     return int(row["next_index"]) if row else 0
 
@@ -273,25 +308,25 @@ def appendStep(
             s.timestamp = $timestamp
         MERGE (e)-[:HAS_STEP {index: $index}]->(s)
         """,
-        execution_id = str(executionId),
-        user_id = str(userId),
-        id = str(uuid.uuid4()),
-        index = step.index,
-        url = step.url,
-        dom_hash = step.domHash,
-        action_type = step.action.type.value,
-        target = step.action.target,
-        value = step.action.value or "",
-        reasoning = step.action.reasoning or "",
-        model = step.action.model_used or "",
-        tier = step.action.tier,
-        confidence = step.action.confidence,
-        risk = step.action.risk.value,
-        cost_usd = step.action.cost_usd,
-        verification_ok = step.verificationOk,
-        verification_note = step.verificationNote,
-        duration_ms = step.durationMs,
-        timestamp = step.timestamp.isoformat(),
+        execution_id=str(executionId),
+        user_id=str(userId),
+        id=str(uuid.uuid4()),
+        index=step.index,
+        url=step.url,
+        dom_hash=step.domHash,
+        action_type=step.action.type.value,
+        target=step.action.target,
+        value=step.action.value or "",
+        reasoning=step.action.reasoning or "",
+        model=step.action.model_used or "",
+        tier=step.action.tier,
+        confidence=step.action.confidence,
+        risk=step.action.risk.value,
+        cost_usd=step.action.cost_usd,
+        verification_ok=step.verificationOk,
+        verification_note=step.verificationNote,
+        duration_ms=step.durationMs,
+        timestamp=step.timestamp.isoformat(),
     )
 
 
@@ -315,16 +350,17 @@ def finalizeExecution(
         OPTIONAL MATCH (e)-[:HAS_STEP]->(s:Step)
         WITH e, count(s) AS step_count, coalesce(sum(s.cost_usd), 0.0) AS total_cost
         SET e.status = $status,
+            e.active_user_id = null,
             e.finished_at = $finished_at,
             e.completion_reason = $completion_reason,
             e.step_count = step_count,
             e.total_cost_usd = total_cost
         """,
-        user_id = str(userId),
-        execution_id = str(executionId),
-        status = status,
-        finished_at = _nowIso(),
-        completion_reason = completionReason,
+        user_id=str(userId),
+        execution_id=str(executionId),
+        status=status,
+        finished_at=_nowIso(),
+        completion_reason=completionReason,
     )
 
 
@@ -336,8 +372,8 @@ def getExecution(userId: str, executionId: str) -> ExecutionRow | None:
         WITH e, count(s) AS step_count
         RETURN e {.*, step_count: step_count} AS execution
         """,
-        user_id = str(userId),
-        execution_id = str(executionId),
+        user_id=str(userId),
+        execution_id=str(executionId),
     )
     return row["execution"] if row else None
 
@@ -349,8 +385,8 @@ def listStepsForExecution(userId: str, executionId: str) -> list[dict[str, Any]]
         RETURN s {.*} AS step
         ORDER BY r.index ASC
         """,
-        user_id = str(userId),
-        execution_id = str(executionId),
+        user_id=str(userId),
+        execution_id=str(executionId),
     )
     return [row["step"] for row in rows]
 
@@ -362,8 +398,8 @@ def listExecutionsForTask(userId: str, taskId: str) -> list[dict[str, Any]]:
         RETURN e {.*} AS execution
         ORDER BY r.run_index DESC
         """,
-        user_id = str(userId),
-        task_id = str(taskId),
+        user_id=str(userId),
+        task_id=str(taskId),
     )
     return [row["execution"] for row in rows]
 
@@ -384,7 +420,7 @@ def findActiveExecutionForUser(userId: str) -> dict[str, Any] | None:
         ORDER BY e.started_at DESC
         LIMIT 1
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
     return row["execution"] if row else None
 
@@ -398,28 +434,29 @@ def persistAgentState(userId: str, taskId: str, state: AgentState) -> None:
     can poll progress live; if missing (direct-shell invocation, tests),
     this method back-fills it.
     """
+    succeeded = agentStateSucceeded(state)
     if getExecution(userId, state.executionId) is None:
         createExecution(
-            userId = userId,
-            taskId = taskId,
-            executionId = state.executionId,
-            replayed = state.replayed,
-            templateId = state.templateId,
+            userId=userId,
+            taskId=taskId,
+            executionId=state.executionId,
+            replayed=state.replayed,
+            templateId=state.templateId,
         )
     for step in state.history:
-        appendStep(userId = userId, executionId = state.executionId, step = step)
+        appendStep(userId=userId, executionId=state.executionId, step=step)
     finalizeExecution(
-        userId = userId,
-        executionId = state.executionId,
-        status = "complete" if state.isComplete else "incomplete",
-        completionReason = state.completionReason,
+        userId=userId,
+        executionId=state.executionId,
+        status="complete" if succeeded else "failed",
+        completionReason=state.completionReason,
     )
     updateTaskStatus(
-        userId = userId,
-        taskId = taskId,
-        status = "completed" if state.isComplete else "failed",
-        lastExecutionId = state.executionId,
-        costDelta = state.totalCostUsd,
+        userId=userId,
+        taskId=taskId,
+        status="completed" if succeeded else "failed",
+        lastExecutionId=state.executionId,
+        costDelta=state.totalCostUsd,
     )
 
 
@@ -438,10 +475,16 @@ def costSummaryForUser(userId: str) -> dict[str, Any]:
                coalesce(sum(step_count), 0) AS step_count,
                coalesce(sum(CASE WHEN e.replayed THEN step_count ELSE 0 END), 0) AS replay_step_count
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
     if row is None:
-        return {"total_cost": 0.0, "task_count": 0, "execution_count": 0, "step_count": 0, "replay_step_count": 0}
+        return {
+            "total_cost": 0.0,
+            "task_count": 0,
+            "execution_count": 0,
+            "step_count": 0,
+            "replay_step_count": 0,
+        }
     return {
         "total_cost": float(row["total_cost"]),
         "task_count": int(row["task_count"]),
@@ -464,8 +507,8 @@ def costTimeseriesForUser(userId: str, days: int = 14) -> list[dict[str, Any]]:
         RETURN toString(day) AS day, daily_cost, step_count
         ORDER BY day ASC
         """,
-        user_id = str(userId),
-        days = int(days),
+        user_id=str(userId),
+        days=int(days),
     )
 
 
@@ -476,7 +519,7 @@ def tierDistributionForUser(userId: str) -> list[dict[str, Any]]:
         RETURN s.tier AS tier, count(s) AS count, sum(s.cost_usd) AS cost_usd
         ORDER BY tier ASC
         """,
-        user_id = str(userId),
+        user_id=str(userId),
     )
 
 
@@ -484,5 +527,5 @@ def asJsonExportRow(task: TaskRow, executions: list[ExecutionRow]) -> dict[str, 
     """Used by the JSON export endpoint."""
     return {
         "task": task,
-        "executions": json.loads(json.dumps(executions, default = str)),
+        "executions": json.loads(json.dumps(executions, default=str)),
     }

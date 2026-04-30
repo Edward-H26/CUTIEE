@@ -4,6 +4,7 @@ We don't burn VLM cycles on the summary; a deterministic rollup of action
 counts per type is enough for the model to reconstruct what happened far
 enough back.
 """
+
 from __future__ import annotations
 
 from collections import Counter

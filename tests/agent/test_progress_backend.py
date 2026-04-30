@@ -1,4 +1,5 @@
 """Unit tests for the pluggable progress backend."""
+
 from __future__ import annotations
 
 import pytest
@@ -6,7 +7,7 @@ import pytest
 from apps.tasks import progress_backend
 
 
-@pytest.fixture(autouse = True)
+@pytest.fixture(autouse=True)
 def _reset_backend():
     progress_backend.resetBackendForTests()
     yield
@@ -14,14 +15,14 @@ def _reset_backend():
 
 
 def test_memoryBackendDefault(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising = False)
+    monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising=False)
     progress_backend.publishProgress("exec-1", {"step": 1})
     assert progress_backend.fetchProgress("exec-1") == {"step": 1}
     assert progress_backend.fetchProgress("missing") is None
 
 
 def test_memoryBackendKeysIsolatePerExecution(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising = False)
+    monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising=False)
     progress_backend.publishProgress("a", {"v": 1})
     progress_backend.publishProgress("b", {"v": 2})
     assert progress_backend.fetchProgress("a") == {"v": 1}
@@ -30,8 +31,8 @@ def test_memoryBackendKeysIsolatePerExecution(monkeypatch: pytest.MonkeyPatch):
 
 def test_redisBackendRequiresUrl(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CUTIEE_PROGRESS_BACKEND", "redis")
-    monkeypatch.delenv("REDIS_URL", raising = False)
-    with pytest.raises(RuntimeError, match = "REDIS_URL"):
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    with pytest.raises(RuntimeError, match="REDIS_URL"):
         progress_backend.getBackend()
 
 

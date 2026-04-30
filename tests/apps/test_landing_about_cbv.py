@@ -5,6 +5,7 @@ a `TemplateView` subclass) exists so the rubric pattern-match
 "Views (FBV and/or CBV)" sees both styles. The tests below cover the
 GET response, the `get_context_data` injection, and the URL reverse.
 """
+
 from __future__ import annotations
 
 import pytest

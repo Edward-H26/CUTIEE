@@ -25,6 +25,7 @@ Lifecycle (TTL):
     procedures keep their freshness lease and don't expire just because
     their original creation date is old.
 """
+
 from __future__ import annotations
 
 import logging
@@ -44,9 +45,12 @@ class Neo4jActionGraphStore:
     `ttlDays`: how long an unused procedure lives. Default 5 days,
     overridable via `CUTIEE_PROCEDURE_GRAPH_TTL_DAYS` env var.
     """
+
     def __init__(self, ttlDays: int | None = None) -> None:
-        self.ttlDays = ttlDays if ttlDays is not None else envInt(
-            "CUTIEE_PROCEDURE_GRAPH_TTL_DAYS", DEFAULT_TTL_DAYS
+        self.ttlDays = (
+            ttlDays
+            if ttlDays is not None
+            else envInt("CUTIEE_PROCEDURE_GRAPH_TTL_DAYS", DEFAULT_TTL_DAYS)
         )
 
     def saveGraph(self, graph: ProcedureGraph) -> None:
@@ -70,10 +74,10 @@ class Neo4jActionGraphStore:
             })
             CREATE (u)-[:LEARNED]->(g)
             """,
-            user_id = graph.user_id,
-            procedure_id = graph.procedure_id,
-            task_description = graph.task_description,
-            topic_slug = graph.metadata.get("topic_slug", ""),
+            user_id=graph.user_id,
+            procedure_id=graph.procedure_id,
+            task_description=graph.task_description,
+            topic_slug=graph.metadata.get("topic_slug", ""),
         )
 
         # Phase 2: create all ActionNodes (one Cypher call each — small graphs,
@@ -96,17 +100,17 @@ class Neo4jActionGraphStore:
                     expected_phash: $expected_phash
                 })
                 """,
-                procedure_id = graph.procedure_id,
-                id = node.id,
-                action_type = node.action_type,
-                target = node.target,
-                value = node.value,
-                coord_x = node.coord_x,
-                coord_y = node.coord_y,
-                description = node.description,
-                hash = node.hash,
-                expected_url = node.expected_url,
-                expected_phash = node.expected_phash,
+                procedure_id=graph.procedure_id,
+                id=node.id,
+                action_type=node.action_type,
+                target=node.target,
+                value=node.value,
+                coord_x=node.coord_x,
+                coord_y=node.coord_y,
+                description=node.description,
+                hash=node.hash,
+                expected_url=node.expected_url,
+                expected_phash=node.expected_phash,
             )
 
         # Phase 3: STARTS_WITH edge to the first node
@@ -117,8 +121,8 @@ class Neo4jActionGraphStore:
             MATCH (n:ActionNode {id: $first_node_id, procedure_id: $procedure_id})
             CREATE (g)-[:STARTS_WITH]->(n)
             """,
-            procedure_id = graph.procedure_id,
-            first_node_id = firstNode.id,
+            procedure_id=graph.procedure_id,
+            first_node_id=firstNode.id,
         )
 
         # Phase 4: NEXT edges between consecutive nodes
@@ -129,10 +133,10 @@ class Neo4jActionGraphStore:
                 MATCH (b:ActionNode {id: $target_id, procedure_id: $procedure_id})
                 CREATE (a)-[:NEXT {sequence_index: $sequence_index}]->(b)
                 """,
-                source_id = edge.source_id,
-                target_id = edge.target_id,
-                procedure_id = graph.procedure_id,
-                sequence_index = edge.sequence_index,
+                source_id=edge.source_id,
+                target_id=edge.target_id,
+                procedure_id=graph.procedure_id,
+                sequence_index=edge.sequence_index,
             )
 
     def loadGraphsForUser(self, userId: str, limit: int = 100) -> list[ProcedureGraph]:
@@ -150,13 +154,16 @@ class Neo4jActionGraphStore:
             ORDER BY g.last_used_at DESC
             LIMIT $limit
             """,
-            user_id = str(userId),
-            limit = int(limit),
+            user_id=str(userId),
+            limit=int(limit),
         )
         return [self._loadGraphChain(row["graph"]) for row in graphRows]
 
     def loadGraphsByTopic(
-        self, userId: str, topicSlug: str, limit: int = 10,
+        self,
+        userId: str,
+        topicSlug: str,
+        limit: int = 10,
     ) -> list[ProcedureGraph]:
         graphRows = run_query(
             """
@@ -166,9 +173,9 @@ class Neo4jActionGraphStore:
             ORDER BY g.last_used_at DESC
             LIMIT $limit
             """,
-            user_id = str(userId),
-            topic_slug = topicSlug,
-            limit = int(limit),
+            user_id=str(userId),
+            topic_slug=topicSlug,
+            limit=int(limit),
         )
         return [self._loadGraphChain(row["graph"]) for row in graphRows]
 
@@ -189,14 +196,14 @@ class Neo4jActionGraphStore:
                 DETACH DELETE g
                 RETURN deleted_count
                 """,
-                days = int(self.ttlDays),
+                days=int(self.ttlDays),
             )
             count = int(row["deleted_count"]) if row else 0
             if count > 0:
                 _logger.info("ActionGraph TTL sweep deleted %d expired procedures", count)
             return count
         except Exception:  # noqa: BLE001 - sweep failures shouldn't break saves
-            _logger.debug("ActionGraph TTL sweep failed", exc_info = True)
+            _logger.debug("ActionGraph TTL sweep failed", exc_info=True)
             return 0
 
     def _loadGraphChain(self, graphRow: dict) -> ProcedureGraph:
@@ -210,42 +217,46 @@ class Neo4jActionGraphStore:
             RETURN n {.*} AS node, depth
             ORDER BY depth ASC
             """,
-            procedure_id = procedureId,
+            procedure_id=procedureId,
         )
 
         nodes: list[ActionNode] = []
         for row in nodeRows:
             n = row["node"]
-            nodes.append(ActionNode(
-                id = n.get("id", ""),
-                action_type = n.get("action_type", ""),
-                target = n.get("target", "") or "",
-                value = n.get("value", "") or "",
-                coord_x = n.get("coord_x"),
-                coord_y = n.get("coord_y"),
-                description = n.get("description", "") or "",
-                hash = n.get("hash", ""),
-                expected_url = n.get("expected_url", "") or "",
-                expected_phash = n.get("expected_phash", "") or "",
-            ))
+            nodes.append(
+                ActionNode(
+                    id=n.get("id", ""),
+                    action_type=n.get("action_type", ""),
+                    target=n.get("target", "") or "",
+                    value=n.get("value", "") or "",
+                    coord_x=n.get("coord_x"),
+                    coord_y=n.get("coord_y"),
+                    description=n.get("description", "") or "",
+                    hash=n.get("hash", ""),
+                    expected_url=n.get("expected_url", "") or "",
+                    expected_phash=n.get("expected_phash", "") or "",
+                )
+            )
 
         # Reconstruct edges from the implied chain order
         edges: list[ActionEdge] = []
         for i, current in enumerate(nodes[:-1]):
-            edges.append(ActionEdge(
-                source_id = current.id,
-                target_id = nodes[i + 1].id,
-                procedure_id = procedureId,
-                sequence_index = i,
-            ))
+            edges.append(
+                ActionEdge(
+                    source_id=current.id,
+                    target_id=nodes[i + 1].id,
+                    procedure_id=procedureId,
+                    sequence_index=i,
+                )
+            )
 
         return ProcedureGraph(
-            procedure_id = procedureId,
-            user_id = "",  # caller already knows; we don't refetch
-            task_description = graphRow.get("task_description", "") or "",
-            nodes = nodes,
-            edges = edges,
-            metadata = {"topic_slug": graphRow.get("topic_slug", "") or ""},
+            procedure_id=procedureId,
+            user_id="",  # caller already knows; we don't refetch
+            task_description=graphRow.get("task_description", "") or "",
+            nodes=nodes,
+            edges=edges,
+            metadata={"topic_slug": graphRow.get("topic_slug", "") or ""},
         )
 
     def deleteGraphsForUser(self, userId: str) -> int:
@@ -259,6 +270,6 @@ class Neo4jActionGraphStore:
             DETACH DELETE g
             RETURN n_deleted
             """,
-            user_id = str(userId),
+            user_id=str(userId),
         )
         return int(row["n_deleted"]) if row else 0

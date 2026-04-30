@@ -12,6 +12,7 @@ False so the Qwen branch in the reflector / decomposer fallback chain is
 never taken; the chain falls through to Gemini (or HeuristicReflector /
 empty graph when no API key is set).
 """
+
 from __future__ import annotations
 
 from pathlib import Path

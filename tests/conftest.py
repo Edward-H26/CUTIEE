@@ -22,6 +22,7 @@ regardless of the developer's `.env`:
    production hardening branch in `cutiee_site/settings.py`, and the
    test client returns 301 for every plain-HTTP request.
 """
+
 from __future__ import annotations
 
 import os
@@ -46,7 +47,7 @@ for _k, _v in _TEST_ENV_DEFAULTS.items():
     os.environ.setdefault(_k, _v)
 
 
-@pytest.fixture(autouse = True)
+@pytest.fixture(autouse=True)
 def _baseEnv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Per-test pin so a stray env mutation cannot leak between tests."""
     monkeypatch.setenv("CUTIEE_ENV", _TEST_ENV_DEFAULTS["CUTIEE_ENV"])
@@ -57,7 +58,7 @@ def _baseEnv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     yield
 
 
-@pytest.fixture(autouse = True)
+@pytest.fixture(autouse=True)
 def _disableHttpsRedirectInTests(settings) -> None:
     """Disable production HTTPS-redirect middleware for the fast suite.
 

@@ -4,9 +4,10 @@
 
 A Django web application that wraps a computer-use agent with three
 cost-reduction mechanisms (procedural memory replay, temporal recency
-pruning, multi-tier model routing) and a self-evolving memory subsystem.
-Recurring tasks drop to zero VLM cost; novel tasks compose tiers so the
-expensive frontier model only fires for the hard 5% of decisions.
+pruning, and hybrid local memory-side inference) and a self-evolving
+memory subsystem. Recurring tasks drop to zero VLM cost; novel browser
+actions run through Gemini Flash Computer Use while memory reflection,
+retrieval, replay matching, and safety checks stay local where possible.
 
 INFO490 final project (A10).
 
@@ -18,9 +19,9 @@ INFO490 final project (A10).
   sequence and the browser controller replays it through Playwright at
   zero inference cost.
 - If no replay path exists, the orchestrator runs the observe-reason-act
-  loop. The pruner trims the trajectory before each model call, the
-  router picks the cheapest viable tier, and the safety gate suspends
-  high-risk actions for explicit user approval.
+  loop. The pruner trims the trajectory before each model call, Gemini
+  Flash emits the browser action, and the safety gate suspends high-risk
+  actions for explicit user approval.
 - Every step is audited. The cost dashboard plots daily spend and tier
   distribution. The memory dashboard exposes the learned bullet store
   and the procedural templates.
@@ -64,6 +65,12 @@ uv run playwright install chromium
 cp .env.example .env
 # CUTIEE_ENV=local (mock CU) or production (real Gemini),
 # NEO4J_*, GOOGLE_CLIENT_ID/SECRET, GEMINI_API_KEY (production only)
+
+# Recommended for CUTIEE_ENV=local: pre-cache the Qwen 3.5 0.8B weights
+# so the memory-side reflector loads in roughly 2 seconds instead of 10.
+# Requires the optional local_llm dep group; safe to skip in production.
+uv sync --group local_llm
+uv run python scripts/cache_local_qwen.py
 
 # Start Neo4j (local) + Django (one shot)
 ./scripts/dev.sh
@@ -181,6 +188,7 @@ the legacy `.env.cutiee.template`). Required keys:
 |---|---|---|
 | `CUTIEE_ENV` | always | `local` or `production` |
 | `DJANGO_SECRET_KEY` | always | Django session signing |
+| `DJANGO_DATABASE_URL` or `DATABASE_URL` | production | Durable SQL store for Django users, allauth social-account links, sessions, and preferences |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | always | Google OAuth |
 | `NEO4J_BOLT_URL`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | always | Neo4j domain DB |
 | `GEMINI_API_KEY` | production | Gemini Flash with the ComputerUse tool |
@@ -223,6 +231,31 @@ in sync automatically; override by editing `render.yaml`, not the
 dashboard.
 
 Full walkthrough: `DEPLOY-RENDER.md` at the repo root.
+
+## INFO490 A10 deliverables map
+
+The submission ships several documents at different lengths so the grader can pick the right one for each rubric category. The page-bounded rubric deliverable is `docs/REPORT.pdf`; the others provide depth, standalone Part 1, and supporting evidence.
+
+| Rubric expectation | File | Length | Purpose |
+|---|---|---|---|
+| Technical Report PDF (4-6 pages) | [`docs/REPORT.pdf`](./docs/REPORT.pdf) | 5 pages | The rubric-graded submission. Covers Product Overview, Django System Architecture, AI Integration, Evaluation and Failure, Cost and Production Readiness. |
+| Part 1 write-up (1-2 pages) | [`docs/PART1.md`](./docs/PART1.md) | ~2 pages | Standalone refined problem statement, target users, final feature set, user flow, system flow diagram. |
+| Verbose technical appendix | [`docs/TECHNICAL-REPORT.pdf`](./docs/TECHNICAL-REPORT.pdf) | 27 pages | Reference document with full architecture detail, mermaid diagrams, deployment topology, and SLO tables. |
+| Academic preprint | [`docs/paper/cutiee_icml2026.pdf`](./docs/paper/cutiee_icml2026.pdf) | 4 pages | ICML-style preprint with literature citations and the production cost narrative. |
+| Evaluation tables (8 cases) | [`docs/EVALUATION.md`](./docs/EVALUATION.md) | - | Input, Expected, Actual, Quality, Latency per rubric Section 4.1. |
+| Failure post-mortems (4 failures) | [`docs/FAILURES.md`](./docs/FAILURES.md) | - | Root cause, evidence, mitigation per rubric Section 4.2. |
+| Improvements (3 deltas) | [`docs/IMPROVEMENT.md`](./docs/IMPROVEMENT.md) | - | Before-and-after metrics per rubric Section 4.3. |
+| AI integration narrative | [`README_AI.md`](./README_AI.md) | - | Workflow, model selection, design decisions, full API-only comparison. |
+
+To rebuild the PDFs after a markdown edit:
+
+```bash
+# Rebuild the rubric-graded 5-page report
+uv run python scripts/build_report_pdf.py --source docs/REPORT.md --output docs/REPORT.pdf --title "CUTIEE: Token-Efficient Computer-Use Agents in Django"
+
+# Rebuild the verbose 27-page appendix
+uv run python scripts/build_report_pdf.py
+```
 
 ## Documentation
 

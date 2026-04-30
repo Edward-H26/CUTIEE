@@ -5,6 +5,7 @@ focused on persistence + progress publishing. Tests can import this
 factory directly to swap any single collaborator (browser, memory,
 replay planner, screenshot sink) without touching the rest.
 """
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
@@ -13,15 +14,19 @@ from typing import Any
 from agent.browser.controller import StubBrowserController, browserFromEnv
 from agent.harness.computer_use_loop import ComputerUseRunner, buildComputerUseRunner
 from agent.harness.config import Config
+from agent.harness.heartbeat import HeartbeatTracker
 from agent.harness.preview import runPreviewAndWait
 from agent.harness.state import Action, ActionType, AgentState, ObservationStep
 from agent.harness.url_utils import hostFromUrl
 from agent.memory.ace_memory import ACEMemory
+from agent.memory.fragment_replay import findReplayFragments
 from agent.memory.pipeline import ACEPipeline
 from agent.memory.replay import ReplayPlanner
 from agent.routing.cu_client import CuClient
 from agent.routing.models.gemini_cu import GeminiComputerUseClient, MockComputerUseClient
 from agent.safety.approval_gate import ApprovalGate
+from agent.safety.captcha_detector import detectCaptcha
+from agent.safety.injection_guard import scanScreenshotForInjection
 from apps.audit.repo import appendAudit
 from apps.memory_app.store import Neo4jBulletStore
 from apps.tasks.approval_queue import buildExecutionGate
@@ -38,19 +43,19 @@ def buildMockCuRunner(*, initialUrl: str = "", maxSteps: int = 6) -> ComputerUse
     that the runner emits itself — first scripted action is the click.
     """
     mockClient = MockComputerUseClient(
-        label = "mock-cu-demo",
-        actionsToReturn = [
-            Action(type = ActionType.CLICK_AT, coordinate = (640, 320), reasoning = "demo click"),
-            Action(type = ActionType.FINISH, reasoning = "demo complete"),
+        label="mock-cu-demo",
+        actionsToReturn=[
+            Action(type=ActionType.CLICK_AT, coordinate=(640, 320), reasoning="demo click"),
+            Action(type=ActionType.FINISH, reasoning="demo complete"),
         ],
-        fixedCostUsd = 0.0,
+        fixedCostUsd=0.0,
     )
     return ComputerUseRunner(
-        browser = StubBrowserController(),
-        client = mockClient,
-        approvalGate = ApprovalGate(),
-        initialUrl = initialUrl,
-        maxSteps = maxSteps,
+        browser=StubBrowserController(),
+        client=mockClient,
+        approvalGate=ApprovalGate(),
+        initialUrl=initialUrl,
+        maxSteps=maxSteps,
     )
 
 
@@ -70,33 +75,53 @@ def buildLiveCuRunnerForUser(
     chromium binary). Workers that ship Playwright should pass
     `useStubBrowser=False` so the agent can actually drive a browser.
     """
-    memory = ACEMemory(userId = str(userId), store = Neo4jBulletStore())
+    config = Config.fromEnv()
+    maxSteps = min(maxSteps, max(1, config.maxStepsPerTask))
+
+    memory = ACEMemory(userId=str(userId), store=Neo4jBulletStore())
     memory.loadFromStore()
-    pipeline = ACEPipeline(memory = memory)
-    replayPlanner = ReplayPlanner(pipeline = pipeline)
+    pipeline = ACEPipeline(memory=memory)
+    replayPlanner = ReplayPlanner(pipeline=pipeline)
 
     domain = hostFromUrl(initialUrl)
     browser = (
         StubBrowserController()
         if useStubBrowser
-        else browserFromEnv(defaultHeadless = False, domain = domain, userId = str(userId))
+        else browserFromEnv(defaultHeadless=False, domain=domain, userId=str(userId))
     )
 
     decider = buildExecutionGate(executionId) if executionId else None
-    client = _buildCuClientFromEnv(cdpUrl = _cdpUrlFromBrowser(browser), maxSteps = maxSteps)
+    client = _buildCuClientFromEnv(
+        config=config,
+        cdpUrl=_cdpUrlFromBrowser(browser),
+        maxSteps=maxSteps,
+    )
 
     runner = buildComputerUseRunner(
-        browser = browser,
-        client = client,
-        onProgress = onProgress,
-        auditSink = appendAudit,
-        screenshotSink = screenshotSink,
-        memory = pipeline,
-        replayPlanner = replayPlanner,
-        initialUrl = initialUrl,
-        maxSteps = maxSteps,
-        approvalGate = ApprovalGate(decider = decider),
+        browser=browser,
+        client=client,
+        onProgress=onProgress,
+        auditSink=appendAudit,
+        screenshotSink=screenshotSink,
+        memory=None,
+        replayPlanner=replayPlanner,
+        initialUrl=initialUrl,
+        maxSteps=maxSteps,
+        approvalGate=ApprovalGate(decider=decider),
     )
+    runner.maxCostUsdPerTask = config.maxCostUsdPerTask
+    runner.maxCostUsdPerHour = config.maxCostUsdPerHour
+    runner.maxCostUsdPerDay = config.maxCostUsdPerDay
+    runner.injectionGuard = scanScreenshotForInjection
+    runner.captchaDetector = detectCaptcha
+    runner.fragmentMatcher = _buildFragmentMatcher(
+        pipeline=pipeline,
+        initialUrl=initialUrl,
+        config=config,
+    )
+    if config.heartbeatMinutes > 0:
+        runner.heartbeat = HeartbeatTracker(hardCapSeconds=config.heartbeatMinutes * 60)
+
     # Phase 8 concrete DOM probe. Composed here so the agent package
     # stays apps-free: the probe returns regions, `redactScreenshot`
     # masks them, and the runner sees only an opaque
@@ -116,12 +141,13 @@ def buildLiveCuRunnerForUser(
 
     User = get_user_model()
     try:
-        userObj = User.objects.filter(pk = userId).first()
+        userObj = User.objects.filter(pk=userId).first()
     except Exception:
         userObj = None
     shouldRedact = UserPreference.for_user(userObj).redact_audit_screenshots
 
     if shouldRedact:
+
         async def _composedRedactor(browserArg: Any, screenshotBytes: bytes) -> bytes:
             regions = await playwrightDomRedactor(browserArg, screenshotBytes)
             if not regions:
@@ -140,9 +166,9 @@ def buildLiveCuRunnerForUser(
         reason, which the runner handles before any browser action fires.
         """
         return await runPreviewAndWait(
-            executionId = state.executionId,
-            userId = state.userId,
-            summary = _buildPreviewSummary(state, fragmentPlan),
+            executionId=state.executionId,
+            userId=state.userId,
+            summary=_buildPreviewSummary(state, fragmentPlan),
         )
 
     runner.previewHook = _previewHook
@@ -156,20 +182,36 @@ def _buildPreviewSummary(state: AgentState, fragmentPlan: Any) -> str:
         fragmentCount = len(getattr(fragmentPlan, "fragments", []) or [])
     lines: list[str] = [f"Goal: {state.taskDescription or '(no description)'}"]
     if fragmentCount > 0:
-        lines.append(
-            f"{fragmentCount} step(s) will replay from procedural memory at $0."
-        )
+        lines.append(f"{fragmentCount} step(s) will replay from procedural memory at $0.")
     else:
-        lines.append(
-            "No procedural replay available; every step will use the model."
-        )
-    lines.append(
-        "Approve to begin, or Cancel to stop before any browser action fires."
-    )
+        lines.append("No procedural replay available; every step will use the model.")
+    lines.append("Approve to begin, or Cancel to stop before any browser action fires.")
     return "\n".join(lines)
 
 
-def _buildCuClientFromEnv(*, cdpUrl: str | None, maxSteps: int) -> CuClient:
+def _buildFragmentMatcher(
+    *,
+    pipeline: ACEPipeline,
+    initialUrl: str,
+    config: Config,
+) -> Callable[..., Any]:
+    currentDomain = hostFromUrl(initialUrl)
+
+    def _matcher(*, taskDescription: str, userId: str) -> Any:
+        return findReplayFragments(
+            pipeline=pipeline,
+            taskDescription=taskDescription,
+            userId=userId,
+            currentDomain=currentDomain,
+            fragmentConfidenceThreshold=config.replayFragmentConfidence,
+        )
+
+    return _matcher
+
+
+def _buildCuClientFromEnv(
+    *, config: Config | None = None, cdpUrl: str | None, maxSteps: int
+) -> CuClient:
     """Dispatch between GeminiComputerUseClient and BrowserUseClient.
 
     `Config.fromEnv()` already validated `CUTIEE_CU_BACKEND` and the
@@ -181,13 +223,17 @@ def _buildCuClientFromEnv(*, cdpUrl: str | None, maxSteps: int) -> CuClient:
     adapter missing `primeTask` or `nextAction` fails at runner
     construction instead of at the first model call inside the loop.
     """
-    config = Config.fromEnv()
+    config = config or Config.fromEnv()
     client: CuClient
     if config.cuBackend == "browser_use":
         from agent.routing.models.browser_use_client import BrowserUseClient
-        client = BrowserUseClient(cdpUrl = cdpUrl, maxSteps = maxSteps)
+
+        client = BrowserUseClient(cdpUrl=cdpUrl, maxSteps=maxSteps)
     else:
-        client = GeminiComputerUseClient()
+        client = GeminiComputerUseClient(
+            modelId=config.cuModel,
+            historyKeepTurns=config.historyKeepTurns,
+        )
     if not isinstance(client, CuClient):
         raise RuntimeError(
             f"CUTIEE_CU_BACKEND={config.cuBackend!r} produced a client "

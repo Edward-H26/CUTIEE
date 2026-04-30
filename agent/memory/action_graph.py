@@ -22,6 +22,7 @@ canonical_value, coord_band)` — used as the equality key for subgraph
 matching. Two ActionNodes with the same hash are considered identical
 even if other fields (timestamps, run_id) differ.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -43,51 +44,59 @@ class ActionNode:
     node. At replay time, `StateVerifier` compares them against the
     current page state to decide whether replay is safe.
     """
-    id: str = field(default_factory = lambda: str(uuid.uuid4()))
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     action_type: str = ""
     target: str = ""
     value: str = ""
     coord_x: int | None = None
     coord_y: int | None = None
-    description: str = ""                  # human-readable label, e.g. "click formula bar"
-    hash: str = ""                         # content fingerprint for subgraph match
-    expected_url: str = ""                 # state at recording time (host + first path seg)
-    expected_phash: str = ""               # 8x8 aHash of the screenshot at recording time
-    metadata: dict[str, Any] = field(default_factory = dict)
+    description: str = ""  # human-readable label, e.g. "click formula bar"
+    hash: str = ""  # content fingerprint for subgraph match
+    expected_url: str = ""  # state at recording time (host + first path seg)
+    expected_phash: str = ""  # 8x8 aHash of the screenshot at recording time
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.hash:
             self.hash = computeActionHash(
-                actionType = self.action_type,
-                target = self.target,
-                value = self.value,
-                coordX = self.coord_x,
-                coordY = self.coord_y,
+                actionType=self.action_type,
+                target=self.target,
+                value=self.value,
+                coordX=self.coord_x,
+                coordY=self.coord_y,
             )
 
 
 @dataclass
 class ActionEdge:
     """A `:NEXT` edge between two ActionNodes within a procedure."""
+
     source_id: str
     target_id: str
-    procedure_id: str                       # groups edges into a coherent procedure
+    procedure_id: str  # groups edges into a coherent procedure
     sequence_index: int = 0
 
 
 @dataclass
 class ProcedureGraph:
     """One procedure's nodes + edges, ready for persistence or replay."""
+
     procedure_id: str
     user_id: str
     task_description: str
-    nodes: list[ActionNode] = field(default_factory = list)
-    edges: list[ActionEdge] = field(default_factory = list)
-    metadata: dict[str, Any] = field(default_factory = dict)
+    nodes: list[ActionNode] = field(default_factory=list)
+    edges: list[ActionEdge] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def hashes(self) -> list[str]:
         """Ordered list of node hashes — the fingerprint for subgraph match."""
         return [n.hash for n in self.nodes]
+
+    def get_absolute_url(self) -> str:
+        from django.urls import reverse
+
+        return f"{reverse('memory_app:list')}#procedure-{self.procedure_id}"
 
 
 def computeActionHash(
@@ -134,15 +143,19 @@ class ActionGraphStore(Protocol):
     via apps/memory_app/action_graph_store.py). The library doesn't
     require a specific persistence layer.
     """
+
     def saveGraph(self, graph: ProcedureGraph) -> None: ...
     def loadGraphsForUser(self, userId: str, limit: int = 100) -> list[ProcedureGraph]: ...
-    def loadGraphsByTopic(self, userId: str, topicSlug: str, limit: int = 10) -> list[ProcedureGraph]: ...
+    def loadGraphsByTopic(
+        self, userId: str, topicSlug: str, limit: int = 10
+    ) -> list[ProcedureGraph]: ...
 
 
 @dataclass
 class InMemoryActionGraphStore:
     """In-process store for tests and standalone use."""
-    graphs: dict[str, ProcedureGraph] = field(default_factory = dict)
+
+    graphs: dict[str, ProcedureGraph] = field(default_factory=dict)
 
     def saveGraph(self, graph: ProcedureGraph) -> None:
         self.graphs[graph.procedure_id] = graph
@@ -151,9 +164,12 @@ class InMemoryActionGraphStore:
         out = [g for g in self.graphs.values() if g.user_id == userId]
         return out[:limit]
 
-    def loadGraphsByTopic(self, userId: str, topicSlug: str, limit: int = 10) -> list[ProcedureGraph]:
+    def loadGraphsByTopic(
+        self, userId: str, topicSlug: str, limit: int = 10
+    ) -> list[ProcedureGraph]:
         out = [
-            g for g in self.graphs.values()
+            g
+            for g in self.graphs.values()
             if g.user_id == userId and g.metadata.get("topic_slug") == topicSlug
         ]
         return out[:limit]

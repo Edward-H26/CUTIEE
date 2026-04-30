@@ -14,6 +14,22 @@
 # Build: docker build -f Dockerfile.worker -t cutiee-worker .
 # Run:   docker run -p 6080:6080 -p 9222:9222 --env-file .env cutiee-worker
 
+# Stage 1: dependency resolution.
+# Splits `uv pip compile` into a dedicated stage so a pyproject.toml
+# change only invalidates this small layer. The runtime stage below
+# never carries the uv binary, which keeps the deployed image leaner
+# and the install path aligned with stock pip.
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy AS deps-builder
+
+WORKDIR /tmp/build
+COPY pyproject.toml ./
+# Resolve against the declared `requires-python = ">=3.11"` constraint.
+# Both stages use the same Playwright base image so the resolved wheels
+# match the runtime Python ABI even though Ubuntu jammy ships Python 3.10.
+RUN pip install --no-cache-dir uv \
+ && uv pip compile pyproject.toml -o /tmp/build/requirements.txt
+
+# Stage 2: runtime image.
 FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -34,14 +50,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-# Install core deps. Docker's RUN defaults to `/bin/sh -c`, and on
-# Ubuntu `/bin/sh` is `dash`, which does NOT support bash's `<(...)`
-# process substitution. Compile to a temp file instead so the command
-# stays POSIX-compliant and works on every Docker host.
-RUN pip install --no-cache-dir uv \
- && uv pip compile pyproject.toml -o /tmp/requirements.txt \
- && uv pip install --system --no-cache -r /tmp/requirements.txt \
+# Pull the pinned requirements file from the deps-builder stage and
+# install with stock pip so the runtime image carries no uv binary.
+# Docker's RUN defaults to `/bin/sh -c`, which is `dash` on Ubuntu;
+# referencing /tmp/requirements.txt as a real file (not via `<(...)`
+# process substitution) keeps this command POSIX-compliant.
+COPY --from=deps-builder /tmp/build/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
  && rm -f /tmp/requirements.txt
 # browser-use is intentionally NOT installed here. This image's runtime
 # (start-worker.sh) only launches Xvfb, fluxbox, x11vnc, websockify, and

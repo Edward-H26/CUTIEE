@@ -6,6 +6,7 @@ Usage:
 
 Stops cleanly on SIGINT.
 """
+
 from __future__ import annotations
 
 import signal
@@ -25,8 +26,12 @@ def main() -> int:
     repoRoot = Path(__file__).resolve().parent.parent
     procs: list[subprocess.Popen[bytes]] = []
     for module, port in SITES:
-        cmd = [sys.executable, "-c", f"import {module} as m; m.createApp().run(host='127.0.0.1', port={port})"]
-        proc = subprocess.Popen(cmd, cwd = str(repoRoot))
+        cmd = [
+            sys.executable,
+            "-c",
+            f"import {module} as m; m.createApp().run(host='127.0.0.1', port={port})",
+        ]
+        proc = subprocess.Popen(cmd, cwd=str(repoRoot))
         procs.append(proc)
 
     def _shutdown(_signum: int, _frame: object) -> None:

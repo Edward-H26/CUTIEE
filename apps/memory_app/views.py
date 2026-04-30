@@ -7,6 +7,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
 from agent.persistence.healthcheck import checkNeo4jReachable
+from apps.memory_app.forms import MarkStaleForm
 from apps.memory_app.repo import (
     listBulletsForUser,
     listTemplatesForUser,
@@ -36,7 +37,7 @@ def bullet_list(request: HttpRequest) -> HttpResponse:
         templates = listTemplatesForUser(userId)
         stats = memoryDashboardStats(userId)
     except Exception:  # noqa: BLE001 - fail soft for UI
-        _logger.warning("Neo4j fetch failed for /memory/", exc_info = True)
+        _logger.warning("Neo4j fetch failed for /memory/", exc_info=True)
         db_error = checkNeo4jReachable().remediation or "Database temporarily unavailable."
     return render(
         request,
@@ -49,9 +50,11 @@ def bullet_list(request: HttpRequest) -> HttpResponse:
 def mark_stale(request: HttpRequest, template_id: str) -> HttpResponse:
     if request.method != "POST":
         return redirect("memory_app:list")
+    form = MarkStaleForm(request.POST)
+    reason = form.cleanedReason() if form.is_valid() else "user-marked"
     markTemplateStale(
-        userId = str(request.user.pk),
-        templateId = str(template_id),
-        reason = request.POST.get("reason", "user-marked"),
+        userId=str(request.user.pk),
+        templateId=str(template_id),
+        reason=reason,
     )
     return redirect("memory_app:list")

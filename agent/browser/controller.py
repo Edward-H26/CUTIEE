@@ -16,15 +16,19 @@ tests and tiers without Chromium) satisfy. The runner accepts anything
 satisfying the Protocol, which eliminates the prior Pyright complaints
 about passing `StubBrowserController` where `BrowserController` was typed.
 """
+
 from __future__ import annotations
 
 import asyncio
 import os
+import re as _re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
+from ..harness.url_safety import sanitizeNavigationUrl
 from ..harness.state import Action, ActionType
+from ..safety.injection_guard import stripUrlFragment, urlFragmentsAllowed
 
 
 @dataclass
@@ -69,11 +73,11 @@ class BrowserController:
     # keep the pre-phase behavior (PNG at native viewport).
     screenshotQuality: int = 90
     screenshotMaxWidth: int = 1280
-    _playwright: Any = field(default = None, init = False, repr = False)
-    _browser: Any = field(default = None, init = False, repr = False)
-    _context: Any = field(default = None, init = False, repr = False)
-    _page: Any = field(default = None, init = False, repr = False)
-    _attachedToExisting: bool = field(default = False, init = False, repr = False)
+    _playwright: Any = field(default=None, init=False, repr=False)
+    _browser: Any = field(default=None, init=False, repr=False)
+    _context: Any = field(default=None, init=False, repr=False)
+    _page: Any = field(default=None, init=False, repr=False)
+    _attachedToExisting: bool = field(default=False, init=False, repr=False)
 
     async def start(self) -> None:
         if self._page is not None:
@@ -106,9 +110,9 @@ class BrowserController:
         if not self.headless:
             launchArgs.append("--start-maximized")
         self._browser = await self._playwright.chromium.launch(
-            headless = self.headless,
-            slow_mo = self.slowMoMs,
-            args = launchArgs,
+            headless=self.headless,
+            slow_mo=self.slowMoMs,
+            args=launchArgs,
         )
         contextArgs: dict[str, Any] = {
             "viewport": {"width": self.viewportWidth, "height": self.viewportHeight},
@@ -156,13 +160,23 @@ class BrowserController:
         startedAt = loop.time()
         try:
             if action.type == ActionType.NAVIGATE:
-                await self._page.goto(action.target)
+                target = action.target
+                if not urlFragmentsAllowed():
+                    target = stripUrlFragment(target)
+                sanitizedTarget, error = sanitizeNavigationUrl(
+                    target,
+                    allowPrivateHosts=_allowPrivateNavigationTargets(),
+                )
+                if sanitizedTarget is None:
+                    return StepResult(success=False, detail=error)
+                action.target = sanitizedTarget
+                await self._page.goto(sanitizedTarget)
             elif action.type == ActionType.WAIT:
                 seconds = float(action.value) if action.value else 1.0
                 await asyncio.sleep(seconds)
             elif action.type == ActionType.CLICK_AT:
                 if action.coordinate is None:
-                    return StepResult(success = False, detail = "click_at requires coordinate")
+                    return StepResult(success=False, detail="click_at requires coordinate")
                 x, y = action.coordinate
                 await self._page.mouse.click(x, y)
             elif action.type == ActionType.TYPE_AT:
@@ -173,7 +187,7 @@ class BrowserController:
             elif action.type == ActionType.KEY_COMBO:
                 keys = action.keys or ([action.value] if action.value else [])
                 if not keys:
-                    return StepResult(success = False, detail = "key_combo requires keys")
+                    return StepResult(success=False, detail="key_combo requires keys")
                 # Playwright requires its own canonical key names (ArrowUp,
                 # PageDown, etc.). Gemini emits informal aliases like "up"
                 # or "page_down"; normalize them here so the press succeeds
@@ -190,23 +204,23 @@ class BrowserController:
             elif action.type in (ActionType.FINISH, ActionType.APPROVE):
                 pass
             else:
-                return StepResult(success = False, detail = f"unknown action: {action.type}")
+                return StepResult(success=False, detail=f"unknown action: {action.type}")
         except Exception as exc:
             elapsed = int((loop.time() - startedAt) * 1000)
-            return StepResult(success = False, detail = repr(exc), durationMs = elapsed)
+            return StepResult(success=False, detail=repr(exc), durationMs=elapsed)
 
         elapsed = int((loop.time() - startedAt) * 1000)
-        return StepResult(success = True, durationMs = elapsed)
+        return StepResult(success=True, durationMs=elapsed)
 
     async def captureScreenshot(self) -> bytes:
-        raw = await self._page.screenshot(type = "png", full_page = False)
+        raw = await self._page.screenshot(type="png", full_page=False)
         return _compressScreenshot(raw, self.screenshotQuality, self.screenshotMaxWidth)
 
     async def currentUrl(self) -> str:
         return self._page.url
 
     async def saveStorageState(self, path: str) -> None:
-        await self._context.storage_state(path = path)
+        await self._context.storage_state(path=path)
 
 
 @dataclass
@@ -219,7 +233,8 @@ class StubBrowserController:
     screenshots so the runner's screenshot sink path stays exercised
     end-to-end without a real browser.
     """
-    log: list[Action] = field(default_factory = list)
+
+    log: list[Action] = field(default_factory=list)
     fakeUrl: str = "stub://blank"
     # Protocol-shaped field so `isinstance(stub, BrowserControllerProtocol)`
     # passes without callers needing to care about the underlying impl.
@@ -233,12 +248,13 @@ class StubBrowserController:
 
     async def execute(self, action: Action) -> StepResult:
         self.log.append(action)
-        return StepResult(success = True, durationMs = 1)
+        return StepResult(success=True, durationMs=1)
 
     async def captureScreenshot(self) -> bytes:
         # Smallest valid PNG: 1x1 transparent pixel. Lets the screenshot sink
         # path execute without dragging in a real chromium.
         import base64
+
         return base64.b64decode(
             b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
         )
@@ -276,15 +292,17 @@ def _compressScreenshot(pngBytes: bytes, quality: int, maxWidth: int) -> bytes:
                 scale = maxWidth / float(width)
                 newSize = (maxWidth, max(1, int(height * scale)))
                 resample = getattr(Image, "Resampling", Image).LANCZOS  # type: ignore[attr-defined]
-                img = img.resize(newSize, resample = resample)
+                img = img.resize(newSize, resample=resample)
             buffer = io.BytesIO()
-            img.save(buffer, format = "PNG", optimize = True, compress_level = 9)
+            img.save(buffer, format="PNG", optimize=True, compress_level=9)
             return buffer.getvalue()
     except Exception:
         return pngBytes
 
 
-import re as _re
+def _allowPrivateNavigationTargets() -> bool:
+    return os.environ.get("CUTIEE_ENV") == "local"
+
 
 # RFC 1035 hostname charset: letters, digits, hyphens, dots only. No slashes,
 # no backslashes, no dot-dot, no leading/trailing dots or hyphens. Used to
@@ -327,10 +345,10 @@ def browserFromEnv(
     cdpUrl = envStr("CUTIEE_BROWSER_CDP_URL") or None
     storage = _resolveStorageStatePath(domain, userId)
     return BrowserController(
-        headless = headless,
-        storageStatePath = storage,
-        slowMoMs = slowMo,
-        cdpUrl = cdpUrl,
+        headless=headless,
+        storageStatePath=storage,
+        slowMoMs=slowMo,
+        cdpUrl=cdpUrl,
     )
 
 

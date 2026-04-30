@@ -18,6 +18,7 @@ action graphs) just need to implement `reflect(state) -> list[LessonCandidate]`.
 This is the extensibility hook that lets the same pipeline serve chat
 agents, CU agents, code agents, etc.
 """
+
 from __future__ import annotations
 
 import logging
@@ -88,6 +89,7 @@ def _taskDescriptionContainsAccountMarker(taskDescription: str) -> bool:
     lowered = taskDescription.lower()
     return any(marker in lowered for marker in _ACCOUNT_LIKE_TASK_MARKERS)
 
+
 logger = logging.getLogger("cutiee.reflector")
 
 # Ported verbatim from miramemoria/app/chat/ace_runtime.py:
@@ -148,11 +150,11 @@ class LessonCandidate:
     content: str
     memoryType: str = "semantic"
     confidence: float = 0.7
-    tags: list[str] = field(default_factory = list)
+    tags: list[str] = field(default_factory=list)
     topic: str = ""
     concept: str = ""
     replacementForBulletId: str | None = None
-    metadata: dict[str, Any] = field(default_factory = dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class Reflector(Protocol):
@@ -161,6 +163,7 @@ class Reflector(Protocol):
     Plug in your own (chat-specific, code-specific, robotics-specific)
     by implementing this single method.
     """
+
     def reflect(self, state: AgentState) -> list[LessonCandidate]: ...
 
 
@@ -213,12 +216,12 @@ class HeuristicReflector:
             if isCredential:
                 tags.append("credential")
             candidate = LessonCandidate(
-                content = content,
-                memoryType = "procedural",
-                confidence = max(0.7, step.action.confidence or 0.7),
-                tags = tags,
-                topic = topic,
-                concept = step.action.type.value,
+                content=content,
+                memoryType="procedural",
+                confidence=max(0.7, step.action.confidence or 0.7),
+                tags=tags,
+                topic=topic,
+                concept=step.action.type.value,
             )
             candidate.metadata["is_credential"] = isCredential
             lessons.append(candidate)
@@ -229,27 +232,27 @@ class HeuristicReflector:
             # SSNs, or wire transfer details never land in memory.
             lessons.append(
                 LessonCandidate(
-                    content = (
+                    content=(
                         f"Task '{state.taskDescription}' completed in "
                         f"{len(state.history)} step(s) with total cost ${state.totalCostUsd:.4f}"
                     ),
-                    memoryType = "episodic",
-                    confidence = 0.85 if state.isComplete else 0.6,
-                    tags = [topic, "outcome:success" if state.isComplete else "outcome:fail"],
-                    topic = topic,
-                    concept = "outcome",
+                    memoryType="episodic",
+                    confidence=0.85 if state.isComplete else 0.6,
+                    tags=[topic, "outcome:success" if state.isComplete else "outcome:fail"],
+                    topic=topic,
+                    concept="outcome",
                 )
             )
 
         if domain:
             lessons.append(
                 LessonCandidate(
-                    content = f"User has interacted with {domain} via task '{state.taskDescription}'.",
-                    memoryType = "semantic",
-                    confidence = 0.75,
-                    tags = [f"domain:{domain}"],
-                    topic = topic,
-                    concept = "domain-affinity",
+                    content=f"User has interacted with {domain} via task '{state.taskDescription}'.",
+                    memoryType="semantic",
+                    confidence=0.75,
+                    tags=[f"domain:{domain}"],
+                    topic=topic,
+                    concept="domain-affinity",
                 )
             )
 
@@ -274,12 +277,13 @@ class LlmReflector:
     The fallback is a key reliability property: if Gemini is down or the
     user is offline, the agent still learns from the trace via heuristics.
     """
+
     apiKey: str | None = None
     modelId: str = "gemini-flash-latest"
     maxOutputTokens: int = 700
     temperature: float = 0.2
     minConfidence: float = 0.6
-    fallback: HeuristicReflector = field(default_factory = HeuristicReflector)
+    fallback: HeuristicReflector = field(default_factory=HeuristicReflector)
     _client: Any = None
 
     def __post_init__(self) -> None:
@@ -288,14 +292,13 @@ class LlmReflector:
             return
         key = self.apiKey or os.environ.get("GEMINI_API_KEY")
         if not key:
-            logger.warning(
-                "LlmReflector: no GEMINI_API_KEY; will always fall back to heuristic"
-            )
+            logger.warning("LlmReflector: no GEMINI_API_KEY; will always fall back to heuristic")
             self._client = None
             return
         try:
             from google import genai
-            self._client = genai.Client(api_key = key)
+
+            self._client = genai.Client(api_key=key)
         except Exception as exc:
             logger.warning("LlmReflector: client init failed (%s); falling back", exc)
             self._client = None
@@ -326,18 +329,18 @@ class LlmReflector:
             outcome = f"{outcome} ({state.completionReason})"
 
         prompt = REFLECTOR_PROMPT.format(
-            trace = trace,
-            task_description = state.taskDescription,
-            outcome = outcome,
+            trace=trace,
+            task_description=state.taskDescription,
+            outcome=outcome,
         )
         response = self._client.models.generate_content(
-            model = self.modelId,
-            contents = prompt,
-            config = types.GenerateContentConfig(
-                system_instruction = REFLECTOR_SYSTEM_INSTRUCTION,
-                temperature = self.temperature,
-                max_output_tokens = self.maxOutputTokens,
-                response_mime_type = "application/json",
+            model=self.modelId,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=REFLECTOR_SYSTEM_INSTRUCTION,
+                temperature=self.temperature,
+                max_output_tokens=self.maxOutputTokens,
+                response_mime_type="application/json",
             ),
         )
         rawText = (response.text or "").strip()
@@ -349,15 +352,18 @@ class LlmReflector:
         if state.completionReason:
             outcome = f"{outcome} ({state.completionReason})"
         prompt = REFLECTOR_PROMPT.format(
-            trace = trace,
-            task_description = state.taskDescription,
-            outcome = outcome,
+            trace=trace,
+            task_description=state.taskDescription,
+            outcome=outcome,
         )
-        rawText = local_llm.generateText(
-            systemInstruction = REFLECTOR_SYSTEM_INSTRUCTION,
-            userPrompt = prompt,
-            maxNewTokens = self.maxOutputTokens,
-        ) or ""
+        rawText = (
+            local_llm.generateText(
+                systemInstruction=REFLECTOR_SYSTEM_INSTRUCTION,
+                userPrompt=prompt,
+                maxNewTokens=self.maxOutputTokens,
+            )
+            or ""
+        )
         return self._parseLessons(rawText, state)
 
     def _formatTrace(self, state: AgentState) -> str:
@@ -405,14 +411,16 @@ class LlmReflector:
             tags.append(topic)
             if domain:
                 tags.append(f"domain:{domain}")
-            out.append(LessonCandidate(
-                content = content,
-                memoryType = memoryType,
-                confidence = confidence,
-                tags = tags,
-                topic = topic,
-                concept = memoryType,
-            ))
+            out.append(
+                LessonCandidate(
+                    content=content,
+                    memoryType=memoryType,
+                    confidence=confidence,
+                    tags=tags,
+                    topic=topic,
+                    concept=memoryType,
+                )
+            )
         return out
 
 
@@ -449,5 +457,5 @@ def buildReflector(*, apiKey: str | None = None) -> Reflector:
     """
     kind = os.environ.get("CUTIEE_REFLECTOR", "heuristic").lower()
     if kind == "llm":
-        return LlmReflector(apiKey = apiKey)
+        return LlmReflector(apiKey=apiKey)
     return HeuristicReflector()

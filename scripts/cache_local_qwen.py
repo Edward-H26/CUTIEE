@@ -1,4 +1,5 @@
 """Pre-download the local Qwen weights into CUTIEE's repo cache."""
+
 from __future__ import annotations
 
 from agent.memory.local_llm import MODEL_ID, ensureModelCached

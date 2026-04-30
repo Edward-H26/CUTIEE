@@ -10,6 +10,7 @@ sequence plus the live-progress publish path. The agent runs in a
 background thread so Django's WSGI stack stays unaware of the asyncio
 event loop the runner spawns.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,11 +18,14 @@ import logging
 import os
 import threading
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+from agent.harness.completion import agentStateSucceeded
 from agent.harness.state import AgentState, ObservationStep
 from agent.harness.url_utils import hostFromUrl
+from agent.persistence.metrics import setActiveExecutions
 from apps.audit.screenshot_store import Neo4jScreenshotStore
 from apps.memory_app.repo import upsertTemplate
 from apps.tasks import progress_backend, repo as tasksRepo
@@ -29,6 +33,8 @@ from apps.tasks.runner_factory import buildLiveCuRunnerForUser, buildMockCuRunne
 
 _SCREENSHOT_STORE: Neo4jScreenshotStore | None = None
 _SCREENSHOT_STORE_LOCK = threading.Lock()
+_ACTIVE_EXECUTIONS = 0
+_ACTIVE_EXECUTIONS_LOCK = threading.Lock()
 _logger = logging.getLogger("cutiee")
 
 
@@ -54,8 +60,10 @@ def persistScreenshot(executionId: str, stepIndex: int, pngBytes: bytes) -> None
         _screenshotStore().save(executionId, stepIndex, pngBytes)
     except Exception:  # noqa: BLE001 - persistence is best-effort, run continues
         _logger.warning(
-            "Failed to persist CU screenshot for %s step %s", executionId, stepIndex,
-            exc_info = True,
+            "Failed to persist CU screenshot for %s step %s",
+            executionId,
+            stepIndex,
+            exc_info=True,
         )
 
 
@@ -65,7 +73,11 @@ def persistScreenshot(executionId: str, stepIndex: int, pngBytes: bytes) -> None
 # default for the demo deploy is the stub browser. Real-browser deploys
 # (worker dynos with Playwright installed, or local laptops with chromium)
 # must opt in by setting CUTIEE_USE_STUB_BROWSER=0.
-USE_STUB_BROWSER = os.environ.get("CUTIEE_USE_STUB_BROWSER", "true").lower() not in {"0", "false", "no"}
+USE_STUB_BROWSER = os.environ.get("CUTIEE_USE_STUB_BROWSER", "true").lower() not in {
+    "0",
+    "false",
+    "no",
+}
 
 
 @dataclass
@@ -104,44 +116,62 @@ def runTaskForUser(
     # Always store the user's prompt as a persistent event before the run
     # starts. Mirrors miramemoria's model of the request itself being a
     # memory artifact, not just the lessons extracted from it.
-    _persistUserPrompt(userId = userId, taskId = taskId, description = description)
+    _persistUserPrompt(userId=userId, taskId=taskId, description=description)
 
-    state = asyncio.run(
-        _runTaskAsync(
-            userId = userId,
-            taskId = taskId,
-            description = description,
-            initialUrl = initialUrl,
-            useMockAgent = useMockAgent,
-            executionId = executionId,
+    with _trackActiveExecution():
+        state = asyncio.run(
+            _runTaskAsync(
+                userId=userId,
+                taskId=taskId,
+                description=description,
+                initialUrl=initialUrl,
+                useMockAgent=useMockAgent,
+                executionId=executionId,
+            )
         )
-    )
 
     # Template first, so the execution row can carry the templateId immediately.
     if state.replayed and state.templateId is None and state.history:
         state.templateId = upsertTemplate(
-            userId = userId,
-            description = description,
-            domain = hostFromUrl(initialUrl),
-            embedding = None,
-            actions = [step.action.asDict() if step.action else {} for step in state.history],
+            userId=userId,
+            description=description,
+            domain=hostFromUrl(initialUrl),
+            embedding=None,
+            actions=[step.action.asDict() if step.action else {} for step in state.history],
         )
 
-    tasksRepo.persistAgentState(userId = userId, taskId = taskId, state = state)
+    tasksRepo.persistAgentState(userId=userId, taskId=taskId, state=state)
 
     summary = _summarize(state)
-    _publishProgress(state.executionId, summary, finished = True)
+    _publishProgress(state.executionId, summary, finished=True)
 
     # Background reflection: spawn a daemon thread so the response returns
     # immediately. The pipeline call can take seconds (Gemini Reflector +
     # Cypher writes), and there's no reason to hold the user's HTTP
-    # response open for it. Failures log but don't surface.
+    # response open for it. Terminal failures skip bullet writeback but
+    # still update planner reward.
     chosenStrategy = getattr(state, "_chosen_strategy", None)
     _scheduleBackgroundReflection(
-        userId = userId, state = state, chosenStrategy = chosenStrategy,
+        userId=userId,
+        state=state,
+        chosenStrategy=chosenStrategy,
     )
 
     return summary
+
+
+@contextmanager
+def _trackActiveExecution():
+    global _ACTIVE_EXECUTIONS
+    with _ACTIVE_EXECUTIONS_LOCK:
+        _ACTIVE_EXECUTIONS += 1
+        setActiveExecutions(_ACTIVE_EXECUTIONS)
+    try:
+        yield
+    finally:
+        with _ACTIVE_EXECUTIONS_LOCK:
+            _ACTIVE_EXECUTIONS = max(0, _ACTIVE_EXECUTIONS - 1)
+            setActiveExecutions(_ACTIVE_EXECUTIONS)
 
 
 def _persistUserPrompt(*, userId: str, taskId: str, description: str) -> None:
@@ -151,6 +181,7 @@ def _persistUserPrompt(*, userId: str, taskId: str, description: str) -> None:
     """
     try:
         from agent.persistence.neo4j_client import run_query
+
         run_query(
             """
             MERGE (u:User {id: $user_id})
@@ -162,21 +193,25 @@ def _persistUserPrompt(*, userId: str, taskId: str, description: str) -> None:
             })
             CREATE (u)-[:SUBMITTED]->(p)
             """,
-            user_id = str(userId),
-            task_id = str(taskId),
-            text = description,
+            user_id=str(userId),
+            task_id=str(taskId),
+            text=description,
         )
     except Exception:  # noqa: BLE001 - best-effort persistence, never block
-        _logger.debug("Failed to persist user prompt for task %s", taskId, exc_info = True)
+        _logger.debug("Failed to persist user prompt for task %s", taskId, exc_info=True)
 
 
 def _scheduleBackgroundReflection(
-    *, userId: str, state, chosenStrategy: str | None = None,
+    *,
+    userId: str,
+    state,
+    chosenStrategy: str | None = None,
 ) -> None:
     """Run the ACE pipeline + record planner reward in a daemon thread."""
-    if state.replayed:
+    if state.replayed or not agentStateSucceeded(state):
         # Replays don't run the pipeline (the template already encodes
-        # the lesson). Still record the reward so the planner learns.
+        # the lesson). Failed runs avoid teaching bad procedures. Still
+        # record the reward so the planner learns.
         if chosenStrategy:
             _recordPlannerReward(userId, chosenStrategy, state)
         return
@@ -186,30 +221,35 @@ def _scheduleBackgroundReflection(
             from agent.memory.ace_memory import ACEMemory
             from agent.memory.pipeline import ACEPipeline
             from apps.memory_app.store import Neo4jBulletStore
-            memory = ACEMemory(userId = str(userId), store = Neo4jBulletStore())
+
+            memory = ACEMemory(userId=str(userId), store=Neo4jBulletStore())
             memory.loadFromStore()
-            pipeline = ACEPipeline.fromEnv(memory = memory)
+            pipeline = ACEPipeline.fromEnv(memory=memory)
             pipeline.processExecution(state)
             if chosenStrategy:
                 # Reward must be recorded against the SAME memory instance
                 # so the planner_state mutation persists.
                 from agent.memory.planner import Planner
-                planner = Planner(memory = memory)
+
+                planner = Planner(memory=memory)
                 planner.updateReward(
                     chosenStrategy,
-                    reward = _computeReward(state),
-                    confidence = 0.8,
+                    reward=_computeReward(state),
+                    confidence=0.8,
                 )
                 # Persist planner state by writing the memory delta (no bullets,
                 # but the upsert path will pick up plannerState)
-                _persistPlannerState(userId = str(userId), plannerState = memory.plannerState)
+                _persistPlannerState(userId=str(userId), plannerState=memory.plannerState)
         except Exception:  # noqa: BLE001
             _logger.warning(
                 "Background ACE reflection failed for execution %s",
-                state.executionId, exc_info = True,
+                state.executionId,
+                exc_info=True,
             )
 
-    threading.Thread(target = _worker, daemon = True, name = f"ace-reflect-{state.executionId[:8]}").start()
+    threading.Thread(
+        target=_worker, daemon=True, name=f"ace-reflect-{state.executionId[:8]}"
+    ).start()
 
 
 def _recordPlannerReward(userId: str, chosenStrategy: str, state) -> None:
@@ -218,15 +258,18 @@ def _recordPlannerReward(userId: str, chosenStrategy: str, state) -> None:
         from agent.memory.ace_memory import ACEMemory
         from agent.memory.planner import Planner
         from apps.memory_app.store import Neo4jBulletStore
-        memory = ACEMemory(userId = str(userId), store = Neo4jBulletStore())
+
+        memory = ACEMemory(userId=str(userId), store=Neo4jBulletStore())
         memory.loadFromStore()
-        planner = Planner(memory = memory)
+        planner = Planner(memory=memory)
         planner.updateReward(
-            chosenStrategy, reward = _computeReward(state), confidence = 0.9,
+            chosenStrategy,
+            reward=_computeReward(state),
+            confidence=0.9,
         )
-        _persistPlannerState(userId = str(userId), plannerState = memory.plannerState)
+        _persistPlannerState(userId=str(userId), plannerState=memory.plannerState)
     except Exception:  # noqa: BLE001
-        _logger.warning("Planner reward update failed", exc_info = True)
+        _logger.warning("Planner reward update failed", exc_info=True)
 
 
 def _persistPlannerState(*, userId: str, plannerState: dict) -> None:
@@ -236,6 +279,7 @@ def _persistPlannerState(*, userId: str, plannerState: dict) -> None:
     try:
         import json as _json
         from agent.persistence.neo4j_client import run_query
+
         run_query(
             """
             MERGE (u:User {id: $user_id})
@@ -243,11 +287,11 @@ def _persistPlannerState(*, userId: str, plannerState: dict) -> None:
             SET m.planner_state_json = $planner_state_json,
                 m.updated_at = datetime()
             """,
-            user_id = userId,
-            planner_state_json = _json.dumps(plannerState),
+            user_id=userId,
+            planner_state_json=_json.dumps(plannerState),
         )
     except Exception:  # noqa: BLE001
-        _logger.debug("Planner state persist failed", exc_info = True)
+        _logger.debug("Planner state persist failed", exc_info=True)
 
 
 async def _runTaskAsync(
@@ -264,13 +308,14 @@ async def _runTaskAsync(
     # client via `CUTIEE_LOCAL_USE_GEMINI=true`. Useful for testing the
     # real CU pipeline against a Neo4j-backed local stack without flipping
     # the entire CUTIEE_ENV to production. Requires GEMINI_API_KEY.
-    localUsesGemini = (
-        cutieeEnv == "local"
-        and os.environ.get("CUTIEE_LOCAL_USE_GEMINI", "false").lower() in {"1", "true", "yes"}
-    )
-    if useMockAgent is not None:
+    localUsesGemini = cutieeEnv == "local" and os.environ.get(
+        "CUTIEE_LOCAL_USE_GEMINI", "false"
+    ).lower() in {"1", "true", "yes"}
+    if cutieeEnv == "production":
+        forceMock = False
+    elif useMockAgent is not None:
         forceMock = useMockAgent
-    elif cutieeEnv == "production" or localUsesGemini:
+    elif localUsesGemini:
         forceMock = False
     else:
         forceMock = True
@@ -278,12 +323,12 @@ async def _runTaskAsync(
     executionId = executionId or str(uuid.uuid4())
 
     if forceMock:
-        runner = buildMockCuRunner(initialUrl = initialUrl)
+        runner = buildMockCuRunner(initialUrl=initialUrl)
         return await runner.run(
-            userId = str(userId),
-            taskId = taskId,
-            taskDescription = description,
-            executionId = executionId,
+            userId=str(userId),
+            taskId=taskId,
+            taskDescription=description,
+            executionId=executionId,
         )
 
     # === Production path: full miramemoria-parity orchestration ===
@@ -297,11 +342,11 @@ async def _runTaskAsync(
     # 5. Update the planner's reward based on outcome
 
     state, strategy = await _runProductionTask(
-        userId = str(userId),
-        taskId = taskId,
-        description = description,
-        initialUrl = initialUrl,
-        executionId = executionId,
+        userId=str(userId),
+        taskId=taskId,
+        description=description,
+        initialUrl=initialUrl,
+        executionId=executionId,
     )
     state._chosen_strategy = strategy  # noqa: SLF001 - stash for post-run pipeline
     return state
@@ -321,7 +366,7 @@ async def _runProductionTask(
     (so the caller can record reward against the right action).
     """
     from agent.memory.ace_memory import ACEMemory
-    from agent.memory.action_graph import ActionNode, ProcedureGraph
+    from agent.memory.action_graph import ActionNode
     from agent.memory.decomposer import LlmActionDecomposer
     from agent.memory.planner import CU_ACTIONS, Planner
     from agent.memory.subgraph_match import SubgraphMatcher
@@ -329,55 +374,55 @@ async def _runProductionTask(
     from apps.memory_app.store import Neo4jBulletStore
 
     # 1. Build memory + planner (planner state lives on ACEMemory)
-    memory = ACEMemory(userId = userId, store = Neo4jBulletStore())
+    memory = ACEMemory(userId=userId, store=Neo4jBulletStore())
     memory.loadFromStore()
-    planner = Planner(memory = memory)
+    planner = Planner(memory=memory)
 
     # 2. Strategy selection
-    strategy = planner.chooseAction(featureText = description, actions = CU_ACTIONS)
+    strategy = planner.chooseAction(featureText=description, actions=CU_ACTIONS)
     _logger.info("Planner picked strategy=%s for task=%s", strategy, taskId)
 
     # 3. Subgraph match (only for refine_with_replay; single_shot skips this)
     prematchedNodes: list[ActionNode] = []
     if strategy == "refine_with_replay":
         prematchedNodes = await _attemptSubgraphMatch(
-            userId = userId,
-            description = description,
-            initialUrl = initialUrl,
-            graphStore = Neo4jActionGraphStore(),
-            decomposer = LlmActionDecomposer(),
-            matcher = SubgraphMatcher(minPrefixLength = 2),
+            userId=userId,
+            description=description,
+            initialUrl=initialUrl,
+            graphStore=Neo4jActionGraphStore(),
+            decomposer=LlmActionDecomposer(),
+            matcher=SubgraphMatcher(minPrefixLength=2),
         )
 
     # 4. Build the runner and run it
     runner = buildLiveCuRunnerForUser(
-        userId = userId,
-        initialUrl = initialUrl,
-        executionId = executionId,
-        onProgress = _progressCallback,
-        screenshotSink = persistScreenshot,
-        useStubBrowser = USE_STUB_BROWSER,
+        userId=userId,
+        initialUrl=initialUrl,
+        executionId=executionId,
+        onProgress=_progressCallback,
+        screenshotSink=persistScreenshot,
+        useStubBrowser=USE_STUB_BROWSER,
     )
     runner.prematchedNodes = prematchedNodes  # consumed at runner.run() start
 
     state = await runner.run(
-        userId = userId,
-        taskId = taskId,
-        taskDescription = description,
-        executionId = executionId,
+        userId=userId,
+        taskId=taskId,
+        taskDescription=description,
+        executionId=executionId,
     )
 
     # 5. Persist the actual executed sequence as a new ProcedureGraph
-    if state.isComplete and not state.replayed and state.history:
+    if agentStateSucceeded(state) and not state.replayed and state.history:
         try:
             _persistProcedureGraph(
-                userId = userId,
-                description = description,
-                state = state,
-                graphStore = Neo4jActionGraphStore(),
+                userId=userId,
+                description=description,
+                state=state,
+                graphStore=Neo4jActionGraphStore(),
             )
         except Exception:  # noqa: BLE001
-            _logger.warning("Failed to persist procedure graph", exc_info = True)
+            _logger.warning("Failed to persist procedure graph", exc_info=True)
 
     return state, strategy
 
@@ -401,40 +446,45 @@ async def _attemptSubgraphMatch(
     list if no match meets the minimum prefix length.
     """
     try:
-        storedGraphs = graphStore.loadGraphsForUser(userId, limit = 20)
+        storedGraphs = graphStore.loadGraphsForUser(userId, limit=20)
     except Exception:  # noqa: BLE001
-        _logger.debug("loadGraphsForUser failed; no replay candidates", exc_info = True)
+        _logger.debug("loadGraphsForUser failed; no replay candidates", exc_info=True)
         return []
     if not storedGraphs:
         return []
 
     newGraph = decomposer.decompose(
-        userId = userId,
-        taskDescription = description,
-        initialUrl = initialUrl,
+        userId=userId,
+        taskDescription=description,
+        initialUrl=initialUrl,
     )
     if not newGraph.nodes:
         return []
 
     # Telemetry: per-step reuse across ALL stored graphs (not just one prefix)
     from agent.memory.subgraph_match import findReusableSteps, reusableCoverageReport
-    reusable = findReusableSteps(newTask = newGraph, storedGraphs = storedGraphs)
+
+    reusable = findReusableSteps(newTask=newGraph, storedGraphs=storedGraphs)
     coverage = reusableCoverageReport(reusable, len(newGraph.nodes))
     if coverage["matched"] > 0:
         _logger.info(
             "Per-step reuse coverage: %d/%d matched (%d safe-to-replay), %.0f%% safe coverage",
-            coverage["matched"], coverage["total_steps"],
-            coverage["safe_to_replay"], coverage["safe_replay_coverage"] * 100,
+            coverage["matched"],
+            coverage["total_steps"],
+            coverage["safe_to_replay"],
+            coverage["safe_replay_coverage"] * 100,
         )
 
     # Execution: only the contiguous prefix match (option a — safe semantics)
-    match = matcher.findBestMatch(newTask = newGraph, storedGraphs = storedGraphs)
+    match = matcher.findBestMatch(newTask=newGraph, storedGraphs=storedGraphs)
     if match is None:
         return []
     _logger.info(
         "Subgraph prefix match: %d/%d nodes (%.0f%% replayable) from procedure %s",
-        match.matchedLength, match.newTaskTotalLength,
-        match.coverageRatio * 100, match.storedProcedureId[:8],
+        match.matchedLength,
+        match.newTaskTotalLength,
+        match.coverageRatio * 100,
+        match.storedProcedureId[:8],
     )
     return match.matchedNodes
 
@@ -472,16 +522,18 @@ def _persistProcedureGraph(*, userId: str, description: str, state, graphStore) 
                 expectedPhash = computeAverageHash(png)
         except Exception:  # noqa: BLE001
             pass
-        nodes.append(ActionNode(
-            action_type = step.action.type.value,
-            target = step.action.target or "",
-            value = step.action.value or "",
-            coord_x = coord[0] if coord else None,
-            coord_y = coord[1] if coord else None,
-            description = step.action.reasoning or "",
-            expected_url = step.url or "",
-            expected_phash = expectedPhash,
-        ))
+        nodes.append(
+            ActionNode(
+                action_type=step.action.type.value,
+                target=step.action.target or "",
+                value=step.action.value or "",
+                coord_x=coord[0] if coord else None,
+                coord_y=coord[1] if coord else None,
+                description=step.action.reasoning or "",
+                expected_url=step.url or "",
+                expected_phash=expectedPhash,
+            )
+        )
 
     if len(nodes) < 2:
         return  # not worth storing single-step procedures
@@ -489,20 +541,20 @@ def _persistProcedureGraph(*, userId: str, description: str, state, graphStore) 
     procedureId = str(_uuid.uuid4())
     edges = [
         ActionEdge(
-            source_id = nodes[i].id,
-            target_id = nodes[i + 1].id,
-            procedure_id = procedureId,
-            sequence_index = i,
+            source_id=nodes[i].id,
+            target_id=nodes[i + 1].id,
+            procedure_id=procedureId,
+            sequence_index=i,
         )
         for i in range(len(nodes) - 1)
     ]
     graph = ProcedureGraph(
-        procedure_id = procedureId,
-        user_id = userId,
-        task_description = description,
-        nodes = nodes,
-        edges = edges,
-        metadata = {"topic_slug": _slugify(description)},
+        procedure_id=procedureId,
+        user_id=userId,
+        task_description=description,
+        nodes=nodes,
+        edges=edges,
+        metadata={"topic_slug": _slugify(description)},
     )
     graphStore.saveGraph(graph)
     _logger.info("Persisted procedure graph %s with %d nodes", procedureId[:8], len(nodes))
@@ -510,6 +562,7 @@ def _persistProcedureGraph(*, userId: str, description: str, state, graphStore) 
 
 def _slugify(text: str) -> str:
     import re as _re
+
     if not text:
         return "task"
     normalized = _re.sub(r"[^a-zA-Z0-9]+", "-", text.strip().lower())
@@ -521,13 +574,12 @@ def _computeReward(state: AgentState) -> float:
     if not state.isComplete:
         return 0.0
     reason = state.completionReason or ""
-    if reason.startswith("action_failed") or reason.startswith("rejected"):
-        return 0.3
-    if reason.startswith("auth_expired"):
-        return 0.1
-    if reason in ("max_steps_reached",):
+    if not agentStateSucceeded(state):
+        if reason.startswith("action_failed") or reason.startswith("rejected"):
+            return 0.3
+        if reason.startswith("auth_expired"):
+            return 0.1
         return 0.2
-    # All other completions (finish_action, replay_success, demo_complete...)
     return 1.0
 
 
@@ -535,17 +587,19 @@ def _progressCallback(state: AgentState, step: ObservationStep) -> None:
     """Per-step hook: publish to the in-process progress cache AND
     persist the step to Neo4j so the detail page's steps table updates
     in real time. Best-effort — Neo4j hiccups never abort the run."""
-    _publishProgress(state.executionId, _summarize(state, latestStep = step), finished = False)
+    _publishProgress(state.executionId, _summarize(state, latestStep=step), finished=False)
     try:
         tasksRepo.appendStep(
-            userId = state.userId,
-            executionId = state.executionId,
-            step = step,
+            userId=state.userId,
+            executionId=state.executionId,
+            step=step,
         )
     except Exception:  # noqa: BLE001 - never block the agent on a write hiccup
         _logger.debug(
             "Live appendStep failed for execution=%s step=%s",
-            state.executionId, step.index, exc_info = True,
+            state.executionId,
+            step.index,
+            exc_info=True,
         )
 
 
@@ -577,14 +631,12 @@ def _summarize(state: AgentState, *, latestStep: ObservationStep | None = None) 
         tierUsage.setdefault(latestStep.action.tier, 0)
 
     return TaskRunSummary(
-        taskId = state.taskId,
-        executionId = state.executionId,
-        stepCount = state.stepCount(),
-        totalCostUsd = round(state.totalCostUsd, 6),
-        completed = state.isComplete,
-        completionReason = state.completionReason,
-        replayed = state.replayed,
-        tierUsage = tierUsage,
+        taskId=state.taskId,
+        executionId=state.executionId,
+        stepCount=state.stepCount(),
+        totalCostUsd=round(state.totalCostUsd, 6),
+        completed=agentStateSucceeded(state),
+        completionReason=state.completionReason,
+        replayed=state.replayed,
+        tierUsage=tierUsage,
     )
-
-

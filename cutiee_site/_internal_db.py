@@ -16,6 +16,7 @@ concerns to handle:
 The helper is idempotent and is safe to call multiple times: a process
 flag short-circuits after the first invocation.
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -36,6 +37,7 @@ def ensureInternalSchema() -> None:
         if _BOOTSTRAPPED:
             return
         from django.conf import settings
+
         defaultDb = settings.DATABASES.get("default", {})
         name = defaultDb.get("NAME", "")
         engine = defaultDb.get("ENGINE", "")
@@ -50,12 +52,13 @@ def ensureInternalSchema() -> None:
         # gap between migrate finishing and the first request opening
         # its own connection.
         useUri = bool(defaultDb.get("OPTIONS", {}).get("uri"))
-        _KEEPALIVE = sqlite3.connect(str(name), uri = useUri, check_same_thread = False)
+        _KEEPALIVE = sqlite3.connect(str(name), uri=useUri, check_same_thread=False)
 
         sys.stderr.write("[cutiee] bootstrapping in-memory framework SQLite...\n")
         sys.stderr.flush()
         from django.core.management import call_command
-        call_command("migrate", "--no-input", verbosity = 0)
+
+        call_command("migrate", "--no-input", verbosity=0)
         sys.stderr.write("[cutiee] in-memory framework SQLite ready.\n")
         sys.stderr.flush()
         _BOOTSTRAPPED = True

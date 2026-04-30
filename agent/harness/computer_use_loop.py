@@ -19,6 +19,7 @@ Responsibilities:
 Every guard is optional: the runner keeps its pre-phase behavior when
 the corresponding field is None or absent.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +29,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..browser.controller import BrowserController, BrowserControllerProtocol, StepResult
+from ..browser.controller import BrowserControllerProtocol, StepResult
 from .state import (
     Action,
     ActionType,
@@ -74,7 +75,7 @@ class ComputerUseRunner:
     maxSteps: int = 20
     maxRetriesPerStep: int = 1
     # Pre-matched ActionNodes from subgraph matcher (hybrid replay prefix).
-    prematchedNodes: list = field(default_factory = list)
+    prematchedNodes: list = field(default_factory=list)
     # Phase 15 fragment-level replay. When set, the runner calls the
     # matcher after browser.start and interleaves matched fragments
     # with the model loop per step index.
@@ -109,10 +110,63 @@ class ComputerUseRunner:
         taskDescription: str,
         executionId: str | None = None,
     ) -> AgentState:
+        """Drive the agent from preview through the model loop to memory writeback.
+
+        Always returns an `AgentState` with `state.completionReason` set,
+        so a caller never has to guess why the run ended. Each terminal
+        reason maps to a specific guard so the audit log and the cost
+        dashboard can attribute the run to the right safety mechanism.
+
+        Terminal `completionReason` values (search them in this file):
+
+          - `preview_timeout` — the user did not approve or cancel the
+            preview within `previewTimeoutSeconds`. Phase 16. No browser
+            action ever fired.
+          - `user_cancelled_preview` — the user clicked Cancel on the
+            preview modal. Phase 16. No browser action ever fired.
+          - `replay_success` — a whole-template replay finished cleanly
+            at zero inference cost. ACE memory writeback is skipped on
+            this path because the source bullets already encode the
+            lesson.
+          - `replay_failed` — a whole-template replay aborted because
+            `browser.execute` reported a step failure.
+          - `rejected_by_user_replay` / `rejected_by_user_graph_replay`
+            / `rejected_by_user_fragment_replay` — the user rejected a
+            HIGH-risk action queued by the replay path. Phase 14.
+          - `rejected_by_user` — the user rejected a HIGH-risk action
+            issued by the live model loop. `agent/safety/approval_gate.py`.
+          - `replay_fragment_failed:<detail>` — a Phase 15 fragment
+            replay step failed; the runner stops rather than risk
+            cascading errors.
+          - `auth_expired:<remediation>` — the agent landed on a
+            sign-in URL (`AUTH_REDIRECT_HINTS`) when the user expected
+            a logged-in surface. Surfaced before any model call so the
+            user is not billed for a doomed run.
+          - `captcha_detected:<kind>` — the Phase 6 CAPTCHA detector
+            fingerprinted the screenshot. The runner exits cleanly so
+            the user can solve the challenge by hand.
+          - `cost_cap_reached:<scope>` — Phase 4 wallet cap fired.
+            Scope is `per_task`, `per_hour`, or `per_day`. Enforced
+            via the Neo4j `:CostLedger` MERGE in
+            `agent/harness/cost_ledger.py`.
+          - `wallclock_heartbeat:<reason>` — Phase 7 silent-interval
+            detector terminated the run. Prevents zombie workers
+            charging for no progress.
+          - `plan_drift_cancelled` — the current page diverged from a
+            replay fragment's `expected_url` and the user cancelled the
+            mid-run re-approval. Phase 17.
+          - `action_failed:<detail>` — `browser.execute` reported a
+            non-recoverable failure for a model-issued action.
+          - `max_steps_reached` — the loop hit `self.maxSteps` without
+            a FINISH action.
+          - `<finish reasoning>` — the model emitted a FINISH action;
+            the reasoning string becomes the completion reason verbatim
+            so the audit log preserves the model's stated rationale.
+        """
         state = AgentState(
-            taskId = taskId or str(uuid.uuid4()),
-            userId = userId,
-            taskDescription = taskDescription,
+            taskId=taskId or str(uuid.uuid4()),
+            userId=userId,
+            taskDescription=taskDescription,
         )
         if executionId:
             state.executionId = executionId
@@ -145,7 +199,7 @@ class ComputerUseRunner:
                 elif self.initialUrl:
                     await self._recordInitialNavigation(state)
                 if not state.isComplete:
-                    await self._runLoop(state, fragmentPlan = fragmentPlan)
+                    await self._runLoop(state, fragmentPlan=fragmentPlan)
         finally:
             await self.browser.stop()
 
@@ -165,7 +219,7 @@ class ComputerUseRunner:
         if self.fragmentMatcher is None:
             return None
         try:
-            plan = self.fragmentMatcher(taskDescription = taskDescription, userId = userId)
+            plan = self.fragmentMatcher(taskDescription=taskDescription, userId=userId)
             return await _maybe(plan)
         except Exception as exc:  # noqa: BLE001 - matcher errors must not kill the run
             logger.warning("Fragment matcher failed: %r", exc)
@@ -182,7 +236,7 @@ class ComputerUseRunner:
             coro = _maybe(self.previewHook(state, fragmentPlan))
             outcome = await asyncio.wait_for(
                 coro,
-                timeout = max(1.0, float(self.previewTimeoutSeconds)),
+                timeout=max(1.0, float(self.previewTimeoutSeconds)),
             )
         except asyncio.TimeoutError:
             logger.warning(
@@ -215,6 +269,7 @@ class ComputerUseRunner:
         wrong thing.
         """
         from ..memory.state_verifier import StateVerifier
+
         verifier = StateVerifier()
 
         for offset, node in enumerate(self.prematchedNodes):
@@ -236,14 +291,15 @@ class ComputerUseRunner:
                 currentScreenshot = b""
 
             verification = verifier.verify(
-                node = node,
-                currentUrl = currentUrl,
-                currentScreenshot = currentScreenshot,
+                node=node,
+                currentUrl=currentUrl,
+                currentScreenshot=currentScreenshot,
             )
             if not verification.safe:
                 logger.info(
                     "Replay halt at offset %d: verification failed (%s); falling through to model",
-                    offset, verification.reason,
+                    offset,
+                    verification.reason,
                 )
                 return
 
@@ -252,15 +308,17 @@ class ComputerUseRunner:
                 coord = (int(node.coord_x), int(node.coord_y))
 
             action = Action(
-                type = actionType,
-                target = node.target or "",
-                value = node.value or None,
-                coordinate = coord,
-                reasoning = f"replay-graph: {node.description} ({verification.reason})" if node.description else f"graph-replay ({verification.reason})",
-                model_used = "replay-graph",
-                tier = 0,
-                confidence = 1.0,
-                cost_usd = 0.0,
+                type=actionType,
+                target=node.target or "",
+                value=node.value or None,
+                coordinate=coord,
+                reasoning=f"replay-graph: {node.description} ({verification.reason})"
+                if node.description
+                else f"graph-replay ({verification.reason})",
+                model_used="replay-graph",
+                tier=0,
+                confidence=1.0,
+                cost_usd=0.0,
             )
             action.risk = classifyRisk(action, state.taskDescription)
             action.requires_approval = action.risk == RiskLevel.HIGH
@@ -276,12 +334,12 @@ class ComputerUseRunner:
             result = await self.browser.execute(action)
             currentUrl = await self.browser.currentUrl()
             step = ObservationStep(
-                index = state.stepCount(),
-                url = currentUrl,
-                action = action,
-                verificationOk = result.success,
-                verificationNote = result.detail,
-                durationMs = result.durationMs,
+                index=state.stepCount(),
+                url=currentUrl,
+                action=action,
+                verificationOk=result.success,
+                verificationNote=result.detail,
+                durationMs=result.durationMs,
             )
             state.appendStep(step)
             await self._emitProgress(state, step)
@@ -290,7 +348,8 @@ class ComputerUseRunner:
             if not result.success:
                 logger.info(
                     "Pre-matched replay failed at step %d (%s); falling through to model",
-                    offset, result.detail,
+                    offset,
+                    result.detail,
                 )
                 return
 
@@ -320,12 +379,12 @@ class ComputerUseRunner:
             result = await self.browser.execute(action)
             currentUrl = await self.browser.currentUrl()
             step = ObservationStep(
-                index = baseIndex + offset,
-                url = currentUrl,
-                action = action,
-                verificationOk = result.success,
-                verificationNote = result.detail,
-                durationMs = result.durationMs,
+                index=baseIndex + offset,
+                url=currentUrl,
+                action=action,
+                verificationOk=result.success,
+                verificationNote=result.detail,
+                durationMs=result.durationMs,
             )
             state.appendStep(step)
             await self._emitProgress(state, step)
@@ -339,28 +398,29 @@ class ComputerUseRunner:
 
     async def _recordInitialNavigation(self, state: AgentState) -> None:
         action = Action(
-            type = ActionType.NAVIGATE,
-            target = self.initialUrl,
-            reasoning = "initial navigation",
-            model_used = "harness",
-            tier = 0,
-            confidence = 1.0,
+            type=ActionType.NAVIGATE,
+            target=self.initialUrl,
+            reasoning="initial navigation",
+            model_used="harness",
+            tier=0,
+            confidence=1.0,
         )
         action.risk = classifyRisk(action, state.taskDescription)
         result = await self.browser.execute(action)
         step = ObservationStep(
-            index = state.stepCount(),
-            url = self.initialUrl,
-            action = action,
-            verificationOk = result.success,
-            verificationNote = result.detail,
-            durationMs = result.durationMs,
+            index=state.stepCount(),
+            url=self.initialUrl,
+            action=action,
+            verificationOk=result.success,
+            verificationNote=result.detail,
+            durationMs=result.durationMs,
         )
         state.appendStep(step)
         await self._emitProgress(state, step)
-        await self._writeAudit(state, step, approvalStatus = "auto")
+        await self._writeAudit(state, step, approvalStatus="auto")
         try:
-            png = await self.browser.captureScreenshot()
+            rawPng = await self.browser.captureScreenshot()
+            png = await self._redactForSink(rawPng)
         except Exception:  # noqa: BLE001 - capture failures don't block the run
             png = b""
         if png:
@@ -395,10 +455,10 @@ class ComputerUseRunner:
                 # a fresh preview approval; the user decides whether
                 # to continue with the revised plan or cancel.
                 driftDecision = await self._handlePlanDrift(
-                    state = state,
-                    stepIndex = stepIndex,
-                    fragment = fragment,
-                    currentUrl = currentUrl,
+                    state=state,
+                    stepIndex=stepIndex,
+                    fragment=fragment,
+                    currentUrl=currentUrl,
                 )
                 if driftDecision == "cancelled":
                     return
@@ -420,10 +480,10 @@ class ComputerUseRunner:
                     continue
 
             step, stepResult, screenshot, currentUrl = await self._executeOneStepWithRetry(
-                state = state,
-                stepIndex = stepIndex,
-                screenshot = screenshot,
-                currentUrl = currentUrl,
+                state=state,
+                stepIndex=stepIndex,
+                screenshot=screenshot,
+                currentUrl=currentUrl,
             )
 
             if step is None:
@@ -475,13 +535,13 @@ class ComputerUseRunner:
         result = await self.browser.execute(action)
         currentUrl = await self.browser.currentUrl()
         step = ObservationStep(
-            index = stepIndex,
-            url = currentUrl,
-            domMarkdown = f"[fragment_replay] bullet={fragment.bullet_id[:8]} confidence={fragment.confidence:.2f}",
-            action = action,
-            verificationOk = result.success,
-            verificationNote = result.detail,
-            durationMs = result.durationMs,
+            index=stepIndex,
+            url=currentUrl,
+            domMarkdown=f"[fragment_replay] bullet={fragment.bullet_id[:8]} confidence={fragment.confidence:.2f}",
+            action=action,
+            verificationOk=result.success,
+            verificationNote=result.detail,
+            durationMs=result.durationMs,
         )
         state.appendStep(step)
         await self._emitProgress(state, step)
@@ -516,6 +576,11 @@ class ComputerUseRunner:
             # the approval gate knows to escalate the next action.
             injectionSuspected = self._scanForInjection(screenshot)
 
+            preflightCapHit = self._checkCostPreflight(state)
+            if preflightCapHit is not None:
+                state.markComplete(f"cost_cap_reached:{preflightCapHit}")
+                return None, _failed(f"cost_cap:{preflightCapHit}"), screenshot, currentUrl
+
             cuStep = await self.client.nextAction(screenshot, currentUrl)
             action = cuStep.action
             action.tier = 1
@@ -548,16 +613,16 @@ class ComputerUseRunner:
             stepResult = await self.browser.execute(action)
             currentUrl = await self.browser.currentUrl()
             step = ObservationStep(
-                index = stepIndex,
-                url = currentUrl,
-                domMarkdown = (
+                index=stepIndex,
+                url=currentUrl,
+                domMarkdown=(
                     f"[computer_use] fn={cuStep.rawFunctionName} "
                     f"args={cuStep.rawArgs} attempt={attempts}"
                 ),
-                action = action,
-                verificationOk = stepResult.success,
-                verificationNote = stepResult.detail,
-                durationMs = stepResult.durationMs,
+                action=action,
+                verificationOk=stepResult.success,
+                verificationNote=stepResult.detail,
+                durationMs=stepResult.durationMs,
             )
             state.appendStep(step)
             await self._emitProgress(state, step)
@@ -573,7 +638,9 @@ class ComputerUseRunner:
 
             logger.info(
                 "CU step %s failed (%s); retrying with fresh screenshot (attempt %s)",
-                stepIndex, stepResult.detail, attempts + 1,
+                stepIndex,
+                stepResult.detail,
+                attempts + 1,
             )
             attempts += 1
 
@@ -584,15 +651,17 @@ class ComputerUseRunner:
         if asyncio.iscoroutine(result):
             await result
 
-    async def _writeAudit(self, state: AgentState, step: ObservationStep, approvalStatus: str) -> None:
+    async def _writeAudit(
+        self, state: AgentState, step: ObservationStep, approvalStatus: str
+    ) -> None:
         if self.auditSink is None:
             return
         payload = buildAuditPayload(
-            userId = state.userId,
-            taskId = state.taskId,
-            executionId = state.executionId,
-            step = step,
-            approvalStatus = approvalStatus,
+            userId=state.userId,
+            taskId=state.taskId,
+            executionId=state.executionId,
+            step=step,
+            approvalStatus=approvalStatus,
         )
         result = self.auditSink(payload)
         if asyncio.iscoroutine(result):
@@ -607,7 +676,7 @@ class ComputerUseRunner:
             if asyncio.iscoroutine(result):
                 await result
         except Exception:  # noqa: BLE001 - persistence is best-effort, run continues
-            logger.debug("Screenshot persistence failed at step %s", stepIndex, exc_info = True)
+            logger.debug("Screenshot persistence failed at step %s", stepIndex, exc_info=True)
 
     def _detectCaptcha(self, screenshot: bytes) -> str | None:
         if self.captchaDetector is None or not screenshot:
@@ -615,7 +684,7 @@ class ComputerUseRunner:
         try:
             result = self.captchaDetector(screenshot)
         except Exception:  # noqa: BLE001
-            logger.debug("captcha_detector raised", exc_info = True)
+            logger.debug("captcha_detector raised", exc_info=True)
             return None
         detected = getattr(result, "detected", False)
         if not detected:
@@ -628,14 +697,57 @@ class ComputerUseRunner:
         try:
             result = self.injectionGuard(screenshot)
         except Exception:  # noqa: BLE001
-            logger.debug("injection_guard raised", exc_info = True)
+            logger.debug("injection_guard raised", exc_info=True)
             return False
         return bool(getattr(result, "suspected", False))
 
-    def _checkCostCaps(self, state: AgentState, projectedStepCost: float) -> str | None:
+    def _checkCostPreflight(self, state: AgentState) -> str | None:
+        estimate = self._estimatedNextStepCostUsd()
+        if estimate <= 0:
+            return None
+        taskHit = self._checkTaskCostCap(state, estimate)
+        if taskHit is not None:
+            return taskHit
+        if self.maxCostUsdPerHour <= 0 and self.maxCostUsdPerDay <= 0:
+            return None
+        try:
+            from agent.harness.cost_ledger import wouldExceed
+        except ImportError:
+            return None
+        try:
+            decision = wouldExceed(
+                userId=state.userId,
+                projectedDeltaUsd=estimate,
+                maxPerHour=self.maxCostUsdPerHour,
+                maxPerDay=self.maxCostUsdPerDay,
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("cost ledger preflight unavailable", exc_info=True)
+            return None
+        if decision.exceeded:
+            return _normalizeCostReason(decision.reason or "per_hour")
+        return None
+
+    def _estimatedNextStepCostUsd(self) -> float:
+        estimate = getattr(self.client, "estimatedStepCostUsd", None)
+        if estimate is None:
+            estimate = getattr(self.client, "fixedCostUsd", 0.0)
+        try:
+            value = estimate() if callable(estimate) else estimate
+            return max(0.0, float(value))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _checkTaskCostCap(self, state: AgentState, projectedStepCost: float) -> str | None:
         projected = state.totalCostUsd + max(0.0, projectedStepCost)
         if self.maxCostUsdPerTask > 0 and projected > self.maxCostUsdPerTask:
             return "per_task"
+        return None
+
+    def _checkCostCaps(self, state: AgentState, projectedStepCost: float) -> str | None:
+        taskHit = self._checkTaskCostCap(state, projectedStepCost)
+        if taskHit is not None:
+            return taskHit
         if self.maxCostUsdPerHour <= 0 and self.maxCostUsdPerDay <= 0:
             return None
         try:
@@ -644,16 +756,16 @@ class ComputerUseRunner:
             return None
         try:
             decision = incrementAndCheck(
-                userId = state.userId,
-                deltaUsd = max(0.0, projectedStepCost),
-                maxPerHour = self.maxCostUsdPerHour,
-                maxPerDay = self.maxCostUsdPerDay,
+                userId=state.userId,
+                deltaUsd=max(0.0, projectedStepCost),
+                maxPerHour=self.maxCostUsdPerHour,
+                maxPerDay=self.maxCostUsdPerDay,
             )
         except Exception:  # noqa: BLE001 - ledger failures must not kill the run
-            logger.debug("cost ledger unavailable", exc_info = True)
+            logger.debug("cost ledger unavailable", exc_info=True)
             return None
         if decision.exceeded:
-            return decision.reason or "per_hour"
+            return _normalizeCostReason(decision.reason or "per_hour")
         return None
 
     def _checkHeartbeat(self) -> str | None:
@@ -733,7 +845,7 @@ class ComputerUseRunner:
             else:
                 redacted = result
         except Exception:  # noqa: BLE001
-            logger.debug("redactor raised", exc_info = True)
+            logger.debug("redactor raised", exc_info=True)
             return screenshot
         if not isinstance(redacted, (bytes, bytearray)) or not redacted:
             return screenshot
@@ -748,7 +860,11 @@ def _failed(detail: str) -> StepResult:
     Staying on `StepResult` means the tuple return type at callers lines
     up with the type `BrowserController.execute` itself returns.
     """
-    return StepResult(success = False, detail = detail)
+    return StepResult(success=False, detail=detail)
+
+
+def _normalizeCostReason(reason: str) -> str:
+    return reason.removesuffix("_cap_reached")
 
 
 def _urlsMatchLoose(expected: str, actual: str) -> bool:
@@ -760,6 +876,7 @@ def _urlsMatchLoose(expected: str, actual: str) -> bool:
     """
     try:
         from urllib.parse import urlparse
+
         a = urlparse(expected)
         b = urlparse(actual)
         if a.netloc and b.netloc and a.netloc != b.netloc:
@@ -805,18 +922,18 @@ def buildComputerUseRunner(
     maxRetriesPerStep: int = 1,
 ) -> ComputerUseRunner:
     resolvedClient: CuClient = client or GeminiComputerUseClient(
-        modelId = modelId or GeminiComputerUseClient.modelId,
+        modelId=modelId or GeminiComputerUseClient.modelId,
     )
     return ComputerUseRunner(
-        browser = browser,
-        client = resolvedClient,
-        approvalGate = approvalGate or ApprovalGate(),
-        onProgress = onProgress,
-        auditSink = auditSink,
-        screenshotSink = screenshotSink,
-        memory = memory,
-        replayPlanner = replayPlanner,
-        initialUrl = initialUrl,
-        maxSteps = maxSteps,
-        maxRetriesPerStep = maxRetriesPerStep,
+        browser=browser,
+        client=resolvedClient,
+        approvalGate=approvalGate or ApprovalGate(),
+        onProgress=onProgress,
+        auditSink=auditSink,
+        screenshotSink=screenshotSink,
+        memory=memory,
+        replayPlanner=replayPlanner,
+        initialUrl=initialUrl,
+        maxSteps=maxSteps,
+        maxRetriesPerStep=maxRetriesPerStep,
     )

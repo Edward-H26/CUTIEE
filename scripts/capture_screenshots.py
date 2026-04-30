@@ -1,4 +1,4 @@
-"""Capture UI screenshots referenced by docs/REPORT.md.
+"""Capture UI screenshots referenced by docs/TECHNICAL-REPORT.md.
 
 Drives a running CUTIEE dev server with Playwright and saves PNGs into
 `docs/screenshots/`. Five panels are captured:
@@ -24,6 +24,7 @@ Prerequisites:
 Usage:
     uv run python scripts/capture_screenshots.py
 """
+
 from __future__ import annotations
 
 import argparse
@@ -50,14 +51,14 @@ def signupAndLogin(page: object, baseUrl: str) -> None:
 
     page.goto(  # type: ignore[attr-defined]
         baseUrl + "/accounts/signup/",
-        wait_until = "networkidle",
-        timeout = 20_000,
+        wait_until="networkidle",
+        timeout=20_000,
     )
     page.fill("input[name='email']", email)  # type: ignore[attr-defined]
     page.fill("input[name='password1']", password)  # type: ignore[attr-defined]
     page.fill("input[name='password2']", password)  # type: ignore[attr-defined]
     page.click("button[type='submit']")  # type: ignore[attr-defined]
-    page.wait_for_load_state("networkidle", timeout = 20_000)  # type: ignore[attr-defined]
+    page.wait_for_load_state("networkidle", timeout=20_000)  # type: ignore[attr-defined]
 
 
 def submitDemoTask(page: object, baseUrl: str) -> str | None:
@@ -68,14 +69,14 @@ def submitDemoTask(page: object, baseUrl: str) -> str | None:
     /tasks/ and is the same one a user types into; failures here mean
     something is off with the dev server, not the script.
     """
-    page.goto(baseUrl + "/tasks/", wait_until = "networkidle", timeout = 20_000)  # type: ignore[attr-defined]
+    page.goto(baseUrl + "/tasks/", wait_until="networkidle", timeout=20_000)  # type: ignore[attr-defined]
     page.fill(  # type: ignore[attr-defined]
         "textarea[name='description']",
         "Open the demo spreadsheet and read row 1.",
     )
     page.fill("input[name='initial_url']", "http://localhost:5001/")  # type: ignore[attr-defined]
     page.click("button[data-testid='submit-task']")  # type: ignore[attr-defined]
-    page.wait_for_load_state("networkidle", timeout = 20_000)  # type: ignore[attr-defined]
+    page.wait_for_load_state("networkidle", timeout=20_000)  # type: ignore[attr-defined]
     currentUrl = str(page.url)  # type: ignore[attr-defined]
     if "/tasks/" in currentUrl and currentUrl.rstrip("/") != baseUrl + "/tasks":
         return currentUrl
@@ -85,7 +86,7 @@ def submitDemoTask(page: object, baseUrl: str) -> str | None:
 def capture(baseUrl: str) -> None:
     from playwright.sync_api import sync_playwright
 
-    OUT_DIR.mkdir(parents = True, exist_ok = True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     publicTargets = [
         ("01-landing.png", "/"),
@@ -95,38 +96,40 @@ def capture(baseUrl: str) -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         try:
-            ctx = browser.new_context(viewport = {"width": 1280, "height": 800})
+            ctx = browser.new_context(viewport={"width": 1280, "height": 800})
             page = ctx.new_page()
 
             for filename, path in publicTargets:
-                page.goto(baseUrl + path, wait_until = "networkidle", timeout = 20_000)
+                page.goto(baseUrl + path, wait_until="networkidle", timeout=20_000)
                 time.sleep(0.5)
-                page.screenshot(path = str(OUT_DIR / filename), full_page = True)
+                page.screenshot(path=str(OUT_DIR / filename), full_page=True)
                 print(f"captured {filename}")
 
             signupAndLogin(page, baseUrl)
             print("logged in via allauth signup flow")
 
-            page.goto(baseUrl + "/tasks/", wait_until = "networkidle", timeout = 20_000)
+            page.goto(baseUrl + "/tasks/", wait_until="networkidle", timeout=20_000)
             time.sleep(0.5)
-            page.screenshot(path = str(OUT_DIR / "03-tasks.png"), full_page = True)
+            page.screenshot(path=str(OUT_DIR / "03-tasks.png"), full_page=True)
             print("captured 03-tasks.png")
 
             detailUrl = submitDemoTask(page, baseUrl)
             if detailUrl:
-                page.goto(detailUrl, wait_until = "networkidle", timeout = 20_000)
+                page.goto(detailUrl, wait_until="networkidle", timeout=20_000)
                 time.sleep(0.5)
-                page.screenshot(path = str(OUT_DIR / "04-detail.png"), full_page = True)
+                page.screenshot(path=str(OUT_DIR / "04-detail.png"), full_page=True)
                 print(f"captured 04-detail.png from {detailUrl}")
             else:
-                page.goto(baseUrl + "/me/preferences/", wait_until = "networkidle", timeout = 20_000)
+                page.goto(baseUrl + "/me/preferences/", wait_until="networkidle", timeout=20_000)
                 time.sleep(0.5)
-                page.screenshot(path = str(OUT_DIR / "04-detail.png"), full_page = True)
-                print("captured 04-detail.png (fell back to /me/preferences/ since task submit did not redirect)")
+                page.screenshot(path=str(OUT_DIR / "04-detail.png"), full_page=True)
+                print(
+                    "captured 04-detail.png (fell back to /me/preferences/ since task submit did not redirect)"
+                )
 
-            page.goto(baseUrl + "/tasks/dashboard/", wait_until = "networkidle", timeout = 20_000)
+            page.goto(baseUrl + "/tasks/dashboard/", wait_until="networkidle", timeout=20_000)
             time.sleep(0.5)
-            page.screenshot(path = str(OUT_DIR / "05-dashboard.png"), full_page = True)
+            page.screenshot(path=str(OUT_DIR / "05-dashboard.png"), full_page=True)
             print("captured 05-dashboard.png")
 
             ctx.close()
@@ -136,7 +139,7 @@ def capture(baseUrl: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default = DEFAULT_BASE_URL)
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     args = parser.parse_args()
 
     capture(args.base_url)

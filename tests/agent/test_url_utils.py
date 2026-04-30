@@ -1,4 +1,5 @@
 """Unit tests for the shared URL helper."""
+
 from __future__ import annotations
 
 from agent.harness.url_utils import hostFromUrl

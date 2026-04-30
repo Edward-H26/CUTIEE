@@ -1,6 +1,6 @@
 # UI screenshots
 
-Five PNGs referenced by `docs/REPORT.md`:
+Five PNGs referenced by `docs/TECHNICAL-REPORT.md`:
 
 | File | Page | Notes |
 |---|---|---|

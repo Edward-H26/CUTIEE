@@ -18,6 +18,7 @@ Installation: install the optional extra with
 Calling `BrowserUseClient()` without the package installed raises
 `RuntimeError` with remediation.
 """
+
 from __future__ import annotations
 
 import json
@@ -89,12 +90,12 @@ class BrowserUseClient:
     apiKey: str | None = None
     cdpUrl: str | None = None
     maxSteps: int = 25
-    _agent: Any = field(default = None, init = False, repr = False)
-    _browser: Any = field(default = None, init = False, repr = False)
-    _pendingTask: str = field(default = "", init = False, repr = False)
-    _pendingUrl: str = field(default = "", init = False, repr = False)
-    _stepCursor: int = field(default = 0, init = False, repr = False)
-    _history: list[Any] = field(default_factory = list, init = False, repr = False)
+    _agent: Any = field(default=None, init=False, repr=False)
+    _browser: Any = field(default=None, init=False, repr=False)
+    _pendingTask: str = field(default="", init=False, repr=False)
+    _pendingUrl: str = field(default="", init=False, repr=False)
+    _stepCursor: int = field(default=0, init=False, repr=False)
+    _history: list[Any] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
         key = self.apiKey or os.environ.get("GEMINI_API_KEY")
@@ -136,16 +137,16 @@ class BrowserUseClient:
         except Exception as exc:
             logger.warning("browser-use step failed: %r", exc)
             action = Action(
-                type = ActionType.FINISH,
-                reasoning = f"browser-use error: {exc!r}",
-                model_used = self.modelId,
-                cost_usd = 0.0,
+                type=ActionType.FINISH,
+                reasoning=f"browser-use error: {exc!r}",
+                model_used=self.modelId,
+                cost_usd=0.0,
             )
             return ComputerUseStep(
-                action = action,
-                rawFunctionName = "error",
-                rawArgs = {"exc": repr(exc)},
-                costUsd = 0.0,
+                action=action,
+                rawFunctionName="error",
+                rawArgs={"exc": repr(exc)},
+                costUsd=0.0,
             )
 
         canonical, rawFunctionName, rawArgs, meta = _toCanonicalAction(rawStep, currentUrl)
@@ -162,10 +163,10 @@ class BrowserUseClient:
         canonical.reasoning = f"{reasoning} {_encodeAdapterMeta(metaPayload)}".strip()
         self._stepCursor += 1
         return ComputerUseStep(
-            action = canonical,
-            rawFunctionName = rawFunctionName,
-            rawArgs = rawArgs,
-            costUsd = costUsd,
+            action=canonical,
+            rawFunctionName=rawFunctionName,
+            rawArgs=rawArgs,
+            costUsd=costUsd,
         )
 
     async def _buildAgent(self) -> Any:
@@ -178,12 +179,12 @@ class BrowserUseClient:
         from browser_use import Agent, Browser
         from browser_use.llm import ChatGoogle
 
-        llm = ChatGoogle(model = self.modelId, api_key = self.apiKey)
-        self._browser = Browser(cdp_url = self.cdpUrl) if self.cdpUrl else Browser()
+        llm = ChatGoogle(model=self.modelId, api_key=self.apiKey)
+        self._browser = Browser(cdp_url=self.cdpUrl) if self.cdpUrl else Browser()
         agent = Agent(
-            task = self._pendingTask,
-            llm = llm,
-            browser = self._browser,
+            task=self._pendingTask,
+            llm=llm,
+            browser=self._browser,
         )
         return agent
 
@@ -204,7 +205,7 @@ class BrowserUseClient:
 
         runMethod = getattr(agent, "run", None)
         if callable(runMethod):
-            result = runMethod(max_steps = 1)
+            result = runMethod(max_steps=1)
             return await _maybeAwait(result)
 
         raise RuntimeError(
@@ -268,14 +269,14 @@ def _toCanonicalAction(
 
     reasoning = rawArgs.get("reasoning") or _extractThought(rawStep)
     canonical = Action(
-        type = actionType,
-        target = target,
-        value = value,
-        reasoning = reasoning or "",
-        coordinate = coordinate,
-        keys = keys,
-        scrollDx = scrollDx,
-        scrollDy = scrollDy,
+        type=actionType,
+        target=target,
+        value=value,
+        reasoning=reasoning or "",
+        coordinate=coordinate,
+        keys=keys,
+        scrollDx=scrollDx,
+        scrollDy=scrollDy,
     )
     meta: dict[str, Any] = {}
     if "index" in rawArgs:

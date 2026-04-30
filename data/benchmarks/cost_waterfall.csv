@@ -1,0 +1,6 @@
+scenario,step_count,tier_mix,production_cost_usd,projected_local_replay_cost_usd,savings_vs_api_only_pct
+api_only_anthropic_cu,15,{4: 15},0.1935,0.1935,0.0
+naive_cloud,15,{3: 15},0.00954,0.00954,95.07
+cutiee_first_run,15,"{1: 11, 2: 3, 3: 1}",0.00954,0.000673,95.07
+cutiee_replay,15,{0: 15},0.0,0.0,100.0
+cutiee_replay_with_mutation,15,"{0: 14, 2: 1}",0.000636,1.2e-05,99.67

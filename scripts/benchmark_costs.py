@@ -1,13 +1,13 @@
 """Cost benchmark for CUTIEE.
 
-Builds three synthetic 15-step trajectories and runs them through the
-router with both production pricing (Gemini) and the local stack (Qwen).
-Also includes projected multi-tier costs from the paper.
+Builds synthetic 15-step trajectories and estimates Gemini CU, API-only,
+replay, and local memory-side pricing.
 Writes a CSV summary to data/benchmarks/cost_waterfall.csv.
 
 Usage:
     uv run python scripts/benchmark_costs.py --scenario all
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,10 +32,9 @@ class Scenario:
 
 
 SCENARIOS: dict[str, Scenario] = {
+    "api_only_anthropic_cu": Scenario(name="api_only_anthropic_cu", steps=15, tierMix={4: 15}),
     "naive_cloud": Scenario(name="naive_cloud", steps=15, tierMix={3: 15}),
-    "cutiee_first_run": Scenario(
-        name="cutiee_first_run", steps=15, tierMix={1: 11, 2: 3, 3: 1}
-    ),
+    "cutiee_first_run": Scenario(name="cutiee_first_run", steps=15, tierMix={1: 11, 2: 3, 3: 1}),
     "cutiee_replay": Scenario(name="cutiee_replay", steps=15, tierMix={0: 15}),
     "cutiee_replay_with_mutation": Scenario(
         name="cutiee_replay_with_mutation", steps=15, tierMix={0: 14, 2: 1}
@@ -48,9 +47,10 @@ TIER_MODEL_PRODUCTION = {
     1: ("gemini-flash-latest", *CU_PRICING["gemini-flash-latest"]),
     2: ("gemini-3-flash-preview", *CU_PRICING["gemini-3-flash-preview"]),
     3: ("gemini-3-flash-preview", *CU_PRICING["gemini-3-flash-preview"]),
+    4: ("anthropic-computer-use-api-only", 3.0, 15.0),
 }
 
-# Projected multi-tier models from paper (local + cloud).
+# Projected local memory-side and replay models from the paper.
 #
 # Tier 1 `qwen3-0.8b-local` is now SHIPPING for memory-side reflection
 # and decomposition (see `agent/memory/local_llm.py`); the CU loop is
@@ -62,6 +62,7 @@ TIER_MODEL_PROJECTED = {
     1: ("qwen3-0.8b-local", 0.0, 0.0),  # SHIPPING for memory-side LLM; projected for CU loop
     2: ("fara-7b-4bit", 0.003, 0.003),  # projected, ~$0.003/call
     3: ("gemini-flash", 0.15, 0.60),  # from paper
+    4: ("anthropic-computer-use-api-only", 3.0, 15.0),
 }
 
 
@@ -87,31 +88,24 @@ def runBenchmarks(scenarios: list[str]) -> list[dict[str, object]]:
             print(f"warning: unknown scenario {name!r}, skipping", file=sys.stderr)
             continue
         scenario = SCENARIOS[name]
-        productionCost = estimateScenarioCost(
-            scenario, tier_models=TIER_MODEL_PRODUCTION
+        productionCost = estimateScenarioCost(scenario, tier_models=TIER_MODEL_PRODUCTION)
+        projectedCost = estimateScenarioCost(scenario, tier_models=TIER_MODEL_PROJECTED)
+
+        apiOnlyCost = estimateScenarioCost(
+            SCENARIOS["api_only_anthropic_cu"], tier_models=TIER_MODEL_PRODUCTION
         )
-        projectedCost = estimateScenarioCost(
-            scenario, tier_models=TIER_MODEL_PROJECTED
+        savingsVsApiOnly = (
+            ((apiOnlyCost - productionCost) / apiOnlyCost * 100) if apiOnlyCost > 0 else 0.0
         )
-        
-        # Calculate savings vs naive cloud (all tier 3)
-        naiveCloudCost = estimateScenarioCost(
-            SCENARIOS["naive_cloud"], tier_models=TIER_MODEL_PRODUCTION
-        )
-        savingsVsNaive = (
-            ((naiveCloudCost - productionCost) / naiveCloudCost * 100)
-            if naiveCloudCost > 0
-            else 0.0
-        )
-        
+
         rows.append(
             {
                 "scenario": name,
                 "step_count": scenario.steps,
                 "tier_mix": str(scenario.tierMix),
                 "production_cost_usd": productionCost,
-                "projected_multitier_cost_usd": projectedCost,
-                "savings_vs_naive_cloud_pct": round(savingsVsNaive, 2),
+                "projected_local_replay_cost_usd": projectedCost,
+                "savings_vs_api_only_pct": round(savingsVsApiOnly, 2),
             }
         )
     return rows
@@ -127,9 +121,10 @@ def writeCsv(rows: list[dict[str, object]]) -> None:
                 "step_count",
                 "tier_mix",
                 "production_cost_usd",
-                "projected_multitier_cost_usd",
-                "savings_vs_naive_cloud_pct",
+                "projected_local_replay_cost_usd",
+                "savings_vs_api_only_pct",
             ],
+            lineterminator="\n",
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -144,8 +139,8 @@ def printSummary(rows: list[dict[str, object]]) -> None:
         scenario = str(row["scenario"]).ljust(width)
         steps = f"{row['step_count']:>6}"
         production = f"${float(row['production_cost_usd']):>10.4f}"
-        projected = f"${float(row['projected_multitier_cost_usd']):>10.4f}"
-        savings = f"{float(row['savings_vs_naive_cloud_pct']):>8.1f}%"
+        projected = f"${float(row['projected_local_replay_cost_usd']):>10.4f}"
+        savings = f"{float(row['savings_vs_api_only_pct']):>8.1f}%"
         print(f"{scenario} {steps} {production} {projected} {savings}")
 
 

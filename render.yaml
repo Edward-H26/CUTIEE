@@ -16,10 +16,9 @@
 # stays bounded for 2-5 concurrent demo users.
 #
 # Django framework bookkeeping (contenttypes, auth_permission, allauth_*,
-# sites, sessions) lives in a shared-cache in-memory SQLite hard-coded
-# in cutiee_site/settings.py. Zero application data lives there: every
-# domain entity round-trips through Neo4j via Cypher in apps/*/repo.py.
-# Therefore no DJANGO_INTERNAL_DB_URL env var is needed or honoured.
+# sites, sessions, user preferences) lives in a durable SQL database.
+# Domain entities still round-trip through Neo4j via apps/*/repo.py.
+# Set DJANGO_DATABASE_URL or DATABASE_URL on cutiee-web before deploy.
 
 services:
   - type: web
@@ -79,6 +78,8 @@ services:
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DJANGO_DATABASE_URL
         sync: false
       - key: NEO4J_BOLT_URL
         sync: false

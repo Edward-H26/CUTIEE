@@ -6,13 +6,12 @@ not loop-safe across threads. The fix uses
 `loop.call_soon_threadsafe(event.set)`; this test would hang (timeout)
 if anyone reverts that fix.
 """
+
 from __future__ import annotations
 
 import asyncio
 import threading
 import time
-
-import pytest
 
 from agent.harness.state import RiskLevel
 from agent.safety.approval_gate import ApprovalRequest
@@ -24,8 +23,8 @@ def test_cross_thread_wakeup() -> None:
 
     async def park() -> None:
         request = ApprovalRequest(
-            actionDescription = "delete account",
-            risk = RiskLevel.HIGH,
+            actionDescription="delete account",
+            risk=RiskLevel.HIGH,
         )
         decision = await awaitDecision("ex-cross-thread-1", request)
         box["decision"] = decision
@@ -33,7 +32,7 @@ def test_cross_thread_wakeup() -> None:
     def runAgentLoop() -> None:
         asyncio.run(park())
 
-    t = threading.Thread(target = runAgentLoop, daemon = True)
+    t = threading.Thread(target=runAgentLoop, daemon=True)
     t.start()
     # Give the agent loop a beat to register the pending decision.
     time.sleep(0.05)
@@ -41,7 +40,7 @@ def test_cross_thread_wakeup() -> None:
     delivered = submitDecision("ex-cross-thread-1", True)
     assert delivered is True
 
-    t.join(timeout = 2.0)
+    t.join(timeout=2.0)
     assert not t.is_alive(), "agent thread should have exited cleanly"
     assert box.get("decision") is True
 
@@ -51,16 +50,16 @@ def test_decline_propagates() -> None:
 
     async def park() -> None:
         request = ApprovalRequest(
-            actionDescription = "delete account",
-            risk = RiskLevel.HIGH,
+            actionDescription="delete account",
+            risk=RiskLevel.HIGH,
         )
         box["decision"] = await awaitDecision("ex-cross-thread-2", request)
 
-    t = threading.Thread(target = lambda: asyncio.run(park()), daemon = True)
+    t = threading.Thread(target=lambda: asyncio.run(park()), daemon=True)
     t.start()
     time.sleep(0.05)
     submitDecision("ex-cross-thread-2", False)
-    t.join(timeout = 2.0)
+    t.join(timeout=2.0)
     assert box.get("decision") is False
 
 

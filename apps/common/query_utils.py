@@ -6,6 +6,7 @@ Django hands the user a 500. Centralizing the pattern here means every
 view degrades the same way and future views can reach for a tested
 helper instead of rolling a try/except of their own.
 """
+
 from __future__ import annotations
 
 

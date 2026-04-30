@@ -12,6 +12,7 @@ any caller that explicitly opts in via `CUTIEE_PREFER_DENSE_EMBEDDINGS=true`
 get FastEmbed; everything else stays on the hash path so tests and offline
 demos do not trigger a 200MB warmup.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -97,5 +98,5 @@ def _loadFastEmbedModel() -> Any:
         if _MODEL is None:
             from fastembed import TextEmbedding
 
-            _MODEL = TextEmbedding(model_name = "BAAI/bge-small-en-v1.5")
+            _MODEL = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     return _MODEL

@@ -1,4 +1,5 @@
 """Unit tests for the temporal pruner."""
+
 from __future__ import annotations
 
 from agent.harness.state import Action, ActionType, ObservationStep
@@ -8,10 +9,10 @@ from agent.pruning import RecencyPruner, allocateFgBgBudget, ruleBasedSummary
 def _hist(n: int) -> list[ObservationStep]:
     return [
         ObservationStep(
-            index = i,
-            url = f"http://example.com/p{i}",
-            domMarkdown = "x" * 200,
-            action = Action(type = ActionType.CLICK, target = f"#btn{i}"),
+            index=i,
+            url=f"http://example.com/p{i}",
+            domMarkdown="x" * 200,
+            action=Action(type=ActionType.CLICK, target=f"#btn{i}"),
         )
         for i in range(n)
     ]
@@ -26,7 +27,7 @@ def test_emptyHistoryReturnsEmpty():
 
 
 def test_smallHistoryFitsInRecent():
-    pruner = RecencyPruner(recencyWindow = 3)
+    pruner = RecencyPruner(recencyWindow=3)
     pruned = pruner.prune(_hist(2))
     assert len(pruned.recent) == 2
     assert pruned.middle == []

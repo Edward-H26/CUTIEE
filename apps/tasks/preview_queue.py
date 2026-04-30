@@ -12,6 +12,7 @@ Keeping the Neo4j helpers in apps/tasks/ (rather than agent/) mirrors
 the apps/*/repo.py pattern: Cypher that reads/writes user-facing state
 lives in apps/, and the agent runtime stays Django-free.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -27,7 +28,7 @@ def fetchPreviewApproval(executionId: str) -> dict[str, Any] | None:
         MATCH (p:PreviewApproval {execution_id: $eid})
         RETURN p {.*} AS preview
         """,
-        eid = str(executionId),
+        eid=str(executionId),
     )
     return row["preview"] if row else None
 
@@ -50,9 +51,9 @@ def setPreviewStatus(executionId: str, *, status: str, note: str = "") -> bool:
             p.updated_at = $nowIso
         RETURN p.execution_id AS id
         """,
-        eid = str(executionId),
-        status = status,
-        note = note,
-        nowIso = datetime.now(timezone.utc).isoformat(),
+        eid=str(executionId),
+        status=status,
+        note=note,
+        nowIso=datetime.now(timezone.utc).isoformat(),
     )
     return bool(rows)

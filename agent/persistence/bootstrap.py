@@ -4,6 +4,7 @@ Safe to run multiple times. Every statement uses `IF NOT EXISTS`, so re-runs
 are no-ops. We also catch `IndexAlreadyExists` errors from prior
 miramemoria-style installs whose indexes shadow CUTIEE constraints.
 """
+
 from __future__ import annotations
 
 import logging
@@ -21,6 +22,7 @@ CONSTRAINTS: list[str] = [
     "CREATE CONSTRAINT session_key       IF NOT EXISTS FOR (s:Session)            REQUIRE s.session_key  IS UNIQUE",
     "CREATE CONSTRAINT task_id           IF NOT EXISTS FOR (t:Task)               REQUIRE t.id           IS UNIQUE",
     "CREATE CONSTRAINT execution_id      IF NOT EXISTS FOR (e:Execution)          REQUIRE e.id           IS UNIQUE",
+    "CREATE CONSTRAINT active_execution_user IF NOT EXISTS FOR (e:Execution)      REQUIRE e.active_user_id IS UNIQUE",
     "CREATE CONSTRAINT step_id           IF NOT EXISTS FOR (s:Step)               REQUIRE s.id           IS UNIQUE",
     "CREATE CONSTRAINT template_id       IF NOT EXISTS FOR (t:ProceduralTemplate) REQUIRE t.id           IS UNIQUE",
     "CREATE CONSTRAINT bullet_id         IF NOT EXISTS FOR (b:MemoryBullet)       REQUIRE b.id           IS UNIQUE",
@@ -82,7 +84,7 @@ def bootstrap() -> None:
 
 
 def main() -> int:
-    logging.basicConfig(level = logging.INFO, format = "%(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     try:
         bootstrap()
     except RuntimeError as exc:

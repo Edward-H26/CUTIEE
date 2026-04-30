@@ -12,6 +12,7 @@ blindly appending. Three branches:
   if the original is fully obsoleted.
 * otherwise → emit a fresh `Bullet` with type heuristics applied.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -30,7 +31,7 @@ CONTENT_DEDUP_THRESHOLD = 0.90
 
 @dataclass
 class Curator:
-    useHashEmbedding: bool = field(default_factory = defaultUseHashEmbedding)
+    useHashEmbedding: bool = field(default_factory=defaultUseHashEmbedding)
 
     def curate(
         self,
@@ -56,7 +57,12 @@ class Curator:
 
             if duplicate is not None:
                 patch = delta.update_bullets.setdefault(duplicate.id, {})
-                patch["helpful_count"] = duplicate.helpful_count + 1 + patch.get("helpful_count", 0) - duplicate.helpful_count
+                patch["helpful_count"] = (
+                    duplicate.helpful_count
+                    + 1
+                    + patch.get("helpful_count", 0)
+                    - duplicate.helpful_count
+                )
                 if memoryType == duplicate.memory_type:
                     bonusKey = f"{memoryType}_strength"
                     boosted = getattr(duplicate, bonusKey, 0.0) + 0.5
@@ -71,17 +77,17 @@ class Curator:
                     supersededPatch.get("procedural_strength", 0.0) - 1.0,
                 )
 
-            embedding = embedTexts([lesson.content], useHashFallback = self.useHashEmbedding)[0]
+            embedding = embedTexts([lesson.content], useHashFallback=self.useHashEmbedding)[0]
             bullet = Bullet(
-                content = lesson.content,
-                memory_type = memoryType,
-                tags = list(lesson.tags),
-                topic = lesson.topic,
-                concept = lesson.concept,
-                content_hash = contentHash,
-                embedding = embedding,
-                helpful_count = 0,
-                harmful_count = 0,
+                content=lesson.content,
+                memory_type=memoryType,
+                tags=list(lesson.tags),
+                topic=lesson.topic,
+                concept=lesson.concept,
+                content_hash=contentHash,
+                embedding=embedding,
+                helpful_count=0,
+                harmful_count=0,
             )
             delta.new_bullets.append(bullet)
 
@@ -94,9 +100,7 @@ class Curator:
     ) -> Bullet | None:
         if not existingEmbeddings:
             return None
-        lessonEmbedding = embedTexts(
-            [lesson.content], useHashFallback = self.useHashEmbedding
-        )[0]
+        lessonEmbedding = embedTexts([lesson.content], useHashFallback=self.useHashEmbedding)[0]
         for bullet, embedding in existingEmbeddings:
             if cosineSimilarity(lessonEmbedding, embedding) >= CONTENT_DEDUP_THRESHOLD:
                 return bullet

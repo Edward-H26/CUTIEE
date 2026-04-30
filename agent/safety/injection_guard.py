@@ -19,6 +19,7 @@ OCR is best-effort: if `pytesseract` is not installed, the scan skips
 silently and returns `False`. The goal is defense in depth, not
 certainty.
 """
+
 from __future__ import annotations
 
 import io
@@ -26,7 +27,6 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import Any
 
 logger = logging.getLogger("cutiee.injection_guard")
 
@@ -86,11 +86,11 @@ def scanScreenshotForInjection(pngBytes: bytes) -> InjectionScanResult:
     pytesseract is unavailable, the scan degrades to a no-op.
     """
     if not pngBytes:
-        return InjectionScanResult(suspected = False)
+        return InjectionScanResult(suspected=False)
     try:
         from PIL import Image
     except ImportError:
-        return InjectionScanResult(suspected = False)
+        return InjectionScanResult(suspected=False)
 
     try:
         with Image.open(io.BytesIO(pngBytes)) as img:
@@ -100,12 +100,12 @@ def scanScreenshotForInjection(pngBytes: bytes) -> InjectionScanResult:
             right = img.crop((int(width * 0.95), 0, width, height))
             patches = [bottom, left, right]
     except Exception:
-        return InjectionScanResult(suspected = False)
+        return InjectionScanResult(suspected=False)
 
     try:
         import pytesseract  # type: ignore[import-not-found]
     except ImportError:
-        return InjectionScanResult(suspected = False)
+        return InjectionScanResult(suspected=False)
 
     haystack_parts: list[str] = []
     for patch in patches:
@@ -116,8 +116,8 @@ def scanScreenshotForInjection(pngBytes: bytes) -> InjectionScanResult:
     haystack = " ".join(haystack_parts).lower()
     for marker in INJECTION_MARKERS:
         if marker in haystack:
-            return InjectionScanResult(suspected = True, reason = f"marker:{marker}")
-    return InjectionScanResult(suspected = False)
+            return InjectionScanResult(suspected=True, reason=f"marker:{marker}")
+    return InjectionScanResult(suspected=False)
 
 
 _URL_FRAGMENT_RE = re.compile(r"#[^\s]*$")

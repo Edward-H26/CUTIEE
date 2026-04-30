@@ -3,6 +3,7 @@
 Mirrors the MIRA pattern: cache Hugging Face weights inside the repo,
 load lazily on first use, and keep production Gemini behavior intact.
 """
+
 from __future__ import annotations
 
 import logging
@@ -65,7 +66,7 @@ def isAvailable() -> bool:
     try:
         ensureModelCached()
     except Exception:  # noqa: BLE001
-        logger.warning("Local Qwen cache warmup failed", exc_info = True)
+        logger.warning("Local Qwen cache warmup failed", exc_info=True)
         return False
     return any(path.exists() and any(path.iterdir()) for path in cachePaths())
 
@@ -73,7 +74,7 @@ def isAvailable() -> bool:
 def ensureModelCached() -> Path:
     global _CACHE_READY
     root = cacheRoot()
-    root.mkdir(parents = True, exist_ok = True)
+    root.mkdir(parents=True, exist_ok=True)
     if _CACHE_READY is True:
         return root
     if any(path.exists() and any(path.iterdir()) for path in cachePaths()):
@@ -89,9 +90,9 @@ def ensureModelCached() -> Path:
 
         logger.info("Downloading local model %s into %s", MODEL_ID, root)
         snapshot_download(
-            repo_id = MODEL_ID,
-            cache_dir = str(root),
-            resume_download = True,
+            repo_id=MODEL_ID,
+            cache_dir=str(root),
+            resume_download=True,
         )
         _CACHE_READY = True
     return root
@@ -117,30 +118,30 @@ def generateText(
         ]
         fullInput = tokenizer.apply_chat_template(
             messages,
-            tokenize = False,
-            add_generation_prompt = True,
+            tokenize=False,
+            add_generation_prompt=True,
         )
         inputs = tokenizer(
             fullInput,
-            return_tensors = "pt",
-            truncation = True,
-            max_length = maxInputTokens,
+            return_tensors="pt",
+            truncation=True,
+            max_length=maxInputTokens,
         )
         modelDevice = next(model.parameters()).device
         inputs = {key: value.to(modelDevice) for key, value in inputs.items()}
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_new_tokens = maxNewTokens,
-                do_sample = False,
-                pad_token_id = tokenizer.pad_token_id,
-                eos_token_id = tokenizer.eos_token_id,
+                max_new_tokens=maxNewTokens,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
             )
-        generated = outputs[0][inputs["input_ids"].shape[1]:]
-        text = tokenizer.decode(generated, skip_special_tokens = True).strip()
+        generated = outputs[0][inputs["input_ids"].shape[1] :]
+        text = tokenizer.decode(generated, skip_special_tokens=True).strip()
         return _stripThinkTags(text) or None
     except Exception:  # noqa: BLE001
-        logger.warning("Local Qwen generation failed", exc_info = True)
+        logger.warning("Local Qwen generation failed", exc_info=True)
         return None
 
 
@@ -162,7 +163,7 @@ def _getModelAndTokenizer() -> tuple[Any, Any]:
                 return _MODEL, _TOKENIZER
             except Exception as exc:  # noqa: BLE001
                 lastError = exc
-                logger.warning("Local Qwen load failed on %s", device, exc_info = True)
+                logger.warning("Local Qwen load failed on %s", device, exc_info=True)
         _LOAD_FAILED = True
         raise RuntimeError("Failed to load local Qwen model") from lastError
 
@@ -214,4 +215,4 @@ def _torchDtype(device: str) -> Any:
 
 
 def _stripThinkTags(text: str) -> str:
-    return re.sub(r"<think>.*?</think>", "", text or "", flags = re.DOTALL).strip()
+    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL).strip()

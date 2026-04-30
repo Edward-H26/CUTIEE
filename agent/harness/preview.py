@@ -13,6 +13,7 @@ stays free of CuClient coupling so the agent package remains vendorable.
 Cancellation marks the run complete with
 `completionReason="user_cancelled_preview"` without touching the browser.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -56,10 +57,10 @@ async def runPreviewAndWait(
                         p.summary = $summary,
                         p.updated_at = $nowIso
         """,
-        executionId = executionId,
-        userId = userId,
-        summary = summary,
-        nowIso = nowIso,
+        executionId=executionId,
+        userId=userId,
+        summary=summary,
+        nowIso=nowIso,
     )
 
     deadline = asyncio.get_event_loop().time() + timeoutSeconds
@@ -69,17 +70,17 @@ async def runPreviewAndWait(
             MATCH (p:PreviewApproval {execution_id: $executionId})
             RETURN p.status AS status, p.summary AS summary, coalesce(p.note, '') AS note
             """,
-            executionId = executionId,
+            executionId=executionId,
         )
         if record is None:
             break
         status = str(record.get("status") or "pending")
         if status in ("approved", "cancelled"):
             return PreviewOutcome(
-                status = status,
-                summary = str(record.get("summary") or summary),
-                note = str(record.get("note") or ""),
+                status=status,
+                summary=str(record.get("summary") or summary),
+                note=str(record.get("note") or ""),
             )
         await asyncio.sleep(pollIntervalSeconds)
 
-    return PreviewOutcome(status = "cancelled", summary = summary, note = "preview_timeout")
+    return PreviewOutcome(status="cancelled", summary=summary, note="preview_timeout")

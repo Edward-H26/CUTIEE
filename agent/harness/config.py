@@ -4,6 +4,7 @@
 raises immediately if anything is missing. There is no silent fallback; the
 operator must pick local or production explicitly.
 """
+
 from __future__ import annotations
 
 import os
@@ -15,7 +16,7 @@ from .env_utils import envBool, envFloat, envInt
 ALLOWED_CU_BACKENDS: frozenset[str] = frozenset({"gemini", "browser_use"})
 
 
-@dataclass(frozen = True)
+@dataclass(frozen=True)
 class Config:
     cutieeEnv: str
     geminiApiKey: str | None
@@ -63,19 +64,19 @@ class Config:
             )
 
         return cls(
-            cutieeEnv = env,
-            geminiApiKey = geminiKey,
-            cuModel = os.environ.get("CUTIEE_CU_MODEL", "gemini-flash-latest"),
-            cuBackend = cuBackend,
-            templateMatchThreshold = envFloat("CUTIEE_TEMPLATE_MATCH_THRESHOLD", 0.85),
-            maxStepsPerTask = envInt("CUTIEE_MAX_STEPS_PER_TASK", 30),
-            approvalRequiredOnHighRisk = envBool("CUTIEE_REQUIRE_APPROVAL_HIGH_RISK", True),
-            screenshotTtlDays = envInt("CUTIEE_SCREENSHOT_TTL_DAYS", 3),
-            maxCostUsdPerTask = envFloat("CUTIEE_MAX_COST_USD_PER_TASK", 0.50),
-            maxCostUsdPerHour = envFloat("CUTIEE_MAX_COST_USD_PER_HOUR", 5.00),
-            maxCostUsdPerDay = envFloat("CUTIEE_MAX_COST_USD_PER_DAY", 1.00),
-            historyKeepTurns = envInt("CUTIEE_HISTORY_KEEP_TURNS", 8),
-            replayFragmentConfidence = envFloat("CUTIEE_REPLAY_FRAGMENT_CONFIDENCE", 0.80),
-            allowUrlFragments = envBool("CUTIEE_ALLOW_URL_FRAGMENTS", False),
-            heartbeatMinutes = envInt("CUTIEE_HEARTBEAT_MINUTES", 20),
+            cutieeEnv=env,
+            geminiApiKey=geminiKey,
+            cuModel=os.environ.get("CUTIEE_CU_MODEL", "gemini-flash-latest"),
+            cuBackend=cuBackend,
+            templateMatchThreshold=envFloat("CUTIEE_TEMPLATE_MATCH_THRESHOLD", 0.85),
+            maxStepsPerTask=envInt("CUTIEE_MAX_STEPS_PER_TASK", 30),
+            approvalRequiredOnHighRisk=envBool("CUTIEE_REQUIRE_APPROVAL_HIGH_RISK", True),
+            screenshotTtlDays=envInt("CUTIEE_SCREENSHOT_TTL_DAYS", 3),
+            maxCostUsdPerTask=envFloat("CUTIEE_MAX_COST_USD_PER_TASK", 0.50),
+            maxCostUsdPerHour=envFloat("CUTIEE_MAX_COST_USD_PER_HOUR", 5.00),
+            maxCostUsdPerDay=envFloat("CUTIEE_MAX_COST_USD_PER_DAY", 1.00),
+            historyKeepTurns=envInt("CUTIEE_HISTORY_KEEP_TURNS", 8),
+            replayFragmentConfidence=envFloat("CUTIEE_REPLAY_FRAGMENT_CONFIDENCE", 0.80),
+            allowUrlFragments=envBool("CUTIEE_ALLOW_URL_FRAGMENTS", False),
+            heartbeatMinutes=envInt("CUTIEE_HEARTBEAT_MINUTES", 20),
         )

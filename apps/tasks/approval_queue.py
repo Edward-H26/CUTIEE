@@ -22,6 +22,7 @@ For multi-worker production you'd swap in a Neo4j-backed pending queue
 (same shape as `_Neo4jBackend` in progress_backend.py). 2-5 concurrent
 demo users on a single Gunicorn worker is well within scope.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +41,7 @@ class PendingDecision:
     event: asyncio.Event
     loop: Any  # asyncio.AbstractEventLoop - typed loosely to avoid cross-version issues
     decision: bool | None = None
-    createdAt: datetime = field(default_factory = lambda: datetime.now(timezone.utc))
+    createdAt: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 _PENDING: dict[str, PendingDecision] = {}
@@ -55,7 +56,7 @@ async def awaitDecision(executionId: str, request: ApprovalRequest) -> bool:
     """
     event = asyncio.Event()
     loop = asyncio.get_running_loop()
-    pending = PendingDecision(request = request, event = event, loop = loop)
+    pending = PendingDecision(request=request, event=event, loop=loop)
     with _LOCK:
         _PENDING[executionId] = pending
     try:
@@ -95,7 +96,7 @@ def submitDecision(executionId: str, approved: bool) -> bool:
 
 def buildExecutionGate(executionId: str) -> "_ExecutionScopedGate":
     """Wire the in-process queue to ApprovalGate.decider for one execution."""
-    return _ExecutionScopedGate(executionId = executionId)
+    return _ExecutionScopedGate(executionId=executionId)
 
 
 @dataclass

@@ -1,4 +1,5 @@
 """ModelForm for UserPreference — paired with views.preferences."""
+
 from __future__ import annotations
 
 from django import forms
@@ -11,9 +12,9 @@ class UserPreferenceForm(forms.ModelForm):  # type: ignore[type-arg]
         model = UserPreference
         fields = ["theme", "dashboard_window_days", "redact_audit_screenshots"]
         widgets = {
-            "theme": forms.Select(attrs = {"class": "input"}),
+            "theme": forms.Select(attrs={"class": "input"}),
             "dashboard_window_days": forms.NumberInput(
-                attrs = {"class": "input", "min": "1", "max": "365"}
+                attrs={"class": "input", "min": "1", "max": "365"}
             ),
             "redact_audit_screenshots": forms.CheckboxInput(),
         }

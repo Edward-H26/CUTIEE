@@ -7,7 +7,8 @@
 #   uv run pre-commit install
 #
 # Hooks intentionally avoid network calls and skip heavy ML-tied paths
-# so the commit-time gate stays fast. Full pytest is still a manual
+# so the commit-time gate stays fast. The strict-typed mypy surface is
+# enforced here before commit, while full pytest remains a manual
 # pre-push check (see scripts/verify_render_isolation.sh + the README).
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -28,6 +29,11 @@ repos:
 
   - repo: local
     hooks:
+      - id: mypy
+        name: Mypy (strict typed surfaces)
+        entry: env UV_CACHE_DIR=/tmp/cutiee-uv-cache uv run mypy
+        language: system
+        pass_filenames: false
       - id: render-isolation
         name: Verify Render isolation (no torch/transformers in base deps)
         entry: bash scripts/verify_render_isolation.sh

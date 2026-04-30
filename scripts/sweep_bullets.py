@@ -7,6 +7,7 @@ strength for each bullet, and removes the ones that have fallen to
 Usage:
     python -m scripts.sweep_bullets
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,15 +27,16 @@ def iterUserIds() -> list[str]:
 
 
 def main() -> int:
-    logging.basicConfig(level = logging.INFO)
+    logging.basicConfig(level=logging.INFO)
     userIds = iterUserIds()
     totalRemoved = 0
     for userId in userIds:
         try:
             from apps.memory_app.store import Neo4jBulletStore
-            memory = ACEMemory(userId = userId, store = Neo4jBulletStore())
+
+            memory = ACEMemory(userId=userId, store=Neo4jBulletStore())
             memory.loadFromStore()
-            removed = memory.sweepDecayedBullets(floor = DECAY_FLOOR)
+            removed = memory.sweepDecayedBullets(floor=DECAY_FLOOR)
             totalRemoved += removed
             if removed:
                 logger.info("user=%s removed=%d", userId, removed)

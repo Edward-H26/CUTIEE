@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 380" width="760" height="380" role="img" aria-label="CUTIEE cost waterfall chart">
+    <title>CUTIEE Cost Waterfall: 15-step task across pricing scenarios</title>
+    <desc>Horizontal bar chart comparing per-task cost across four displayed execution scenarios. The source CSV also includes the Anthropic API-only baseline.</desc>
+
+    <rect width="760" height="380" fill="#ffffff"/>
+
+    <text x="24" y="34" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="600" fill="#0f172a">CUTIEE Cost Waterfall</text>
+    <text x="24" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#64748b">Cost per 15-step task across displayed scenarios. CSV includes the Anthropic API-only row.</text>
+
+    <text x="240" y="100" text-anchor="end" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#0f172a">naive_cloud</text>
+    <rect x="250" y="86" width="350" height="22" fill="#ef4444" rx="3"/>
+    <text x="608" y="101" font-family="-apple-system, sans-serif" font-size="12" fill="#0f172a">$0.00954 (baseline, 0% saved)</text>
+
+    <text x="240" y="142" text-anchor="end" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#0f172a">cutiee_first_run</text>
+    <rect x="250" y="128" width="25" height="22" fill="#f59e0b" rx="3"/>
+    <text x="285" y="143" font-family="-apple-system, sans-serif" font-size="12" fill="#0f172a">$0.000673 (92.9% below Gemini)</text>
+
+    <text x="240" y="184" text-anchor="end" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#0f172a">cutiee_replay</text>
+    <rect x="250" y="170" width="2" height="22" fill="#10b981" rx="3"/>
+    <text x="262" y="185" font-family="-apple-system, sans-serif" font-size="12" fill="#0f172a">$0.0000 (100.0% saved)</text>
+
+    <text x="240" y="226" text-anchor="end" font-family="-apple-system, sans-serif" font-size="13" font-weight="500" fill="#0f172a">cutiee_replay_with_mutation</text>
+    <rect x="250" y="212" width="2" height="22" fill="#10b981" rx="3"/>
+    <text x="262" y="227" font-family="-apple-system, sans-serif" font-size="12" fill="#0f172a">$0.0000126 (99.7% below API)</text>
+
+    <line x1="250" y1="248" x2="600" y2="248" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="250" y1="248" x2="250" y2="254" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="425" y1="248" x2="425" y2="254" stroke="#cbd5e1" stroke-width="1"/>
+    <line x1="600" y1="248" x2="600" y2="254" stroke="#cbd5e1" stroke-width="1"/>
+    <text x="250" y="268" font-family="-apple-system, sans-serif" font-size="11" fill="#64748b" text-anchor="middle">$0.000</text>
+    <text x="425" y="268" font-family="-apple-system, sans-serif" font-size="11" fill="#64748b" text-anchor="middle">$0.005</text>
+    <text x="600" y="268" font-family="-apple-system, sans-serif" font-size="11" fill="#64748b" text-anchor="middle">$0.010</text>
+    <text x="425" y="288" font-family="-apple-system, sans-serif" font-size="12" font-weight="500" fill="#475569" text-anchor="middle">USD per 15-step task</text>
+
+    <rect x="24" y="310" width="14" height="14" fill="#ef4444" rx="2"/>
+    <text x="44" y="322" font-family="-apple-system, sans-serif" font-size="11" fill="#475569">naive_cloud (Gemini Flash CU baseline, no replay)</text>
+    <rect x="280" y="310" width="14" height="14" fill="#f59e0b" rx="2"/>
+    <text x="300" y="322" font-family="-apple-system, sans-serif" font-size="11" fill="#475569">cutiee_first_run (projected local/cloud mix)</text>
+    <rect x="520" y="310" width="14" height="14" fill="#10b981" rx="2"/>
+    <text x="540" y="322" font-family="-apple-system, sans-serif" font-size="11" fill="#475569">cutiee_replay (procedural cache hit)</text>
+
+    <text x="24" y="350" font-family="-apple-system, sans-serif" font-size="11" fill="#64748b">Anthropic Computer Use baseline at the same task shape: approximately $0.194 per 15-step task, 20.3x naive_cloud,</text>
+    <text x="24" y="366" font-family="-apple-system, sans-serif" font-size="11" fill="#64748b">288x cutiee_first_run, infinitely more than cutiee_replay. Tier mix labels: naive_cloud {3:15}, first_run {1:11, 2:3, 3:1}, replay {0:15}, replay+mutation {0:14, 2:1}.</text>
+</svg>

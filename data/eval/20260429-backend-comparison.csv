@@ -1,0 +1,7 @@
+task,backend,success,steps,costUsd,completionReason,notes
+open_spreadsheet,gemini,True,3,0.0,demo complete,elapsed=2.55s execution=cd075890
+fill_form_wizard,gemini,True,3,0.0,demo complete,elapsed=2.35s execution=6e571413
+navigate_slides,gemini,True,3,0.0,demo complete,elapsed=1.58s execution=11a26ed3
+open_spreadsheet,browser_use,True,3,0.0,demo complete,elapsed=1.56s execution=61eb59f3
+fill_form_wizard,browser_use,True,3,0.0,demo complete,elapsed=1.14s execution=9982fced
+navigate_slides,browser_use,True,3,0.0,demo complete,elapsed=0.80s execution=74c3381e

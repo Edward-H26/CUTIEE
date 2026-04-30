@@ -5,6 +5,7 @@ captures the prompt context the VLM saw, the `Action` it returned, the cost of
 that decision, and the verification status. `AgentState` is the running record
 that gets handed to the memory pipeline at the end of a task.
 """
+
 from __future__ import annotations
 
 import enum
@@ -94,7 +95,7 @@ class ObservationStep:
     verificationOk: bool = True
     verificationNote: str = ""
     durationMs: int = 0
-    timestamp: datetime = field(default_factory = lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def shortSummary(self) -> str:
         if self.action is None:
@@ -111,12 +112,12 @@ class AgentState:
     taskId: str
     userId: str
     taskDescription: str
-    executionId: str = field(default_factory = lambda: str(uuid.uuid4()))
-    history: list[ObservationStep] = field(default_factory = list)
+    executionId: str = field(default_factory=lambda: str(uuid.uuid4()))
+    history: list[ObservationStep] = field(default_factory=list)
     isComplete: bool = False
     completionReason: str = ""
     totalCostUsd: float = 0.0
-    startedAt: datetime = field(default_factory = lambda: datetime.now(timezone.utc))
+    startedAt: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     finishedAt: datetime | None = None
     replayed: bool = False
     templateId: str | None = None

@@ -8,8 +8,8 @@ from apps.accounts.models import UserPreference
 
 @pytest.mark.django_db
 def test_userPreferenceDefaults() -> None:
-    user = get_user_model().objects.create_user(username = "prefs", password = "pw")
-    pref = UserPreference.objects.create(user = user)
+    user = get_user_model().objects.create_user(username="prefs", password="pw")
+    pref = UserPreference.objects.create(user=user)
 
     assert pref.theme == UserPreference.Theme.AURORA
     assert pref.dashboard_window_days == 14

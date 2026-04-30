@@ -6,6 +6,7 @@ retrieval ranks by the sum of decayed strengths plus relevance and a type
 priority. `DeltaUpdate` is what the curator emits at the end of every
 execution: a compact patch that the memory layer can apply atomically.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -28,10 +29,10 @@ def hashContent(content: str) -> str:
 
 @dataclass
 class Bullet:
-    id: str = field(default_factory = lambda: str(uuid.uuid4()))
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     content: str = ""
     memory_type: str = "semantic"
-    tags: list[str] = field(default_factory = list)
+    tags: list[str] = field(default_factory=list)
     topic: str = ""
     concept: str = ""
     content_hash: str = ""
@@ -52,9 +53,9 @@ class Bullet:
     embedding: list[float] | None = None
     is_seed: bool = False
     is_credential: bool = False
-    is_skill: bool = False                                  # mirrors miramemoria's `:Skill` concept
-    created_at: datetime = field(default_factory = _nowUtc)
-    last_used: datetime = field(default_factory = _nowUtc)
+    is_skill: bool = False  # mirrors miramemoria's `:Skill` concept
+    created_at: datetime = field(default_factory=_nowUtc)
+    last_used: datetime = field(default_factory=_nowUtc)
 
     def __post_init__(self) -> None:
         if not self.content_hash and self.content:
@@ -93,9 +94,15 @@ class Bullet:
             "semantic_access_index": self.semantic_access_index,
             "episodic_access_index": self.episodic_access_index,
             "procedural_access_index": self.procedural_access_index,
-            "semantic_last_access": self.semantic_last_access.isoformat() if self.semantic_last_access else None,
-            "episodic_last_access": self.episodic_last_access.isoformat() if self.episodic_last_access else None,
-            "procedural_last_access": self.procedural_last_access.isoformat() if self.procedural_last_access else None,
+            "semantic_last_access": self.semantic_last_access.isoformat()
+            if self.semantic_last_access
+            else None,
+            "episodic_last_access": self.episodic_last_access.isoformat()
+            if self.episodic_last_access
+            else None,
+            "procedural_last_access": self.procedural_last_access.isoformat()
+            if self.procedural_last_access
+            else None,
             "ttl_days": self.ttl_days,
             "embedding": self.embedding,
             "is_seed": self.is_seed,
@@ -108,42 +115,42 @@ class Bullet:
     @classmethod
     def fromNeo4j(cls, row: dict[str, Any]) -> "Bullet":
         return cls(
-            id = row.get("id", str(uuid.uuid4())),
-            content = row.get("content", ""),
-            memory_type = row.get("memory_type", "semantic"),
-            tags = list(row.get("tags") or []),
-            topic = row.get("topic", "") or "",
-            concept = row.get("concept", "") or "",
-            content_hash = row.get("content_hash", "") or "",
-            context_scope_id = row.get("context_scope_id", "") or "",
-            learner_id = row.get("learner_id", "") or "",
-            helpful_count = int(row.get("helpful_count") or 0),
-            harmful_count = int(row.get("harmful_count") or 0),
-            semantic_strength = float(row.get("semantic_strength") or 0.0),
-            episodic_strength = float(row.get("episodic_strength") or 0.0),
-            procedural_strength = float(row.get("procedural_strength") or 0.0),
-            semantic_access_index = int(row.get("semantic_access_index") or 0),
-            episodic_access_index = int(row.get("episodic_access_index") or 0),
-            procedural_access_index = int(row.get("procedural_access_index") or 0),
-            semantic_last_access = _optionalIso(row.get("semantic_last_access")),
-            episodic_last_access = _optionalIso(row.get("episodic_last_access")),
-            procedural_last_access = _optionalIso(row.get("procedural_last_access")),
-            ttl_days = row.get("ttl_days"),
-            embedding = row.get("embedding"),
-            is_seed = bool(row.get("is_seed") or False),
-            is_credential = bool(row.get("is_credential") or False),
-            is_skill = bool(row.get("is_skill") or False),
-            created_at = _parseIso(row.get("created_at")),
-            last_used = _parseIso(row.get("last_used")),
+            id=row.get("id", str(uuid.uuid4())),
+            content=row.get("content", ""),
+            memory_type=row.get("memory_type", "semantic"),
+            tags=list(row.get("tags") or []),
+            topic=row.get("topic", "") or "",
+            concept=row.get("concept", "") or "",
+            content_hash=row.get("content_hash", "") or "",
+            context_scope_id=row.get("context_scope_id", "") or "",
+            learner_id=row.get("learner_id", "") or "",
+            helpful_count=int(row.get("helpful_count") or 0),
+            harmful_count=int(row.get("harmful_count") or 0),
+            semantic_strength=float(row.get("semantic_strength") or 0.0),
+            episodic_strength=float(row.get("episodic_strength") or 0.0),
+            procedural_strength=float(row.get("procedural_strength") or 0.0),
+            semantic_access_index=int(row.get("semantic_access_index") or 0),
+            episodic_access_index=int(row.get("episodic_access_index") or 0),
+            procedural_access_index=int(row.get("procedural_access_index") or 0),
+            semantic_last_access=_optionalIso(row.get("semantic_last_access")),
+            episodic_last_access=_optionalIso(row.get("episodic_last_access")),
+            procedural_last_access=_optionalIso(row.get("procedural_last_access")),
+            ttl_days=row.get("ttl_days"),
+            embedding=row.get("embedding"),
+            is_seed=bool(row.get("is_seed") or False),
+            is_credential=bool(row.get("is_credential") or False),
+            is_skill=bool(row.get("is_skill") or False),
+            created_at=_parseIso(row.get("created_at")),
+            last_used=_parseIso(row.get("last_used")),
         )
 
 
 @dataclass
 class DeltaUpdate:
-    new_bullets: list[Bullet] = field(default_factory = list)
-    update_bullets: dict[str, dict[str, Any]] = field(default_factory = dict)
-    remove_bullets: list[str] = field(default_factory = list)
-    metadata: dict[str, Any] = field(default_factory = dict)
+    new_bullets: list[Bullet] = field(default_factory=list)
+    update_bullets: dict[str, dict[str, Any]] = field(default_factory=dict)
+    remove_bullets: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def isEmpty(self) -> bool:
         return not (self.new_bullets or self.update_bullets or self.remove_bullets)
@@ -156,11 +163,11 @@ def _parseIso(value: Any) -> datetime:
 
 def _optionalIso(value: Any) -> datetime | None:
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo = timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
     if isinstance(value, str) and value:
         try:
             parsed = datetime.fromisoformat(value)
-            return parsed if parsed.tzinfo else parsed.replace(tzinfo = timezone.utc)
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
         except ValueError:
             return None
     return None

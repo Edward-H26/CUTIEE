@@ -8,6 +8,7 @@ hosts `_stepIndexFromContent`, which was duplicated across
 These helpers stay dependency-free so they import cheaply from any
 caller in the memory layer.
 """
+
 from __future__ import annotations
 
 import json

@@ -4,6 +4,7 @@ Injects deployment-level settings that several templates rely on but
 that are not per-view (the noVNC URL, the CU backend label, etc.).
 Keeping this here avoids sprinkling `os.environ` reads across views.
 """
+
 from __future__ import annotations
 
 import os

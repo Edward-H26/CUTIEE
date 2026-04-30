@@ -6,6 +6,7 @@ window, audit screenshot redaction default). The view reads or creates
 the row via the OneToOne accessor and renders a ModelForm; POST writes
 through the form's save and redirects back to the preferences page.
 """
+
 from __future__ import annotations
 
 from django.contrib.auth.decorators import login_required
@@ -19,14 +20,14 @@ from apps.accounts.models import UserPreference
 
 @login_required
 def preferences(request: HttpRequest) -> HttpResponse:
-    pref, _ = UserPreference.objects.get_or_create(user = request.user)
+    pref, _ = UserPreference.objects.get_or_create(user=request.user)
     if request.method == "POST":
-        form = UserPreferenceForm(request.POST, instance = pref)
+        form = UserPreferenceForm(request.POST, instance=pref)
         if form.is_valid():
             form.save()
             return HttpResponseRedirect(reverse("accounts:preferences"))
     else:
-        form = UserPreferenceForm(instance = pref)
+        form = UserPreferenceForm(instance=pref)
     return render(
         request,
         "accounts/preferences.html",

@@ -3,6 +3,7 @@
 These stay unit-level by monkeypatching the model bridge instead of
 loading transformers or touching the network.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -16,7 +17,7 @@ def test_local_llm_only_applies_to_localhost(monkeypatch: pytest.MonkeyPatch) ->
     from agent.memory import local_llm
 
     monkeypatch.setenv("CUTIEE_ENV", "local")
-    monkeypatch.delenv("CUTIEE_FORCE_LOCAL_LLM", raising = False)
+    monkeypatch.delenv("CUTIEE_FORCE_LOCAL_LLM", raising=False)
     monkeypatch.setenv("CUTIEE_ENABLE_LOCAL_LLM", "true")
 
     assert local_llm.shouldUseLocalLlmForUrl("http://localhost:5000/demo") is True
@@ -27,11 +28,14 @@ def test_local_llm_only_applies_to_localhost(monkeypatch: pytest.MonkeyPatch) ->
 def test_decomposer_prefers_local_qwen_for_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CUTIEE_ENV", "local")
     monkeypatch.setenv("CUTIEE_ENABLE_LOCAL_LLM", "true")
-    monkeypatch.delenv("GEMINI_API_KEY", raising = False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     from agent.memory import local_llm
 
-    monkeypatch.setattr(local_llm, "generateText", lambda **_: """
+    monkeypatch.setattr(
+        local_llm,
+        "generateText",
+        lambda **_: """
     {
       "steps": [
         {
@@ -48,12 +52,13 @@ def test_decomposer_prefers_local_qwen_for_localhost(monkeypatch: pytest.MonkeyP
         }
       ]
     }
-    """)
+    """,
+    )
 
     graph = LlmActionDecomposer().decompose(
-        userId = "u",
-        taskDescription = "open the demo app",
-        initialUrl = "http://localhost:5000",
+        userId="u",
+        taskDescription="open the demo app",
+        initialUrl="http://localhost:5000",
     )
 
     assert [node.action_type for node in graph.nodes] == ["navigate", "finish"]
@@ -62,11 +67,14 @@ def test_decomposer_prefers_local_qwen_for_localhost(monkeypatch: pytest.MonkeyP
 def test_reflector_prefers_local_qwen_for_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CUTIEE_ENV", "local")
     monkeypatch.setenv("CUTIEE_ENABLE_LOCAL_LLM", "true")
-    monkeypatch.delenv("GEMINI_API_KEY", raising = False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     from agent.memory import local_llm
 
-    monkeypatch.setattr(local_llm, "generateText", lambda **_: """
+    monkeypatch.setattr(
+        local_llm,
+        "generateText",
+        lambda **_: """
     {
       "lessons": [
         {
@@ -77,19 +85,20 @@ def test_reflector_prefers_local_qwen_for_localhost(monkeypatch: pytest.MonkeyPa
         }
       ]
     }
-    """)
+    """,
+    )
 
-    state = AgentState(taskId = "t", userId = "u", taskDescription = "submit the localhost form")
+    state = AgentState(taskId="t", userId="u", taskDescription="submit the localhost form")
     state.history = [
         ObservationStep(
-            index = 0,
-            url = "http://localhost:5000",
-            action = Action(type = ActionType.NAVIGATE, target = "http://localhost:5000"),
+            index=0,
+            url="http://localhost:5000",
+            action=Action(type=ActionType.NAVIGATE, target="http://localhost:5000"),
         ),
     ]
     state.markComplete("ok")
 
-    lessons = LlmReflector(fallback = HeuristicReflector()).reflect(state)
+    lessons = LlmReflector(fallback=HeuristicReflector()).reflect(state)
 
     assert len(lessons) == 1
     assert lessons[0].memoryType == "procedural"

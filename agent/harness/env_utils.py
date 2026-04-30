@@ -7,6 +7,7 @@ the screenshot store. The previous duplicated parsers in `config.py` and
 `controller.py` disagreed on edge cases (one accepted "y", the other
 didn't), which made `.env` debugging painful.
 """
+
 from __future__ import annotations
 
 import os

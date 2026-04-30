@@ -5,6 +5,7 @@ The gate is async and channel-agnostic: the orchestrator awaits
 or reject. Production wires this into Django's HTMX progress polling
 endpoint; tests inject a deterministic stub.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,7 +20,7 @@ from ..harness.state import Action, RiskLevel
 class ApprovalRequest:
     actionDescription: str
     risk: RiskLevel
-    requestedAt: datetime = field(default_factory = lambda: datetime.now(timezone.utc))
+    requestedAt: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     decision: str = "pending"
     decidedAt: datetime | None = None
 
@@ -32,7 +33,7 @@ class ApprovalGate:
     requireApproval: bool = True
     autoApproveBelow: RiskLevel = RiskLevel.MEDIUM
     decider: ApprovalDecider | None = None
-    log: list[ApprovalRequest] = field(default_factory = list)
+    log: list[ApprovalRequest] = field(default_factory=list)
 
     async def requestApproval(self, action: Action) -> bool:
         if not self.requireApproval:
@@ -41,8 +42,8 @@ class ApprovalGate:
             return True
 
         request = ApprovalRequest(
-            actionDescription = f"{action.type.value} {action.target} {action.value or ''}".strip(),
-            risk = action.risk,
+            actionDescription=f"{action.type.value} {action.target} {action.value or ''}".strip(),
+            risk=action.risk,
         )
         self.log.append(request)
 
