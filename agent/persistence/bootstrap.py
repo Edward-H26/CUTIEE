@@ -19,6 +19,8 @@ _logger = logging.getLogger("cutiee.bootstrap")
 CONSTRAINTS: list[str] = [
     "CREATE CONSTRAINT user_id           IF NOT EXISTS FOR (u:User)               REQUIRE u.id           IS UNIQUE",
     "CREATE CONSTRAINT user_email        IF NOT EXISTS FOR (u:User)               REQUIRE u.email        IS UNIQUE",
+    "CREATE CONSTRAINT user_google_sub   IF NOT EXISTS FOR (u:User)               REQUIRE u.google_sub   IS UNIQUE",
+    "CREATE CONSTRAINT user_pref_user    IF NOT EXISTS FOR (p:UserPreference)     REQUIRE p.user_id      IS UNIQUE",
     "CREATE CONSTRAINT session_key       IF NOT EXISTS FOR (s:Session)            REQUIRE s.session_key  IS UNIQUE",
     "CREATE CONSTRAINT task_id           IF NOT EXISTS FOR (t:Task)               REQUIRE t.id           IS UNIQUE",
     "CREATE CONSTRAINT execution_id      IF NOT EXISTS FOR (e:Execution)          REQUIRE e.id           IS UNIQUE",

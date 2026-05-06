@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import include, path
 
@@ -32,8 +31,6 @@ def _metrics(_request) -> HttpResponse:
 
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
-    path("accounts/", include("allauth.urls")),
     path("me/", include("apps.accounts.urls")),
     path("tasks/", include("apps.tasks.urls")),
     path("memory/", include("apps.memory_app.urls")),
@@ -43,6 +40,14 @@ urlpatterns = [
     path("health/", _liveness, name="liveness"),
     path("", include("apps.landing.urls")),
 ]
+
+if getattr(settings, "CUTIEE_NEO4J_FRAMEWORK_AUTH", False):
+    urlpatterns.insert(0, path("accounts/", include("apps.accounts.neo4j_urls")))
+else:
+    from django.contrib import admin
+
+    urlpatterns.insert(0, path("accounts/", include("allauth.urls")))
+    urlpatterns.insert(0, path("admin/", admin.site.urls))
 
 if getattr(settings, "CUTIEE_ENABLE_PROMETHEUS", False):
     urlpatterns.append(path("metrics/", _metrics, name="metrics"))

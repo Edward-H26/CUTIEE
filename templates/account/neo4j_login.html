@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign in · CUTIEE{% endblock %}
+{% block content %}
+<section class="cutiee-auth-wrap">
+    <div class="cutiee-card cutiee-auth-card">
+        <h1>Sign in to CUTIEE</h1>
+        <p class="cutiee-text-sm cutiee-muted cutiee-mt-1 cutiee-mb-4">Delegate repetitive web tasks to an agent that learns from your workflows.</p>
+        <a href="{% url 'google_login' %}{% if nextUrl %}?next={{ nextUrl|urlencode }}{% endif %}" class="cta cutiee-auth-google" data-testid="google-signin">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M21.35 11.1H12v2.96h5.35c-.23 1.54-1.76 4.5-5.35 4.5-3.22 0-5.85-2.67-5.85-5.96s2.63-5.96 5.85-5.96c1.84 0 3.07.78 3.77 1.46l2.57-2.48C16.76 4.1 14.57 3 12 3 7.03 3 3 7.03 3 12s4.03 9 9 9c5.19 0 8.64-3.65 8.64-8.79 0-.59-.06-1.04-.14-1.41z"/>
+            </svg>
+            Sign in with Google
+        </a>
+    </div>
+</section>
+{% endblock %}

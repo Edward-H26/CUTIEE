@@ -157,7 +157,7 @@ is at `/memory/`. The audit log is at `/audit/`.
 CUTIEE/
 ├── cutiee_site/         Django project (settings, urls, sessions backend)
 ├── apps/
-│   ├── accounts/        allauth + Neo4j auth backend
+│   ├── accounts/        local allauth path + production Neo4j auth backend
 │   ├── common/          cross-app helpers (query_utils.safeInt, future request validators)
 │   ├── tasks/           task submission, services bridge, runner_factory, JSON API, HTMX views
 │   ├── memory_app/      ACE bullet + template dashboard, JSON export
@@ -173,7 +173,7 @@ CUTIEE/
 ├── demo_sites/          three Flask test targets (spreadsheet, slides, form)
 ├── scripts/             dev.sh, neo4j_up.sh, capture_storage_state.py, benchmark_costs.py
 ├── static/css/          unified design tokens (cutiee.css)
-├── templates/           base.html + allauth overrides
+├── templates/           base.html + account templates
 ├── tests/               pytest unit + integration tests
 ├── render.yaml         Render Blueprint: CUTIEE (Django) + cutiee-worker (Dockerized Xvfb + Chromium + noVNC)
 └── Dockerfile.worker   Worker image for the live framebuffer service
@@ -188,10 +188,10 @@ the legacy `.env.cutiee.template`). Required keys:
 |---|---|---|
 | `CUTIEE_ENV` | always | `local` or `production` |
 | `DJANGO_SECRET_KEY` | always | Django session signing |
-| `DJANGO_DATABASE_URL` or `DATABASE_URL` | production | Durable SQL store for Django users, allauth social-account links, sessions, and preferences |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | always | Google OAuth |
 | `NEO4J_BOLT_URL`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | always | Neo4j domain DB |
 | `GEMINI_API_KEY` | production | Gemini Flash with the ComputerUse tool |
+| `CUTIEE_NEO4J_FRAMEWORK_AUTH` | production | Default `true`; stores production auth, sessions, and preferences in Neo4j instead of Django SQL |
 | `CUTIEE_CU_MODEL` | optional | Override default `gemini-flash-latest`; pin to `gemini-3-flash-preview` for deterministic replay |
 | `CUTIEE_ENABLE_LOCAL_LLM` | optional | Default `true`; when `CUTIEE_ENV=local` and the task targets `localhost` or `127.0.0.1`, prefer cached `Qwen/Qwen3.5-0.8B` for memory-side JSON generation |
 | `CUTIEE_LOCAL_LLM_CACHE_DIR` | optional | Override the Hugging Face cache root (default `.cache/huggingface-models/`) |
@@ -222,7 +222,8 @@ the legacy `.env.cutiee.template`). Required keys:
 
 Push to GitHub, point Render at the repo once via **New +** > **Blueprint**,
 and Render provisions both services in lockstep. Paste the `sync: false`
-secrets during the first sync. The Blueprint derives the worker's public
+secrets during the first sync. Production auth, sessions, preferences, and
+domain data are stored in Neo4j; the Blueprint derives the worker's public
 URL into `CUTIEE_WORKER_EXTERNAL_URL`; set `CUTIEE_NOVNC_URL` only when you
 need to override that derived URL.
 

@@ -6,9 +6,8 @@
         <div class="crumb">Workspace &middot; Preferences</div>
         <h1>Your preferences</h1>
         <div class="page-head__stats">
-            Stored in the Django framework database via
-            <code>apps.accounts.models.UserPreference</code> (OneToOneField to your user).
-            Domain data (tasks, memory, audit) lives separately in Neo4j; see
+            Saved with your account profile. Production stores auth, sessions,
+            preferences, tasks, memory, and audit data in Neo4j; see
             <a href="https://github.com/Edward-H26/CUTIEE/blob/main/SPEC.md">SPEC.md</a>.
         </div>
     </div>
@@ -56,11 +55,9 @@
         </div>
     </div>
     <p class="cutiee-text-sm cutiee-muted">
-        This is a deliberate Django ORM record (rubric Part 2 expects "Django models with
-        meaningful relationships"). The CUTIEE domain layer (Task, Execution, MemoryBullet,
-        AuditEntry, CostLedger) lives in Neo4j because graph queries fit those access
-        patterns better. UI preferences travel with the session so they live in the
-        framework database where the user model lives.
+        In production this record is stored as a Neo4j preference node linked to your
+        account. Local developer and test runs keep a small Django ORM placeholder so
+        forms, fixtures, and model checks stay lightweight.
     </p>
 </section>
 {% endblock %}

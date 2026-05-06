@@ -15,10 +15,8 @@
 # post-finish purge drops them on the next HTMX poll, so the graph
 # stays bounded for 2-5 concurrent demo users.
 #
-# Django framework bookkeeping (contenttypes, auth_permission, allauth_*,
-# sites, sessions, user preferences) lives in a durable SQL database.
-# Domain entities still round-trip through Neo4j via apps/*/repo.py.
-# Set DJANGO_DATABASE_URL or DATABASE_URL on CUTIEE before deploy.
+# Django framework auth, sessions, and preferences use Neo4j in production.
+# Django's SQL backend remains configured only as an unused placeholder.
 
 services:
   - type: web
@@ -26,7 +24,7 @@ services:
     env: python
     region: oregon
     # Standard plan gives the web dyno headroom for concurrent HTMX
-    # polls, allauth OAuth handshakes, Cypher round-trips, and 2-5
+    # polls, Google OAuth handshakes, Cypher round-trips, and 2-5
     # simultaneous demo users. Chromium itself runs on cutiee-worker
     # and is reached over CDP, so this plan does NOT need to size for
     # a browser process. Starter (512 MB) is viable when the cohort
@@ -41,7 +39,6 @@ services:
     buildCommand: |
       uv sync --group browser_use &&
       uv run playwright install chromium &&
-      uv run python manage.py migrate --no-input &&
       uv run python manage.py collectstatic --no-input &&
       uv run python -m agent.persistence.bootstrap &&
       cp agent/memory/local_llm_stub.py agent/memory/local_llm.py &&
@@ -63,6 +60,8 @@ services:
         value: "3.12.7"
       - key: CUTIEE_ENV
         value: production
+      - key: CUTIEE_NEO4J_FRAMEWORK_AUTH
+        value: "true"
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_DEBUG
@@ -77,8 +76,6 @@ services:
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: DJANGO_DATABASE_URL
         sync: false
       - key: NEO4J_BOLT_URL
         sync: false

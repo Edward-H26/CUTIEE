@@ -135,16 +135,25 @@ def buildLiveCuRunnerForUser(
     # supported (some users prefer raw screenshots for debugging their
     # own demo sites). The default is True so anonymous and
     # never-set-preferences users get the safer behavior.
+    from django.conf import settings
     from apps.accounts.models import UserPreference
     from apps.audit.redactor import playwrightDomRedactor, redactScreenshot
-    from django.contrib.auth import get_user_model
 
-    User = get_user_model()
-    try:
-        userObj = User.objects.filter(pk=userId).first()
-    except Exception:
-        userObj = None
-    shouldRedact = UserPreference.for_user(userObj).redact_audit_screenshots
+    if getattr(settings, "CUTIEE_NEO4J_FRAMEWORK_AUTH", False):
+        from apps.accounts import repo as accountsRepo
+
+        shouldRedact = bool(
+            accountsRepo.preferenceForUser(str(userId)).get("redact_audit_screenshots", True)
+        )
+    else:
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        try:
+            userObj = User.objects.filter(pk=userId).first()
+        except Exception:
+            userObj = None
+        shouldRedact = UserPreference.for_user(userObj).redact_audit_screenshots
 
     if shouldRedact:
 

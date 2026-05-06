@@ -1,9 +1,9 @@
 """Django settings for CUTIEE.
 
-Domain data lives in Neo4j. Django framework state, authentication,
-allauth account links, sessions, and preferences live in SQL. Local
-mode uses process-local SQLite; production requires a durable database
-URL so user primary keys remain stable across restarts.
+Domain data lives in Neo4j. Production framework auth, sessions, and
+preferences also use Neo4j; Django's SQL backend remains configured only as
+an unused framework placeholder. Local mode keeps Django's ORM auth path for
+tests and developer convenience.
 """
 
 from __future__ import annotations
@@ -77,8 +77,14 @@ CUTIEE_ENV = _envStr("CUTIEE_ENV")
 if CUTIEE_ENV not in {"local", "production"}:
     raise RuntimeError("CUTIEE_ENV must be set to 'local' or 'production'. See .env.example.")
 
-for required_key in ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"):
-    if not _envStr(required_key):
+GOOGLE_CLIENT_ID = _envStr("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = _envStr("GOOGLE_CLIENT_SECRET")
+
+for required_key, value in (
+    ("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID),
+    ("GOOGLE_CLIENT_SECRET", GOOGLE_CLIENT_SECRET),
+):
+    if not value:
         raise RuntimeError(
             f"{required_key} is required. Google OAuth is the primary auth flow. "
             "Create credentials at https://console.cloud.google.com/apis/credentials."
@@ -113,6 +119,11 @@ if CUTIEE_ENV == "production" and SECRET_KEY.startswith("cutiee-insecure"):
 # to CSRF_TRUSTED_ORIGINS. Explicit env vars still win when set.
 RENDER_EXTERNAL_HOSTNAME = _envStr("RENDER_EXTERNAL_HOSTNAME")
 IS_ON_RENDER = bool(RENDER_EXTERNAL_HOSTNAME)
+CUTIEE_NEO4J_FRAMEWORK_AUTH = (
+    CUTIEE_ENV == "production"
+    and not IS_PYTEST
+    and _envBool("CUTIEE_NEO4J_FRAMEWORK_AUTH", default=True)
+)
 
 DEBUG = _envBool(
     "DJANGO_DEBUG",
@@ -150,19 +161,28 @@ if IS_ON_RENDER:
     if _WILDCARD_RENDER not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_WILDCARD_RENDER)
 
-INSTALLED_APPS = [
-    "django.contrib.admin",
+_DJANGO_FRAMEWORK_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
-    "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.sites",
     "rest_framework",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.google",
+]
+
+if not CUTIEE_NEO4J_FRAMEWORK_AUTH:
+    _DJANGO_FRAMEWORK_APPS = [
+        "django.contrib.admin",
+        *_DJANGO_FRAMEWORK_APPS,
+        "django.contrib.sessions",
+        "django.contrib.sites",
+        "allauth",
+        "allauth.account",
+        "allauth.socialaccount",
+        "allauth.socialaccount.providers.google",
+    ]
+
+INSTALLED_APPS = [
+    *_DJANGO_FRAMEWORK_APPS,
     "apps.accounts",
     "apps.tasks",
     "apps.memory_app",
@@ -176,11 +196,16 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    (
+        "apps.accounts.neo4j_auth.Neo4jAuthenticationMiddleware"
+        if CUTIEE_NEO4J_FRAMEWORK_AUTH
+        else "django.contrib.auth.middleware.AuthenticationMiddleware"
+    ),
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
+if not CUTIEE_NEO4J_FRAMEWORK_AUTH:
+    MIDDLEWARE.append("allauth.account.middleware.AccountMiddleware")
 
 ROOT_URLCONF = "cutiee_site.urls"
 
@@ -193,7 +218,11 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
+                (
+                    "apps.accounts.context_processors.auth"
+                    if CUTIEE_NEO4J_FRAMEWORK_AUTH
+                    else "django.contrib.auth.context_processors.auth"
+                ),
                 "django.contrib.messages.context_processors.messages",
                 "cutiee_site.context_processors.runtime",
                 "cutiee_site.context_processors.userTheme",
@@ -245,14 +274,14 @@ def _databaseConfigFromUrl(rawUrl: str) -> dict[str, Any]:
 
 
 def _productionDatabaseConfig() -> dict[str, Any]:
-    rawUrl = _envStr("DJANGO_DATABASE_URL") or _envStr("DATABASE_URL")
-    if not rawUrl and IS_PYTEST:
+    if IS_PYTEST or CUTIEE_NEO4J_FRAMEWORK_AUTH:
         return _localDatabaseConfig()
+    rawUrl = _envStr("DJANGO_DATABASE_URL") or _envStr("DATABASE_URL")
     if not rawUrl:
         raise RuntimeError(
-            "DJANGO_DATABASE_URL or DATABASE_URL is required when "
-            "CUTIEE_ENV=production. This database stores durable Django "
-            "users, allauth social-account mappings, sessions, and preferences."
+            "DJANGO_DATABASE_URL or DATABASE_URL is only required in production when "
+            "CUTIEE_NEO4J_FRAMEWORK_AUTH=false. Set CUTIEE_NEO4J_FRAMEWORK_AUTH=true "
+            "to keep framework auth, sessions, and preferences in Neo4j."
         )
     return _databaseConfigFromUrl(rawUrl)
 
@@ -270,10 +299,21 @@ NEO4J_DATABASE = _envStr("NEO4J_DATABASE", "neo4j")
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.account.auth_backends.AuthenticationBackend",
 ]
+if not CUTIEE_NEO4J_FRAMEWORK_AUTH:
+    AUTHENTICATION_BACKENDS.append("allauth.account.auth_backends.AuthenticationBackend")
 
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 14
+SESSION_ENGINE = (
+    "cutiee_site.neo4j_session_backend"
+    if CUTIEE_NEO4J_FRAMEWORK_AUTH
+    else "django.contrib.sessions.backends.db"
+)
+MESSAGE_STORAGE = (
+    "django.contrib.messages.storage.cookie.CookieStorage"
+    if CUTIEE_NEO4J_FRAMEWORK_AUTH
+    else "django.contrib.messages.storage.fallback.FallbackStorage"
+)
 
 SITE_ID = 1
 LOGIN_URL = "/accounts/login/"
@@ -294,8 +334,8 @@ DEFAULT_FROM_EMAIL = _envStr("DJANGO_DEFAULT_FROM_EMAIL", "no-reply@cutiee.local
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
         "APP": {
-            "client_id": _envStr("GOOGLE_CLIENT_ID"),
-            "secret": _envStr("GOOGLE_CLIENT_SECRET"),
+            "client_id": GOOGLE_CLIENT_ID,
+            "secret": GOOGLE_CLIENT_SECRET,
             "key": "",
         },
         "SCOPE": ["profile", "email"],

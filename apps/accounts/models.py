@@ -7,7 +7,7 @@ from django.db import models
 
 
 class UserPreference(models.Model):
-    """Framework-side per-user preferences that do not belong in Neo4j."""
+    """Local ORM placeholder plus form-compatible preference shape."""
 
     class Theme(models.TextChoices):
         AURORA = "aurora", "Aurora"
@@ -41,6 +41,15 @@ class UserPreference(models.Model):
         """
         if user is None or not getattr(user, "is_authenticated", False):
             return cls()
+        if getattr(settings, "CUTIEE_NEO4J_FRAMEWORK_AUTH", False):
+            from apps.accounts import repo
+
+            raw = repo.preferenceForUser(str(getattr(user, "pk", "")))
+            return cls(
+                theme=str(raw.get("theme") or cls.Theme.AURORA),
+                dashboard_window_days=int(raw.get("dashboard_window_days") or 14),
+                redact_audit_screenshots=bool(raw.get("redact_audit_screenshots")),
+            )
         try:
             return cast("UserPreference", user.preference)
         except cls.DoesNotExist:

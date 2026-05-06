@@ -7,6 +7,11 @@ class AccountsConfig(AppConfig):
     label = "accounts"
 
     def ready(self) -> None:
+        from django.conf import settings
+
+        if getattr(settings, "CUTIEE_NEO4J_FRAMEWORK_AUTH", False):
+            return
+
         from apps.accounts import signals  # noqa: F401
         from cutiee_site._internal_db import ensureInternalSchema
 
