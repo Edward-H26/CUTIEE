@@ -32,15 +32,14 @@ services:
     # a browser process. Starter (512 MB) is viable when the cohort
     # is a single user at a time; bump back to Standard before demos.
     plan: standard
-    # `uv sync` installs only base [project] dependencies + the dev group
-    # (uv default). The optional `local_llm` group (torch, transformers,
-    # huggingface-hub) is INTENTIONALLY skipped on Render: this service
-    # always runs CUTIEE_ENV=production so the local-Qwen code path
-    # (agent/memory/local_llm.py) never fires. The post-install replace
-    # below swaps the real module for a stub as defense-in-depth per the
-    # 2026-04-29 local-only directive.
+    # `uv sync --group browser_use` installs the browser-use adapter path
+    # used by CUTIEE_CU_BACKEND=browser_use while still skipping the optional
+    # `local_llm` group (torch, transformers, huggingface-hub) on Render.
+    # This service always runs CUTIEE_ENV=production so the local-Qwen code
+    # path never fires. The post-install replace below swaps the real module
+    # for a stub as defense-in-depth per the 2026-04-29 local-only directive.
     buildCommand: |
-      uv sync &&
+      uv sync --group browser_use &&
       uv run playwright install chromium &&
       uv run python manage.py migrate --no-input &&
       uv run python manage.py collectstatic --no-input &&
@@ -105,18 +104,26 @@ services:
         value: "true"
       - key: CUTIEE_USE_STUB_BROWSER
         value: "false"
-      # Private-network handle for the worker's Chromium. The worker's
-      # Dockerfile starts Chromium with --remote-debugging-address=0.0.0.0
-      # on port 9222, and Render's private DNS resolves cutiee-worker to
-      # the worker container, so this URL is reachable without any
-      # firewall punch or public exposure.
-      - key: CUTIEE_BROWSER_CDP_URL
-        value: "http://cutiee-worker:9222"
+      # Private-network handle for the worker's Chromium. Render gives
+      # each service a generated internal hostname, so the web service
+      # receives the worker host from the Blueprint instead of assuming
+      # the literal service name is resolvable.
+      - key: CUTIEE_BROWSER_CDP_HOST
+        fromService:
+          type: web
+          name: cutiee-worker
+          property: host
+      - key: CUTIEE_BROWSER_CDP_PORT
+        value: "9222"
+      - key: CUTIEE_WORKER_EXTERNAL_URL
+        fromService:
+          type: web
+          name: cutiee-worker
+          envVarKey: RENDER_EXTERNAL_URL
       # Public noVNC URL the dashboard iframe points at. Render appends
       # a per-workspace suffix (e.g. cutiee-worker-xyz.onrender.com) so
-      # we cannot predict the exact hostname. Fill this in from the
-      # dashboard once the worker's first deploy completes; format is
-      # https://<worker-hostname>/vnc.html.
+      # this value can override the derived CUTIEE_WORKER_EXTERNAL_URL
+      # fallback when a custom worker host is needed.
       - key: CUTIEE_NOVNC_URL
         sync: false
       # Aura-backed progress cache: 30 ms / publish, no Redis dyno needed.

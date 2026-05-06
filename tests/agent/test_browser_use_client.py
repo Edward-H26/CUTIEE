@@ -11,6 +11,8 @@ Covers three things the plan mandates:
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from agent.harness.state import ActionType
@@ -37,6 +39,7 @@ def _browserUseInstalled(monkeypatch: pytest.MonkeyPatch) -> None:
     stub = types.ModuleType("browser_use")
     stub.Agent = object  # type: ignore[attr-defined]
     stub.Browser = object  # type: ignore[attr-defined]
+    stub.ChatGoogle = object  # type: ignore[attr-defined]
     llm_stub = types.ModuleType("browser_use.llm")
     llm_stub.ChatGoogle = object  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "browser_use", stub)
@@ -64,6 +67,41 @@ def test_client_satisfies_protocol(
     assert isinstance(client, CuClient)
     assert client.modelId == DEFAULT_BROWSER_USE_MODEL
     assert DEFAULT_BROWSER_USE_MODEL in BROWSER_USE_PRICING
+
+
+def test_client_sets_google_api_key_alias(
+    monkeypatch: pytest.MonkeyPatch,
+    _browserUseInstalled: None,
+) -> None:
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+
+    BrowserUseClient()
+
+    assert os.environ["GOOGLE_API_KEY"] == "test"
+
+
+def test_primeTaskAddsLocalQwenGuidance(
+    monkeypatch: pytest.MonkeyPatch,
+    _browserUseInstalled: None,
+) -> None:
+    from agent.routing.models import browser_use_client
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setenv("CUTIEE_ENV", "local")
+    monkeypatch.setattr(browser_use_client.local_llm, "shouldUseLocalLlmForUrl", lambda _url: True)
+    monkeypatch.setattr(
+        browser_use_client.local_llm,
+        "generateText",
+        lambda **_kwargs: "Use the visible spreadsheet grid and fill column C with row sums.",
+    )
+
+    client = BrowserUseClient()
+    client.primeTask("Find sums", "http://localhost:5000/sheet")
+
+    assert "Find sums" in client._pendingTask
+    assert "Local Qwen guidance for browser-use" in client._pendingTask
+    assert "fill column C" in client._pendingTask
 
 
 def test_click_by_index_maps_to_click_at() -> None:

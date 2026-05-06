@@ -20,6 +20,8 @@ def _clearEnv(monkeypatch: pytest.MonkeyPatch) -> None:
         "CUTIEE_BROWSER_SLOW_MO_MS",
         "CUTIEE_STORAGE_STATE_PATH",
         "CUTIEE_BROWSER_CDP_URL",
+        "CUTIEE_BROWSER_CDP_HOST",
+        "CUTIEE_BROWSER_CDP_PORT",
         "CUTIEE_TEST_FOO",
     ):
         monkeypatch.delenv(key, raising=False)
@@ -101,6 +103,12 @@ def test_browserFromEnv_cdp_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CUTIEE_BROWSER_CDP_URL", "http://localhost:9222")
     ctrl = browserFromEnv()
     assert ctrl.cdpUrl == "http://localhost:9222"
+
+
+def test_browserFromEnv_derives_cdp_url_from_render_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CUTIEE_BROWSER_CDP_HOST", "cutiee-worker-d7k527m47okc73defib0")
+    ctrl = browserFromEnv()
+    assert ctrl.cdpUrl == "http://cutiee-worker-d7k527m47okc73defib0:9222"
 
 
 def test_browserFromEnv_storage_state_only_if_exists(

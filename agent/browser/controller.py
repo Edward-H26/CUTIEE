@@ -331,6 +331,7 @@ def browserFromEnv(
       - CUTIEE_STORAGE_STATE_PATH (path to Playwright storage_state.json)
       - CUTIEE_BROWSER_SLOW_MO_MS (delay between actions for visibility)
       - CUTIEE_BROWSER_CDP_URL (Chrome DevTools attach URL, e.g. http://localhost:9222)
+      - CUTIEE_BROWSER_CDP_HOST / CUTIEE_BROWSER_CDP_PORT (Render private host fallback)
 
     `domain` and `userId` (both optional): used to look for a per-user,
     per-domain storage_state at `data/storage_state/<userId>/<domain>.json`
@@ -338,11 +339,11 @@ def browserFromEnv(
     then `CUTIEE_STORAGE_STATE_PATH`. The user_id scoping prevents one
     user's auth cookies from leaking into another user's CU run.
     """
-    from agent.harness.env_utils import envBool, envInt, envStr
+    from agent.harness.env_utils import envBool, envInt
 
     headless = envBool("CUTIEE_BROWSER_HEADLESS", defaultHeadless)
     slowMo = envInt("CUTIEE_BROWSER_SLOW_MO_MS", 0)
-    cdpUrl = envStr("CUTIEE_BROWSER_CDP_URL") or None
+    cdpUrl = _cdpUrlFromEnv()
     storage = _resolveStorageStatePath(domain, userId)
     return BrowserController(
         headless=headless,
@@ -350,6 +351,20 @@ def browserFromEnv(
         slowMoMs=slowMo,
         cdpUrl=cdpUrl,
     )
+
+
+def _cdpUrlFromEnv() -> str | None:
+    from agent.harness.env_utils import envInt, envStr
+
+    cdpUrl = envStr("CUTIEE_BROWSER_CDP_URL")
+    if cdpUrl:
+        return cdpUrl
+
+    host = envStr("CUTIEE_BROWSER_CDP_HOST")
+    if not host:
+        return None
+    port = envInt("CUTIEE_BROWSER_CDP_PORT", 9222)
+    return f"http://{host}:{port}"
 
 
 def _resolveStorageStatePath(domain: str, userId: str = "") -> str | None:

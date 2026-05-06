@@ -13,6 +13,14 @@ from agent.memory.bullet import (
     Bullet,
     DeltaUpdate,
     hashContent,
+    humanReadableBulletContent,
 )
 
-__all__ = ["MEMORY_TYPES", "TYPE_PRIORITY", "Bullet", "DeltaUpdate", "hashContent"]
+__all__ = [
+    "MEMORY_TYPES",
+    "TYPE_PRIORITY",
+    "Bullet",
+    "DeltaUpdate",
+    "hashContent",
+    "humanReadableBulletContent",
+]

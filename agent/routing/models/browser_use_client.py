@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ...harness.state import Action, ActionType
+from ...memory import local_llm
 from ..cu_client import ComputerUseStep
 
 DEFAULT_BROWSER_USE_MODEL = "gemini-3-flash-preview"
@@ -70,6 +71,15 @@ _NAME_TO_TYPE: dict[str, ActionType] = {
 
 ADAPTER_META_PREFIX = "__adapter_meta__"
 ADAPTER_META_SUFFIX = "__"
+_LOCAL_GUIDANCE_SYSTEM = (
+    "You write concise guidance for a browser automation agent. "
+    "Return practical steps only, without secrets or commentary."
+)
+_LOCAL_GUIDANCE_PROMPT = (
+    "Task: {task}\n"
+    "Current URL: {url}\n\n"
+    "Give short guidance that helps browser-use complete this task."
+)
 
 
 def _encodeAdapterMeta(payload: dict[str, Any]) -> str:
@@ -105,6 +115,8 @@ class BrowserUseClient:
                 "browser-use is wired to Gemini 3 Flash in this plan."
             )
         self.apiKey = key
+        if not os.environ.get("GOOGLE_API_KEY"):
+            os.environ["GOOGLE_API_KEY"] = key
         try:
             import browser_use  # noqa: F401 - presence check only
         except ImportError as exc:
@@ -115,7 +127,7 @@ class BrowserUseClient:
         return f"browser_use:{self.modelId}"
 
     def primeTask(self, taskDescription: str, currentUrl: str) -> None:
-        self._pendingTask = taskDescription
+        self._pendingTask = _taskWithLocalGuidance(taskDescription, currentUrl)
         self._pendingUrl = currentUrl
         self._stepCursor = 0
         self._history.clear()
@@ -177,9 +189,16 @@ class BrowserUseClient:
         browser controlled by CUTIEE's BrowserController.
         """
         from browser_use import Agent, Browser
-        from browser_use.llm import ChatGoogle
 
-        llm = ChatGoogle(model=self.modelId, api_key=self.apiKey)
+        try:
+            from browser_use import ChatGoogle
+        except ImportError:
+            from browser_use.llm import ChatGoogle
+
+        try:
+            llm = ChatGoogle(model=self.modelId, api_key=self.apiKey)
+        except TypeError:
+            llm = ChatGoogle(model=self.modelId)
         self._browser = Browser(cdp_url=self.cdpUrl) if self.cdpUrl else Browser()
         agent = Agent(
             task=self._pendingTask,
@@ -363,3 +382,21 @@ def _extractTokens(rawStep: Any, keys: tuple[str, ...]) -> int:
             if isinstance(value, int):
                 return value
     return 0
+
+
+def _taskWithLocalGuidance(taskDescription: str, currentUrl: str) -> str:
+    if not local_llm.shouldUseLocalLlmForUrl(currentUrl):
+        return taskDescription
+    guidance = local_llm.generateText(
+        systemInstruction=_LOCAL_GUIDANCE_SYSTEM,
+        userPrompt=_LOCAL_GUIDANCE_PROMPT.format(task=taskDescription, url=currentUrl or "about:blank"),
+        maxInputTokens=512,
+        maxNewTokens=160,
+    )
+    if not guidance:
+        return taskDescription
+    return (
+        f"{taskDescription}\n\n"
+        "Local Qwen guidance for browser-use:\n"
+        f"{guidance.strip()}"
+    )

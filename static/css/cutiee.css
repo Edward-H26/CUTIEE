@@ -870,6 +870,25 @@ select:focus {
     word-break: break-word;
 }
 
+.cutiee-machine-memory {
+    margin-bottom: var(--mm-space-2);
+    font-size: var(--mm-text-sm);
+    color: var(--mm-fg-muted-2);
+}
+
+.cutiee-machine-memory summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.cutiee-machine-memory code {
+    display: block;
+    margin-top: var(--mm-space-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .cutiee-bullet-strength {
     display: flex;
     flex-wrap: wrap;

@@ -42,7 +42,13 @@
                         <span class="cutiee-pill">{{ b.memory_type }}</span>
                         <span class="cutiee-mono">{{ b.id|truncatechars:14 }}</span>
                     </div>
-                    <p class="cutiee-bullet-content">{{ b.content }}</p>
+                    <p class="cutiee-bullet-content">{{ b.human_content|default:b.content }}</p>
+                    {% if b.human_content and b.human_content != b.content %}
+                        <details class="cutiee-machine-memory">
+                            <summary>Machine format</summary>
+                            <code>{{ b.content }}</code>
+                        </details>
+                    {% endif %}
                     <div class="cutiee-bullet-strength">
                         <span>semantic: <strong class="cutiee-strong">{{ b.semantic_strength|floatformat:2 }}</strong></span>
                         <span>episodic: <strong class="cutiee-strong">{{ b.episodic_strength|floatformat:2 }}</strong></span>

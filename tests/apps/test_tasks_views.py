@@ -44,6 +44,24 @@ def test_vlmHealthEndpointRespondsJson():
     assert "env" in body
 
 
+def test_runtimeContextDerivesNovncUrlFromWorkerUrl(monkeypatch: pytest.MonkeyPatch):
+    from cutiee_site.context_processors import runtime
+
+    monkeypatch.delenv("CUTIEE_NOVNC_URL", raising=False)
+    monkeypatch.setenv("CUTIEE_WORKER_EXTERNAL_URL", "https://cutiee-worker-demo.onrender.com/")
+
+    assert runtime(None)["NOVNC_URL"] == "https://cutiee-worker-demo.onrender.com/vnc.html"
+
+
+def test_runtimeContextPrefersExplicitNovncUrl(monkeypatch: pytest.MonkeyPatch):
+    from cutiee_site.context_processors import runtime
+
+    monkeypatch.setenv("CUTIEE_NOVNC_URL", "https://worker.example.com/vnc.html")
+    monkeypatch.setenv("CUTIEE_WORKER_EXTERNAL_URL", "https://cutiee-worker-demo.onrender.com")
+
+    assert runtime(None)["NOVNC_URL"] == "https://worker.example.com/vnc.html"
+
+
 @pytest.mark.django_db
 def test_livenessEndpointReturnsOk():
     # Render's healthCheckPath targets /health/ and a deploy is marked

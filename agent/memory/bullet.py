@@ -10,6 +10,7 @@ execution: a compact patch that the memory layer can apply atomically.
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -17,6 +18,25 @@ from typing import Any
 
 MEMORY_TYPES = ("semantic", "episodic", "procedural")
 TYPE_PRIORITY = {"procedural": 1.0, "episodic": 0.7, "semantic": 0.4}
+_ACTION_RE = re.compile(r"\baction=([a-z_]+)")
+_STEP_RE = re.compile(r"\bstep_index=(\d+)")
+_TARGET_RE = re.compile(r"\btarget=([\"'])(.*?)\1")
+_VALUE_RE = re.compile(r"\bvalue=([\"'])(.*?)\1")
+_COORDINATE_RE = re.compile(r"\bcoordinate=\((-?\d+),\s*(-?\d+)\)")
+_SCROLL_RE = re.compile(r"\bscroll=\((-?\d+),\s*(-?\d+)\)")
+_KEYS_RE = re.compile(r"\bkeys=([^\s]+)")
+_ACTION_LABELS = {
+    "click": "click",
+    "click_at": "click",
+    "type": "type",
+    "type_at": "type",
+    "navigate": "open",
+    "scroll": "scroll",
+    "scroll_at": "scroll",
+    "key_combo": "press",
+    "wait": "wait",
+    "finish": "finish the task",
+}
 
 
 def _nowUtc() -> datetime:
@@ -27,10 +47,49 @@ def hashContent(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
 
 
+def humanReadableBulletContent(content: str, memoryType: str = "") -> str:
+    cleaned = (content or "").strip()
+    if not cleaned:
+        return ""
+    action = _extractRegex(_ACTION_RE, cleaned)
+    if (memoryType or "").lower() != "procedural" and not action:
+        return cleaned
+    if not action:
+        return cleaned
+
+    step = _humanStepPrefix(cleaned)
+    target = _extractRegex(_TARGET_RE, cleaned, group=2)
+    value = _extractRegex(_VALUE_RE, cleaned, group=2)
+    coordinate = _coordinateText(cleaned)
+    scroll = _scrollText(cleaned)
+    keys = _keysText(cleaned)
+    label = _ACTION_LABELS.get(action, action.replace("_", " "))
+
+    if action == "navigate":
+        detail = f"{label} {target}".strip()
+    elif action in {"click", "click_at"}:
+        detail = f"{label} {target or coordinate}".strip()
+    elif action in {"type", "type_at"}:
+        location = target or coordinate
+        suffix = _valueText(value)
+        if location:
+            detail = f"{label} into {location} {suffix}".strip()
+        else:
+            detail = f"{label} {suffix}".strip()
+    elif action in {"scroll", "scroll_at"}:
+        detail = f"{label} {scroll}".strip()
+    elif action == "key_combo":
+        detail = f"{label} {keys}".strip()
+    else:
+        detail = label
+    return f"{step}{detail}".strip()
+
+
 @dataclass
 class Bullet:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     content: str = ""
+    human_content: str = ""
     memory_type: str = "semantic"
     tags: list[str] = field(default_factory=list)
     topic: str = ""
@@ -60,6 +119,8 @@ class Bullet:
     def __post_init__(self) -> None:
         if not self.content_hash and self.content:
             self.content_hash = hashContent(self.content)
+        if not self.human_content and self.content:
+            self.human_content = humanReadableBulletContent(self.content, self.memory_type)
         if self.memory_type not in MEMORY_TYPES:
             raise ValueError(f"memory_type must be one of {MEMORY_TYPES}, got {self.memory_type!r}")
         if self.memory_type == "semantic" and self.semantic_strength == 0.0:
@@ -79,6 +140,7 @@ class Bullet:
         return {
             "id": self.id,
             "content": self.content,
+            "human_content": self.human_content,
             "memory_type": self.memory_type,
             "tags": list(self.tags),
             "topic": self.topic,
@@ -117,6 +179,7 @@ class Bullet:
         return cls(
             id=row.get("id", str(uuid.uuid4())),
             content=row.get("content", ""),
+            human_content=row.get("human_content", "") or "",
             memory_type=row.get("memory_type", "semantic"),
             tags=list(row.get("tags") or []),
             topic=row.get("topic", "") or "",
@@ -171,3 +234,54 @@ def _optionalIso(value: Any) -> datetime | None:
         except ValueError:
             return None
     return None
+
+
+def _extractRegex(pattern: re.Pattern[str], text: str, *, group: int = 1) -> str:
+    match = pattern.search(text)
+    return match.group(group).strip() if match else ""
+
+
+def _humanStepPrefix(text: str) -> str:
+    raw = _extractRegex(_STEP_RE, text)
+    if not raw:
+        return ""
+    return f"Step {int(raw) + 1}: "
+
+
+def _coordinateText(text: str) -> str:
+    match = _COORDINATE_RE.search(text)
+    if not match:
+        return ""
+    return f"({match.group(1)}, {match.group(2)})"
+
+
+def _scrollText(text: str) -> str:
+    match = _SCROLL_RE.search(text)
+    if not match:
+        return ""
+    dy = int(match.group(2))
+    if dy < 0:
+        return f"up {abs(dy)} px"
+    if dy > 0:
+        return f"down {dy} px"
+    dx = int(match.group(1))
+    if dx < 0:
+        return f"left {abs(dx)} px"
+    if dx > 0:
+        return f"right {dx} px"
+    return "in place"
+
+
+def _keysText(text: str) -> str:
+    keys = _extractRegex(_KEYS_RE, text)
+    return keys.replace(",", " + ") if keys else ""
+
+
+def _valueText(value: str) -> str:
+    if not value:
+        return ""
+    lowered = value.lower()
+    if "redacted" in lowered or value == "***":
+        return "with a redacted value"
+    display = value.replace("\"", "\\\"")
+    return f"with value \"{display}\""

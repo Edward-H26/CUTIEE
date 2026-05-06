@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agent.persistence.neo4j_client import run_query, run_single
-from apps.memory_app.bullet import Bullet, DeltaUpdate
+from apps.memory_app.bullet import Bullet, DeltaUpdate, humanReadableBulletContent
 
 
 class MemoryBulletRow(dict[str, Any]):
@@ -69,6 +69,7 @@ def upsertBullet(userId: str, bullet: Bullet) -> None:
         MERGE (b:MemoryBullet {id: $id})
         SET b.user_id = $user_id,
             b.content = $content,
+            b.human_content = $human_content,
             b.memory_type = $memory_type,
             b.tags = $tags,
             b.topic = $topic,
@@ -112,6 +113,12 @@ def updateBulletFields(userId: str, bulletId: str, patch: dict[str, Any]) -> Non
             continue
         params[key] = value
         setFragments.append(f"b.{key} = ${key}")
+    if "content" in patch and "human_content" not in patch:
+        params["human_content"] = humanReadableBulletContent(
+            str(patch.get("content") or ""),
+            str(patch.get("memory_type") or ""),
+        )
+        setFragments.append("b.human_content = $human_content")
     setFragments.append("b.last_used = $now")
     cypher = "MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet {id: $id})\nSET " + ", ".join(
         setFragments
@@ -145,6 +152,7 @@ def listBulletsForUser(userId: str) -> list[MemoryBulletRow]:
         MATCH (u:User {id: $user_id})-[:HOLDS]->(b:MemoryBullet)
         RETURN b.id AS id,
                b.content AS content,
+               b.human_content AS human_content,
                b.memory_type AS memory_type,
                b.tags AS tags,
                b.helpful_count AS helpful_count,
@@ -159,7 +167,14 @@ def listBulletsForUser(userId: str) -> list[MemoryBulletRow]:
         """,
         user_id=str(userId),
     )
-    return [MemoryBulletRow(row) for row in rows]
+    out: list[MemoryBulletRow] = []
+    for row in rows:
+        row["human_content"] = row.get("human_content") or humanReadableBulletContent(
+            str(row.get("content") or ""),
+            str(row.get("memory_type") or ""),
+        )
+        out.append(MemoryBulletRow(row))
+    return out
 
 
 def listAllBulletObjectsForUser(userId: str) -> list[Bullet]:

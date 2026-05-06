@@ -14,7 +14,7 @@ from typing import Any
 def runtime(request: Any) -> dict[str, str]:
     del request  # request-agnostic; everything here is a deployment setting
     return {
-        "NOVNC_URL": os.environ.get("CUTIEE_NOVNC_URL", "").strip(),
+        "NOVNC_URL": _novncUrl(),
         "CUTIEE_CU_BACKEND": os.environ.get("CUTIEE_CU_BACKEND", "gemini"),
     }
 
@@ -33,3 +33,19 @@ def userTheme(request: Any) -> dict[str, str]:
     user = getattr(request, "user", None)
     pref = UserPreference.for_user(user)
     return {"USER_THEME": str(pref.theme)}
+
+
+def _novncUrl() -> str:
+    explicit = os.environ.get("CUTIEE_NOVNC_URL", "").strip()
+    if explicit:
+        return explicit
+
+    workerUrl = os.environ.get("CUTIEE_WORKER_EXTERNAL_URL", "").strip().rstrip("/")
+    if workerUrl:
+        return f"{workerUrl}/vnc.html"
+
+    workerHost = os.environ.get("CUTIEE_WORKER_EXTERNAL_HOSTNAME", "").strip().strip("/")
+    if workerHost:
+        return f"https://{workerHost}/vnc.html"
+
+    return ""

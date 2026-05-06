@@ -44,6 +44,25 @@ def test_bulletDefaultsByType():
     assert semantic.semantic_strength == 1.0
 
 
+def test_proceduralBulletKeepsMachineContentAndAddsHumanContent():
+    bullet = Bullet(
+        content="step_index=1 action=click_at target='' value='' coordinate=(640,320)",
+        memory_type="procedural",
+    )
+
+    assert bullet.content.startswith("step_index=1")
+    assert bullet.human_content == "Step 2: click (640, 320)"
+
+
+def test_semanticBulletHumanContentDefaultsToContent():
+    bullet = Bullet(
+        content="User has interacted with docs.google.com.",
+        memory_type="semantic",
+    )
+
+    assert bullet.human_content == "User has interacted with docs.google.com."
+
+
 def test_deltaUpdateIsEmptyDetection():
     assert DeltaUpdate().isEmpty() is True
     assert DeltaUpdate(new_bullets=[Bullet(content="x", memory_type="semantic")]).isEmpty() is False
