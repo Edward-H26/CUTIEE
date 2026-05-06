@@ -2,7 +2,7 @@
 #
 # Two services, both IaC-managed by this blueprint:
 #
-#   cutiee-web     Django + HTMX dashboard. Drives a REMOTE Chromium
+#   CUTIEE         Django + HTMX dashboard. Drives a REMOTE Chromium
 #                  over CDP; never launches a browser locally.
 #   cutiee-worker  Docker image from Dockerfile.worker. Runs Xvfb +
 #                  fluxbox + x11vnc + websockify + Chromium. Serves
@@ -18,11 +18,11 @@
 # Django framework bookkeeping (contenttypes, auth_permission, allauth_*,
 # sites, sessions, user preferences) lives in a durable SQL database.
 # Domain entities still round-trip through Neo4j via apps/*/repo.py.
-# Set DJANGO_DATABASE_URL or DATABASE_URL on cutiee-web before deploy.
+# Set DJANGO_DATABASE_URL or DATABASE_URL on CUTIEE before deploy.
 
 services:
   - type: web
-    name: cutiee-web
+    name: CUTIEE
     env: python
     region: oregon
     # Standard plan gives the web dyno headroom for concurrent HTMX
@@ -68,9 +68,9 @@ services:
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: "cutiee-web.onrender.com,cutiee.onrender.com,cutiee-1kqk.onrender.com"
+        value: "cutiee.onrender.com,cutiee-1kqk.onrender.com"
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
-        value: "https://cutiee-web.onrender.com,https://cutiee.onrender.com,https://cutiee-1kqk.onrender.com"
+        value: "https://cutiee.onrender.com,https://cutiee-1kqk.onrender.com"
       # === Required secrets (paste in Render dashboard) ===
       - key: GEMINI_API_KEY
         sync: false
@@ -193,7 +193,8 @@ services:
       # Local attach: the worker's own Chromium binds CDP inside the
       # container, and runner_factory uses this URL when it runs in
       # the worker. From the web dyno, the equivalent URL is
-      # http://cutiee-worker:9222 (see cutiee-web above).
+      # derived from CUTIEE_BROWSER_CDP_HOST and CUTIEE_BROWSER_CDP_PORT
+      # on the CUTIEE service above.
       - key: CUTIEE_BROWSER_CDP_URL
         value: "http://localhost:9222"
       # === Provisional parity secrets (paste in Render dashboard) ===
@@ -217,14 +218,14 @@ services:
         sync: false
       - key: NEO4J_PASSWORD
         sync: false
-      # === Computer Use tunables (parity with cutiee-web; unused today) ===
+      # === Computer Use tunables (parity with CUTIEE; unused today) ===
       - key: CUTIEE_CU_MODEL
         value: "gemini-flash-latest"
       - key: CUTIEE_CU_BACKEND
         value: "gemini"
       - key: NEO4J_DATABASE
         value: "neo4j"
-      # === Runtime guardrails (parity with cutiee-web; unused today) ===
+      # === Runtime guardrails (parity with CUTIEE; unused today) ===
       - key: CUTIEE_MAX_COST_USD_PER_TASK
         value: "0.50"
       - key: CUTIEE_MAX_COST_USD_PER_HOUR

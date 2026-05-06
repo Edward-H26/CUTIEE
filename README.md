@@ -175,7 +175,7 @@ CUTIEE/
 ├── static/css/          unified design tokens (cutiee.css)
 ├── templates/           base.html + allauth overrides
 ├── tests/               pytest unit + integration tests
-├── render.yaml         Render Blueprint: cutiee-web (Django) + cutiee-worker (Dockerized Xvfb + Chromium + noVNC)
+├── render.yaml         Render Blueprint: CUTIEE (Django) + cutiee-worker (Dockerized Xvfb + Chromium + noVNC)
 └── Dockerfile.worker   Worker image for the live framebuffer service
 ```
 
@@ -198,10 +198,13 @@ the legacy `.env.cutiee.template`). Required keys:
 | `CUTIEE_BROWSER_HEADLESS` | optional | `true` for CI; default `false` (visible browser) |
 | `CUTIEE_STORAGE_STATE_PATH` | optional | Path to a Playwright storage_state.json so CU runs are pre-authenticated |
 | `CUTIEE_BROWSER_CDP_URL` | optional | Attach to your real Chrome via `--remote-debugging-port=9222` instead of launching a fresh chromium |
+| `CUTIEE_BROWSER_CDP_HOST` | production Blueprint | Render private hostname for `cutiee-worker`; combined with `CUTIEE_BROWSER_CDP_PORT` |
+| `CUTIEE_BROWSER_CDP_PORT` | production Blueprint | Chrome DevTools port on the worker, normally `9222` |
 | `CUTIEE_PROGRESS_BACKEND` | production multi-worker | `memory`, `redis`, or `neo4j` (default `memory`; demo deploys use `neo4j`) |
 | `REDIS_URL` | only when `CUTIEE_PROGRESS_BACKEND=redis` | Render Redis URL |
 | `CUTIEE_CU_BACKEND` | optional | `gemini` (default) or `browser_use`; both use `GEMINI_API_KEY` |
-| `CUTIEE_NOVNC_URL` | optional | Public URL of the Docker worker's noVNC viewer for the live panel |
+| `CUTIEE_WORKER_EXTERNAL_URL` | production Blueprint | Public URL for `cutiee-worker`; used to derive `/vnc.html` for the live panel |
+| `CUTIEE_NOVNC_URL` | optional | Manual override for the Docker worker's noVNC viewer |
 | `CUTIEE_MAX_COST_USD_PER_TASK` | optional | Wallet cap per task (default 0.50) |
 | `CUTIEE_MAX_COST_USD_PER_HOUR` | optional | Wallet cap per hour (default 5.00) |
 | `CUTIEE_MAX_COST_USD_PER_DAY` | optional | Wallet cap per day (default 1.00) |
@@ -210,7 +213,7 @@ the legacy `.env.cutiee.template`). Required keys:
 
 `render.yaml` is a two-service Blueprint:
 
-- `cutiee-web`: Python web dyno running Django + HTMX. Drives a remote
+- `CUTIEE`: Python web dyno running Django + HTMX. Drives a remote
   Chromium over CDP; never launches a browser in-process.
 - `cutiee-worker`: Docker image built from `Dockerfile.worker`. Runs
   Xvfb, fluxbox, x11vnc, websockify, and a headed Chromium. Serves
@@ -219,10 +222,9 @@ the legacy `.env.cutiee.template`). Required keys:
 
 Push to GitHub, point Render at the repo once via **New +** > **Blueprint**,
 and Render provisions both services in lockstep. Paste the `sync: false`
-secrets during the first sync; the only post-deploy step is copying the
-worker's public hostname into `CUTIEE_NOVNC_URL` on the web service (the
-hostname cannot be predicted before the first deploy because Render
-appends a per-workspace suffix).
+secrets during the first sync. The Blueprint derives the worker's public
+URL into `CUTIEE_WORKER_EXTERNAL_URL`; set `CUTIEE_NOVNC_URL` only when you
+need to override that derived URL.
 
 Cross-process progress is cached on AuraDB via `CUTIEE_PROGRESS_BACKEND=neo4j`,
 so no Redis dyno is required. The blueprint also pins every runtime
