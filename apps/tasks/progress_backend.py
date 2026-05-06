@@ -6,11 +6,12 @@ needs a shared store so live HTMX polls land on the same payload no
 matter which worker handled the agent run.
 
 Backends:
-    CUTIEE_PROGRESS_BACKEND=memory  → in-process dict (default; tests, single worker)
+    CUTIEE_PROGRESS_BACKEND=memory  → in-process dict (default for local/tests)
     CUTIEE_PROGRESS_BACKEND=redis   → Redis hash, requires REDIS_URL
     CUTIEE_PROGRESS_BACKEND=neo4j   → Aura-backed `:ProgressSnapshot` nodes
-                                       (uses the database we already pay for;
-                                       sized for the 2-5 concurrent demo users)
+                                       (default for production; uses the
+                                       database we already pay for; sized for
+                                       the 2-5 concurrent demo users)
 
 The Neo4j backend trades ~30 ms per publish for free hosting on AuraDB.
 A lazy sweep on every publish drops snapshots older than `NEO4J_TTL_SECONDS`
@@ -136,13 +137,22 @@ _BACKEND: Backend | None = None
 _BACKEND_LOCK = threading.Lock()
 
 
+def _defaultBackendKind() -> str:
+    if os.environ.get("CUTIEE_ENV") == "production":
+        return "neo4j"
+    return "memory"
+
+
 def getBackend() -> Backend:
     global _BACKEND
     if _BACKEND is not None:
         return _BACKEND
     with _BACKEND_LOCK:
         if _BACKEND is None:
-            kind = (os.environ.get("CUTIEE_PROGRESS_BACKEND") or "memory").lower()
+            backendKind = (
+                os.environ.get("CUTIEE_PROGRESS_BACKEND") or _defaultBackendKind()
+            )
+            kind = backendKind.lower()
             if kind == "redis":
                 redisUrl = os.environ.get("REDIS_URL")
                 if not redisUrl:
@@ -153,8 +163,12 @@ def getBackend() -> Backend:
                 _BACKEND = _RedisBackend(redisUrl)
             elif kind == "neo4j":
                 _BACKEND = _Neo4jBackend()
-            else:
+            elif kind == "memory":
                 _BACKEND = _MemoryBackend()
+            else:
+                raise RuntimeError(
+                    "CUTIEE_PROGRESS_BACKEND must be memory, redis, or neo4j."
+                )
     return _BACKEND
 
 

@@ -200,11 +200,11 @@ the legacy `.env.cutiee.template`). Required keys:
 | `CUTIEE_BROWSER_CDP_URL` | optional | Attach to your real Chrome via `--remote-debugging-port=9222` instead of launching a fresh chromium |
 | `CUTIEE_BROWSER_CDP_HOST` | production Blueprint | Render private hostname for `cutiee-worker`; combined with `CUTIEE_BROWSER_CDP_PORT` |
 | `CUTIEE_BROWSER_CDP_PORT` | production Blueprint | Chrome DevTools port on the worker, normally `9222` |
-| `CUTIEE_PROGRESS_BACKEND` | production multi-worker | `memory`, `redis`, or `neo4j` (default `memory`; demo deploys use `neo4j`) |
+| `CUTIEE_PROGRESS_BACKEND` | optional local/debug override | Production defaults to `neo4j`; local/tests default to `memory`; `redis` requires `REDIS_URL` |
 | `REDIS_URL` | only when `CUTIEE_PROGRESS_BACKEND=redis` | Render Redis URL |
 | `CUTIEE_CU_BACKEND` | optional | `gemini` (default) or `browser_use`; both use `GEMINI_API_KEY` |
-| `CUTIEE_WORKER_EXTERNAL_URL` | production Blueprint | Public URL for `cutiee-worker`; used to derive `/vnc.html` for the live panel |
-| `CUTIEE_NOVNC_URL` | optional | Manual override for the Docker worker's noVNC viewer |
+| `CUTIEE_WORKER_EXTERNAL_URL`, `CUTIEE_WORKER_EXTERNAL_HOSTNAME` | production Blueprint | Public worker values used to derive `/vnc.html` for the live panel |
+| `CUTIEE_NOVNC_URL` | production Blueprint | noVNC viewer URL; current demo default is `https://cutiee-worker.onrender.com/vnc.html` |
 | `CUTIEE_MAX_COST_USD_PER_TASK` | optional | Wallet cap per task (default 0.50) |
 | `CUTIEE_MAX_COST_USD_PER_HOUR` | optional | Wallet cap per hour (default 5.00) |
 | `CUTIEE_MAX_COST_USD_PER_DAY` | optional | Wallet cap per day (default 1.00) |
@@ -223,15 +223,14 @@ the legacy `.env.cutiee.template`). Required keys:
 Push to GitHub, point Render at the repo once via **New +** > **Blueprint**,
 and Render provisions both services in lockstep. Paste the `sync: false`
 secrets during the first sync. Production auth, sessions, preferences, and
-domain data are stored in Neo4j; the Blueprint derives the worker's public
-URL into `CUTIEE_WORKER_EXTERNAL_URL`; set `CUTIEE_NOVNC_URL` only when you
-need to override that derived URL.
+domain data are stored in Neo4j; the Blueprint sets `CUTIEE_NOVNC_URL` and
+also derives the worker's public URL/hostname when Render exposes them.
 
-Cross-process progress is cached on AuraDB via `CUTIEE_PROGRESS_BACKEND=neo4j`,
-so no Redis dyno is required. The blueprint also pins every runtime
-tunable (cost caps, CU model, history window) so the two services stay
-in sync automatically; override by editing `render.yaml`, not the
-dashboard.
+Cross-process progress defaults to AuraDB whenever `CUTIEE_ENV=production`,
+so no Redis dyno or progress env var is required. The blueprint also pins
+every runtime tunable that is environment-specific (cost caps, CU model,
+history window) so the two services stay in sync automatically; override by
+editing `render.yaml`, not the dashboard.
 
 Full walkthrough: `DEPLOY-RENDER.md` at the repo root.
 

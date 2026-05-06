@@ -16,6 +16,7 @@ def _reset_backend():
 
 def test_memoryBackendDefault(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising=False)
+    monkeypatch.setenv("CUTIEE_ENV", "local")
     progress_backend.publishProgress("exec-1", {"step": 1})
     assert progress_backend.fetchProgress("exec-1") == {"step": 1}
     assert progress_backend.fetchProgress("missing") is None
@@ -23,6 +24,7 @@ def test_memoryBackendDefault(monkeypatch: pytest.MonkeyPatch):
 
 def test_memoryBackendKeysIsolatePerExecution(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising=False)
+    monkeypatch.setenv("CUTIEE_ENV", "local")
     progress_backend.publishProgress("a", {"v": 1})
     progress_backend.publishProgress("b", {"v": 2})
     assert progress_backend.fetchProgress("a") == {"v": 1}
@@ -40,6 +42,19 @@ def test_neo4jBackendSelectable(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CUTIEE_PROGRESS_BACKEND", "neo4j")
     backend = progress_backend.getBackend()
     assert isinstance(backend, progress_backend._Neo4jBackend)
+
+
+def test_neo4jBackendProductionDefault(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("CUTIEE_PROGRESS_BACKEND", raising=False)
+    monkeypatch.setenv("CUTIEE_ENV", "production")
+    backend = progress_backend.getBackend()
+    assert isinstance(backend, progress_backend._Neo4jBackend)
+
+
+def test_unknownBackendRaises(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("CUTIEE_PROGRESS_BACKEND", "sqlite")
+    with pytest.raises(RuntimeError, match="memory, redis, or neo4j"):
+        progress_backend.getBackend()
 
 
 def test_neo4jBackendUsesRunQuery(monkeypatch: pytest.MonkeyPatch):

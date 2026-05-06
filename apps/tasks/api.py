@@ -36,7 +36,13 @@ from apps.tasks.approval_queue import (
 )
 from apps.tasks.partials import renderApprovalModal, renderPreviewModal, renderStatusPartial
 from apps.tasks.preview_queue import fetchPreviewApproval, setPreviewStatus
-from apps.tasks.services import _screenshotStore, fetchProgress, runTaskForUser
+from apps.tasks.services import (
+    TaskRunSummary,
+    _publishProgress,
+    _screenshotStore,
+    fetchProgress,
+    runTaskForUser,
+)
 
 logger = logging.getLogger("cutiee")
 
@@ -121,6 +127,20 @@ def _finalizeFailedBackgroundRun(kwargs: dict[str, object], exc: Exception) -> N
             taskId=taskId,
             status="failed",
             lastExecutionId=executionId,
+        )
+        _publishProgress(
+            executionId,
+            TaskRunSummary(
+                taskId=taskId,
+                executionId=executionId,
+                stepCount=0,
+                totalCostUsd=0.0,
+                completed=False,
+                completionReason=reason,
+                replayed=False,
+                tierUsage={},
+            ),
+            finished=True,
         )
     except Exception:  # noqa: BLE001 - avoid recursive thread failures
         logger.exception("Failed to finalize failed background task")

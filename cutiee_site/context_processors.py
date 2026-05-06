@@ -40,12 +40,17 @@ def _novncUrl() -> str:
     if explicit:
         return explicit
 
-    workerUrl = os.environ.get("CUTIEE_WORKER_EXTERNAL_URL", "").strip().rstrip("/")
-    if workerUrl:
-        return f"{workerUrl}/vnc.html"
+    for key in ("CUTIEE_WORKER_EXTERNAL_URL", "CUTIEE_WORKER_PUBLIC_URL"):
+        workerUrl = os.environ.get(key, "").strip().rstrip("/")
+        if workerUrl:
+            return f"{workerUrl}/vnc.html"
 
-    workerHost = os.environ.get("CUTIEE_WORKER_EXTERNAL_HOSTNAME", "").strip().strip("/")
-    if workerHost:
-        return f"https://{workerHost}/vnc.html"
+    for key in ("CUTIEE_WORKER_EXTERNAL_HOSTNAME", "CUTIEE_WORKER_PUBLIC_HOSTNAME"):
+        workerHost = os.environ.get(key, "").strip().strip("/")
+        if workerHost:
+            return f"https://{workerHost}/vnc.html"
+
+    if os.environ.get("CUTIEE_ENV") == "production":
+        return "https://cutiee-worker.onrender.com/vnc.html"
 
     return ""

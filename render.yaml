@@ -117,15 +117,16 @@ services:
           type: web
           name: cutiee-worker
           envVarKey: RENDER_EXTERNAL_URL
-      # Public noVNC URL the dashboard iframe points at. Render appends
-      # a per-workspace suffix (e.g. cutiee-worker-xyz.onrender.com) so
-      # this value can override the derived CUTIEE_WORKER_EXTERNAL_URL
-      # fallback when a custom worker host is needed.
+      - key: CUTIEE_WORKER_EXTERNAL_HOSTNAME
+        fromService:
+          type: web
+          name: cutiee-worker
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+      # Public noVNC URL the dashboard iframe points at. This exact URL is
+      # live for the current cutiee-worker service and prevents a blank panel
+      # when Render's cross-service RENDER_EXTERNAL_URL reference is absent.
       - key: CUTIEE_NOVNC_URL
-        sync: false
-      # Aura-backed progress cache: 30 ms / publish, no Redis dyno needed.
-      - key: CUTIEE_PROGRESS_BACKEND
-        value: "neo4j"
+        value: "https://cutiee-worker.onrender.com/vnc.html"
       # === ACE / planner tunables (defaults are sane; override per env) ===
       - key: CUTIEE_RECENCY_WINDOW
         value: "3"

@@ -11,5 +11,6 @@ urlpatterns = [
     path("signup/", oauth_views.signup, name="account_signup"),
     path("logout/", oauth_views.logout, name="account_logout"),
     path("google/login/", oauth_views.googleLogin, name="google_login"),
-    path("google/callback/", oauth_views.googleCallback, name="google_callback"),
+    path("google/login/callback/", oauth_views.googleCallback, name="google_callback"),
+    path("google/callback/", oauth_views.googleCallback, name="google_callback_alias"),
 ]

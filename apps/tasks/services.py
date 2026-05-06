@@ -67,17 +67,8 @@ def persistScreenshot(executionId: str, stepIndex: int, pngBytes: bytes) -> None
         )
 
 
-# Browser policy:
-#
-# Render's web tier ships without `playwright install chromium`, so the
-# default for the demo deploy is the stub browser. Real-browser deploys
-# (worker dynos with Playwright installed, or local laptops with chromium)
-# must opt in by setting CUTIEE_USE_STUB_BROWSER=0.
-USE_STUB_BROWSER = os.environ.get("CUTIEE_USE_STUB_BROWSER", "true").lower() not in {
-    "0",
-    "false",
-    "no",
-}
+_FALSEY = {"0", "false", "no", "off"}
+_TRUTHY = {"1", "true", "yes", "on"}
 
 
 @dataclass
@@ -395,13 +386,16 @@ async def _runProductionTask(
         )
 
     # 4. Build the runner and run it
+    useStubBrowser = _shouldUseStubBrowser()
+    if not useStubBrowser:
+        _requireProductionBrowserEndpoint()
     runner = buildLiveCuRunnerForUser(
         userId=userId,
         initialUrl=initialUrl,
         executionId=executionId,
         onProgress=_progressCallback,
         screenshotSink=persistScreenshot,
-        useStubBrowser=USE_STUB_BROWSER,
+        useStubBrowser=useStubBrowser,
     )
     runner.prematchedNodes = prematchedNodes  # consumed at runner.run() start
 
@@ -425,6 +419,26 @@ async def _runProductionTask(
             _logger.warning("Failed to persist procedure graph", exc_info=True)
 
     return state, strategy
+
+
+def _shouldUseStubBrowser() -> bool:
+    raw = os.environ.get("CUTIEE_USE_STUB_BROWSER", "").strip().lower()
+    if raw in _TRUTHY:
+        return True
+    if raw in _FALSEY:
+        return False
+    return os.environ.get("CUTIEE_ENV") != "production"
+
+
+def _requireProductionBrowserEndpoint() -> None:
+    if os.environ.get("CUTIEE_ENV") != "production":
+        return
+    if os.environ.get("CUTIEE_BROWSER_CDP_URL") or os.environ.get("CUTIEE_BROWSER_CDP_HOST"):
+        return
+    raise RuntimeError(
+        "CUTIEE_BROWSER_CDP_HOST or CUTIEE_BROWSER_CDP_URL is required in production "
+        "so CUTIEE can drive the live cutiee-worker Chromium instead of a hidden local browser."
+    )
 
 
 async def _attemptSubgraphMatch(

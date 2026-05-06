@@ -39,7 +39,7 @@ The iframe in the main panel points at `https://<cutiee-worker-hostname>.onrende
 
 ## 2. Services Declared in `render.yaml`
 
-Both services below are managed by the Blueprint at the repo root. Push the file, point Render at the repo once via **New +** > **Blueprint**, and Render provisions both services in lockstep. After the first apply you only use the dashboard for secrets and, if needed, a manual `CUTIEE_NOVNC_URL` override.
+Both services below are managed by the Blueprint at the repo root. Push the file, point Render at the repo once via **New +** > **Blueprint**, and Render provisions both services in lockstep. After the first apply you only use the dashboard for secrets.
 
 | Service | Name | Runtime | Plan | Role |
 |---------|------|---------|------|------|
@@ -74,7 +74,6 @@ GEMINI_API_KEY                   # Google AI Studio
 NEO4J_BOLT_URL                   # neo4j+s://<auradb-id>.databases.neo4j.io
 NEO4J_USERNAME                   # usually "neo4j"
 NEO4J_PASSWORD                   # AuraDB password
-CUTIEE_NOVNC_URL                 # optional override; normally blank because CUTIEE_WORKER_EXTERNAL_URL is derived
 ```
 
 **`cutiee-worker` secrets (provisional parity; unused at current runtime):**
@@ -90,7 +89,7 @@ NEO4J_PASSWORD
 In Google Cloud Console, add this authorized redirect URI for the `CUTIEE` OAuth client:
 
 ```
-https://cutiee-1kqk.onrender.com/accounts/google/callback/
+https://cutiee-1kqk.onrender.com/accounts/google/login/callback/
 ```
 
 The `start-worker.sh` process in `Dockerfile.worker` launches only Xvfb, fluxbox, x11vnc, websockify, and Chromium; no Python runs on the worker, so these five credentials are not read at runtime. They are declared in `render.yaml` to unblock a future sidecar (a heartbeat writer, log forwarder, or browser-use wrapper) that would run Python inside the container and reach AuraDB directly. You have two defensible choices during sync:
@@ -100,7 +99,7 @@ The `start-worker.sh` process in `Dockerfile.worker` launches only Xvfb, fluxbox
 
 Note on `DJANGO_SECRET_KEY`: `render.yaml` sets `generateValue: true` on `CUTIEE`, which produces an opaque value the user does not directly read. Pasting "the same value" into the worker therefore requires first copying the web-service secret from Render's **Environment** tab. If you prefer a readable shared value, change the web side to `sync: false` and paste your own random string into both services. Pick one posture and stick with it; mixing `generateValue` with cross-service parity is what makes this awkward.
 
-No other env vars need dashboard entry when the Blueprint is managing both services. The blueprint sets every tunable (`CUTIEE_NEO4J_FRAMEWORK_AUTH`, `CUTIEE_CU_MODEL`, `CUTIEE_MAX_COST_USD_*`, `CUTIEE_PROGRESS_BACKEND`, `CUTIEE_BROWSER_CDP_HOST`, `CUTIEE_WORKER_EXTERNAL_URL`, etc.) to its canonical value so the two services stay in sync automatically. If you need to override one, change it in `render.yaml` and push, not in the dashboard.
+No other env vars need dashboard entry when the Blueprint is managing both services. The blueprint sets every environment-specific tunable (`CUTIEE_NEO4J_FRAMEWORK_AUTH`, `CUTIEE_CU_MODEL`, `CUTIEE_MAX_COST_USD_*`, `CUTIEE_BROWSER_CDP_HOST`, `CUTIEE_WORKER_EXTERNAL_URL`, `CUTIEE_NOVNC_URL`, etc.) to its canonical value so the two services stay in sync automatically. Production progress defaults to Neo4j from code when `CUTIEE_ENV=production`, so `CUTIEE_PROGRESS_BACKEND` is no longer a Render setting. If you need to override one, change it in `render.yaml` and push, not in the dashboard.
 
 `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` are set in the blueprint and additionally auto-include the Render hostname via `RENDER_EXTERNAL_HOSTNAME` detection in `cutiee_site/settings.py`. The settings module also sets `SECURE_PROXY_SSL_HEADER` and `SESSION_COOKIE_SECURE` whenever `RENDER_EXTERNAL_HOSTNAME` is present, which is required for OAuth callbacks to succeed behind Render's TLS terminator.
 
@@ -110,7 +109,7 @@ No other env vars need dashboard entry when the Blueprint is managing both servi
 2. In Render: **New +** > **Blueprint** (or **Blueprints** > an existing one > **Sync**).
 3. Connect the GitHub repo `github.com/Edward-H26/CUTIEE`, branch `main`.
 4. Render lists the two services. Confirm Standard for both.
-5. Render prompts for each `sync: false` secret. Paste the web-side secrets now. Leave `CUTIEE_NOVNC_URL` blank unless you want to override the derived worker URL manually.
+5. Render prompts for each `sync: false` secret. Paste the web-side secrets now. The noVNC URL is already set by `render.yaml`.
 6. Click **Apply**. Render starts both builds in parallel. First builds run 6-8 minutes each because the worker pulls the Playwright base image plus noVNC + websockify apt packages, and the web service downloads Playwright's Chromium.
 
 ## 5. Why the Worker Needs No "Ports" Configuration
@@ -125,11 +124,11 @@ No Networking / Ports / Additional Ports UI step is required. Earlier versions o
 
 1. Wait for `cutiee-worker` to finish its first build and reach **Live**.
 2. Open `https://cutiee-worker.onrender.com/vnc.html` directly. The noVNC viewer should load and connect. A dark Xvfb desktop with a fluxbox taskbar confirms all five worker processes are healthy. No tasks are running yet, so Chromium may or may not have focus.
-3. Back on `CUTIEE`, verify `CUTIEE_WORKER_EXTERNAL_URL` is present. It should be populated from `cutiee-worker`'s `RENDER_EXTERNAL_URL` by the Blueprint.
-4. Leave `CUTIEE_NOVNC_URL` blank unless you need a manual override. If you do need one, set `CUTIEE_NOVNC_URL=https://cutiee-worker.onrender.com/vnc.html` on `CUTIEE` and trigger a manual deploy.
+3. Back on `CUTIEE`, verify `CUTIEE_NOVNC_URL=https://cutiee-worker.onrender.com/vnc.html` is present. `CUTIEE_WORKER_EXTERNAL_URL` and `CUTIEE_WORKER_EXTERNAL_HOSTNAME` are also derived from the worker service when Render exposes them to the Blueprint.
+4. If your worker's public hostname is different, change `CUTIEE_NOVNC_URL` in `render.yaml` to that worker URL ending in `/vnc.html`, then redeploy.
 5. Visit `https://cutiee-1kqk.onrender.com`, sign in with Google, submit a task, and watch the Tasks detail page. The main panel renders a card titled "Live browser" containing the noVNC iframe with autoconnect. You see the agent's Chrome in real time.
 
-The iframe appears when the active execution's status is `running` and either `CUTIEE_WORKER_EXTERNAL_URL` or `CUTIEE_NOVNC_URL` resolves to a noVNC URL. Before a run starts or after it finishes, the panel shows other cards (preview approval, step log, cost summary).
+The iframe appears when the active execution's status is `running` and `CUTIEE_NOVNC_URL`, `CUTIEE_WORKER_EXTERNAL_URL`, `CUTIEE_WORKER_EXTERNAL_HOSTNAME`, or the production `https://cutiee-worker.onrender.com/vnc.html` default resolves to a noVNC URL. Before a run starts or after it finishes, the panel shows other cards (preview approval, step log, cost summary).
 
 ## 7. Day-2 Changes
 

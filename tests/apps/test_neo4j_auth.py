@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlparse
+
 from django.test import RequestFactory
 
 from apps.accounts import oauth_views
@@ -64,3 +66,16 @@ def test_neo4jLoginPagePreservesNextParameter() -> None:
 
     assert response.status_code == 200
     assert b"?next=/me/preferences/" in response.content
+
+
+def test_googleLoginUsesAllauthCompatibleCallbackPath() -> None:
+    request = RequestFactory().get("/accounts/google/login/")
+    request.session = _Session()
+
+    response = oauth_views.googleLogin(request)
+    location = response.headers["Location"]
+    params = parse_qs(urlparse(location).query)
+
+    assert params["redirect_uri"] == [
+        "http://testserver/accounts/google/login/callback/"
+    ]

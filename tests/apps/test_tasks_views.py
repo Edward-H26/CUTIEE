@@ -62,6 +62,49 @@ def test_runtimeContextPrefersExplicitNovncUrl(monkeypatch: pytest.MonkeyPatch):
     assert runtime(None)["NOVNC_URL"] == "https://worker.example.com/vnc.html"
 
 
+def test_runtimeContextUsesProductionWorkerDefault(monkeypatch: pytest.MonkeyPatch):
+    from cutiee_site.context_processors import runtime
+
+    monkeypatch.delenv("CUTIEE_NOVNC_URL", raising=False)
+    monkeypatch.delenv("CUTIEE_WORKER_EXTERNAL_URL", raising=False)
+    monkeypatch.delenv("CUTIEE_WORKER_PUBLIC_URL", raising=False)
+    monkeypatch.delenv("CUTIEE_WORKER_EXTERNAL_HOSTNAME", raising=False)
+    monkeypatch.delenv("CUTIEE_WORKER_PUBLIC_HOSTNAME", raising=False)
+    monkeypatch.setenv("CUTIEE_ENV", "production")
+
+    assert runtime(None)["NOVNC_URL"] == "https://cutiee-worker.onrender.com/vnc.html"
+
+
+def testProductionBrowserDefaultsToRealWorker(monkeypatch: pytest.MonkeyPatch):
+    from apps.tasks import services
+
+    monkeypatch.delenv("CUTIEE_USE_STUB_BROWSER", raising=False)
+    monkeypatch.setenv("CUTIEE_ENV", "production")
+
+    assert services._shouldUseStubBrowser() is False
+
+
+def testProductionBrowserRequiresCdpEndpoint(monkeypatch: pytest.MonkeyPatch):
+    from apps.tasks import services
+
+    monkeypatch.setenv("CUTIEE_ENV", "production")
+    monkeypatch.delenv("CUTIEE_BROWSER_CDP_URL", raising=False)
+    monkeypatch.delenv("CUTIEE_BROWSER_CDP_HOST", raising=False)
+
+    with pytest.raises(RuntimeError, match="CUTIEE_BROWSER_CDP_HOST"):
+        services._requireProductionBrowserEndpoint()
+
+
+def testProductionBrowserAcceptsCdpHost(monkeypatch: pytest.MonkeyPatch):
+    from apps.tasks import services
+
+    monkeypatch.setenv("CUTIEE_ENV", "production")
+    monkeypatch.setenv("CUTIEE_BROWSER_CDP_HOST", "cutiee-worker-internal")
+    monkeypatch.delenv("CUTIEE_BROWSER_CDP_URL", raising=False)
+
+    services._requireProductionBrowserEndpoint()
+
+
 @pytest.mark.django_db
 def test_livenessEndpointReturnsOk():
     # Render's healthCheckPath targets /health/ and a deploy is marked
@@ -235,6 +278,7 @@ def testBackgroundFailureFinalizesRunningExecution(monkeypatch: pytest.MonkeyPat
 
     finalized = {}
     updated = {}
+    published = {}
 
     def fakeRunTaskForUser(**_kwargs):
         raise RuntimeError("boom")
@@ -255,6 +299,17 @@ def testBackgroundFailureFinalizesRunningExecution(monkeypatch: pytest.MonkeyPat
         "updateTaskStatus",
         lambda **kwargs: updated.update(kwargs),
     )
+    monkeypatch.setattr(
+        tasksApi,
+        "_publishProgress",
+        lambda executionId, summary, *, finished: published.update(
+            {
+                "executionId": executionId,
+                "summary": summary,
+                "finished": finished,
+            }
+        ),
+    )
 
     tasksApi._runInBackground(
         userId="user-1",
@@ -269,6 +324,9 @@ def testBackgroundFailureFinalizesRunningExecution(monkeypatch: pytest.MonkeyPat
     assert finalized["completionReason"] == "background_exception:RuntimeError"
     assert updated["status"] == "failed"
     assert updated["lastExecutionId"] == "exec-failed"
+    assert published["executionId"] == "exec-failed"
+    assert published["summary"].completionReason == "background_exception:RuntimeError"
+    assert published["finished"] is True
 
 
 @pytest.mark.django_db
